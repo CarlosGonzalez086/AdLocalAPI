@@ -13,7 +13,6 @@ namespace AdLocalAPI.Controllers
     public class SuscripcionesController : ControllerBase
     {
         private readonly SuscripcionService _service;
-
         public SuscripcionesController(SuscripcionService service)
         {
             _service = service;
