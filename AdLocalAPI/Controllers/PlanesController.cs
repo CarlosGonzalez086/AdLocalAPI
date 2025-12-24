@@ -11,7 +11,6 @@ namespace AdLocalAPI.Controllers
     public class PlanesController : ControllerBase
     {
         private readonly PlanService _service;
-
         public PlanesController(PlanService service)
         {
             _service = service;
