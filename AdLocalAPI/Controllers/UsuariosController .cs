@@ -9,7 +9,6 @@ namespace AdLocalAPI.Controllers
     public class UsuariosController : ControllerBase
     {
         private readonly UsuarioService _service;
-
         public UsuariosController(UsuarioService service)
         {
             _service = service;
