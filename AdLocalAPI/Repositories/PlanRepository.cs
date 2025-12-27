@@ -1,6 +1,7 @@
 ﻿using AdLocalAPI.Data;
 using AdLocalAPI.Models;
 using Microsoft.EntityFrameworkCore;
+using Stripe;
 
 namespace AdLocalAPI.Repositories
 {
@@ -13,35 +14,79 @@ namespace AdLocalAPI.Repositories
             _context = context;
         }
 
-        public async Task<List<Plan>> GetAllAsync() => await _context.Plans.ToListAsync();
-        public async Task<Plan> GetByIdAsync(int id) => await _context.Plans.FindAsync(id);
-        public async Task<Plan> CreateAsync(Plan plan)
+        public async Task<List<Models.Plan>> GetAllAsync()
+        {
+            List<Models.Plan> plans = new List<Models.Plan>();
+            try 
+            {
+                plans = await _context.Plans.ToListAsync();
+            }
+            catch (Exception ex) 
+            {
+                Console.WriteLine(ex);
+                return plans;
+            }            
+            return plans;
+        }
+        public async Task<Models.Plan> GetByIdAsync(int id) 
+        {
+            Models.Plan plan = new Models.Plan();
+            try 
+            {
+                plan = await _context.Plans.FindAsync(id);
+            }
+            catch (Exception ex) 
+            {
+                Console.WriteLine($"Could not find {ex.Message}");
+                return plan;
+            }
+            return plan;
+        }
+        public async Task<Models.Plan> CreateAsync(Models.Plan plan)
         {
             try
             {
                 _context.Plans.Add(plan);
                 await _context.SaveChangesAsync();
-                return plan;
             }
             catch (Exception ex) 
             {
                 Console.WriteLine(ex);
                 return null;
             }
+            return plan;
         }
-        public async Task UpdateAsync(Plan plan)
+        public async Task<Models.Plan> UpdateAsync(Models.Plan plan)
         {
-            _context.Plans.Update(plan);
-            await _context.SaveChangesAsync();
-        }
-        public async Task DeleteAsync(int id)
-        {
-            var plan = await _context.Plans.FindAsync(id);
-            if (plan != null)
+            try
             {
-                _context.Plans.Remove(plan);
+                _context.Plans.Update(plan);
                 await _context.SaveChangesAsync();
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+                return plan;
+            }
+            return plan;
+        }
+        public async Task<bool> DeleteAsync(int id)
+        {
+            try
+            {
+                var plan = await _context.Plans.FindAsync(id);
+                if (plan != null)
+                {
+                    _context.Plans.Remove(plan);
+                    await _context.SaveChangesAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+                return false;
+            }
+            return true;
         }
     }
 }
