@@ -41,10 +41,16 @@ namespace AdLocalAPI.Controllers
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll(
+            int page = 1,
+            int pageSize = 10,
+            string orderBy = "recent",
+            string search = ""
+        )
         {
-            var response = await _service.GetAllPlanes();
+            var response = await _service.GetAllPlanes(page, pageSize, orderBy, search);
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
+
     }
 }

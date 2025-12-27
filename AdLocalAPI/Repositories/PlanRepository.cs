@@ -1,7 +1,6 @@
 ﻿using AdLocalAPI.Data;
-using AdLocalAPI.Models;
 using Microsoft.EntityFrameworkCore;
-using Stripe;
+
 
 namespace AdLocalAPI.Repositories
 {
@@ -14,20 +13,49 @@ namespace AdLocalAPI.Repositories
             _context = context;
         }
 
-        public async Task<List<Models.Plan>> GetAllAsync()
+        public async Task<object> GetAllAsync(
+            int page,
+            int pageSize,
+            string orderBy,
+            string search
+        )
         {
-            List<Models.Plan> plans = new List<Models.Plan>();
-            try 
+            var query = _context.Plans.AsQueryable();
+
+
+            if (!string.IsNullOrWhiteSpace(search))
             {
-                plans = await _context.Plans.ToListAsync();
+                query = query.Where(p =>
+                    EF.Functions.ILike(p.Nombre, $"%{search}%")
+                );
             }
-            catch (Exception ex) 
+
+
+            query = orderBy switch
             {
-                Console.WriteLine(ex);
-                return plans;
-            }            
-            return plans;
+                "recent" => query.OrderByDescending(p => p.FechaCreacion),
+                "old" => query.OrderBy(p => p.FechaCreacion),
+                "az" => query.OrderBy(p => p.Nombre),
+                "za" => query.OrderByDescending(p => p.Nombre),
+                _ => query.OrderByDescending(p => p.FechaCreacion)
+            };
+
+            var totalRecords = await query.CountAsync();
+
+            var plans = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new
+            {
+                totalRecords,
+                page,
+                pageSize,
+                data = plans
+            };
         }
+
         public async Task<Models.Plan> GetByIdAsync(int id) 
         {
             Models.Plan plan = new Models.Plan();

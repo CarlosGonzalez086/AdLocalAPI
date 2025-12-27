@@ -13,14 +13,19 @@ namespace AdLocalAPI.Services
             _repository = repository;
         }
 
-        public async Task<ApiResponse<object>> GetAllPlanes()
+        public async Task<ApiResponse<object>> GetAllPlanes(
+            int page,
+            int pageSize,
+            string orderBy,
+            string search
+        )
         {
             try
             {
-                var planes = await _repository.GetAllAsync();
+                var result = await _repository.GetAllAsync(page, pageSize, orderBy, search);
 
                 return ApiResponse<object>.Success(
-                    planes,
+                    result,
                     "Listado de planes obtenido correctamente"
                 );
             }
@@ -29,6 +34,7 @@ namespace AdLocalAPI.Services
                 return ApiResponse<object>.Error("500", ex.Message);
             }
         }
+
         public async Task<ApiResponse<object>> GetPlanById(int id)
         {
             try
