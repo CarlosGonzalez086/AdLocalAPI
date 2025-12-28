@@ -72,15 +72,17 @@ builder.Services.AddScoped<IConfiguracionRepository, ConfiguracionRepository>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
-        policy.WithOrigins(
-            "http://localhost:5173",
-            "https://localhost:5173",
-            "https://tudominio.com"
-        )
-        .AllowAnyHeader()
-        .AllowAnyMethod()
+        policy
+            .WithOrigins(
+                "http://localhost:5173",
+                "https://localhost:5173",
+                "https://ad-local.vercel.app"
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod()
     );
 });
+
 
 var app = builder.Build();
 
