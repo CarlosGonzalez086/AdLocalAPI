@@ -16,6 +16,10 @@ var builder = WebApplication.CreateBuilder(args);
 var key = builder.Configuration["Jwt:Key"] ?? "ClaveSuperSecreta123!";
 var issuer = builder.Configuration["Jwt:Issuer"] ?? "AdLocalAPI";
 
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+
+builder.WebHost.UseUrls($"http://*:{port}");
+
 // Stripe
 var stripeSecret = builder.Configuration["Stripe:SecretKey"];
 StripeConfiguration.ApiKey = stripeSecret;
