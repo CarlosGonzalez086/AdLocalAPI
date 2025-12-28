@@ -14,6 +14,7 @@ namespace AdLocalAPI.Data
         public DbSet<Evento> Eventos { get; set; }
         public DbSet<Promocion> Promociones { get; set; }
         public DbSet<Publicidad> Publicidades { get; set; }
+        public DbSet<ConfiguracionSistema> ConfiguracionSistema { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

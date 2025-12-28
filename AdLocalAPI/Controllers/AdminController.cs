@@ -40,6 +40,16 @@ namespace AdLocalAPI.Controllers
           ? Ok(response)
           : BadRequest(response);
         }
+        [HttpPut("cambiar-password")]
+        public async Task<IActionResult> CambiarPassword([FromBody] ChangePasswordDto dto)
+        {
+            var response = await _service.CambiarPassword(dto);
+
+            return response.Codigo == "200"
+                ? Ok(response)
+                : BadRequest(response);
+        }
+
         [HttpGet]
         public async Task<IActionResult> VerAdmin()
         {
@@ -47,6 +57,42 @@ namespace AdLocalAPI.Controllers
             return response.Codigo == "200"
           ? Ok(response)
           : BadRequest(response);
-        }       
+        }
+        [HttpPost("actualizar-jwt")]
+        public async Task<IActionResult> ActualizarJwt([FromBody] UpdateJwtRequest request)
+        {
+            var result = await _service.ActualizarJwtAsync(
+                request.Email,
+                request.UpdateJWT
+            );
+
+            if (!result.Success)
+            {
+                return NotFound(new
+                {
+                    codigo = "404",
+                    mensaje = result.Message,
+                    respuesta = ""
+                });
+            }
+
+            return Ok(new
+            {
+                codigo = "200",
+                mensaje = result.Message,
+                respuesta = new
+                {
+                    token = result.Token,
+                    usuario = new
+                    {
+                        result.Usuario!.Id,
+                        result.Usuario.Nombre,
+                        result.Usuario.Email,
+                        result.Usuario.Rol,
+                        result.Usuario.ComercioId
+                    }
+                }
+            });
+        }
     }
 }

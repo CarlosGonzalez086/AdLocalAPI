@@ -121,7 +121,6 @@ namespace AdLocalAPI.Services
             }
         }
 
-
         public async Task<ApiResponse<object>> ActualizarUsuario(UsuarioUpdateDto dto)
         {
             int id = _jwtContext.GetUserId();
@@ -229,13 +228,11 @@ namespace AdLocalAPI.Services
             );
         }
 
-
         public string GenerateJwtToken(Usuario usuario)
         {
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-            // Claims básicos
             var claims = new List<Claim>
             {
                 new Claim(JwtRegisteredClaimNames.Sub, usuario.Email),
@@ -244,7 +241,6 @@ namespace AdLocalAPI.Services
                 new Claim("rol", usuario.Rol)
             };
 
-            // Solo agregar ComercioId si el rol es Comercio
             if (usuario.Rol == "Comercio" && usuario.ComercioId.HasValue)
             {
                 claims.Add(new Claim("comercioId", usuario.ComercioId.Value.ToString()));
@@ -254,11 +250,81 @@ namespace AdLocalAPI.Services
                 issuer: _config["Jwt:Issuer"],
                 audience: null,
                 claims: claims,
-                expires: DateTime.UtcNow.AddHours(2),
+                expires: DateTime.UtcNow.AddDays(7),
                 signingCredentials: creds
             );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        public async Task<UpdateJwtResult> ActualizarJwtAsync(string email, bool updateJWT)
+        {
+            var usuario = (await _repository.GetAllAsync())
+                .FirstOrDefault(u => u.Email == email);
+
+            if (usuario == null)
+            {
+                return new UpdateJwtResult
+                {
+                    Success = false,
+                    Message = "Usuario no encontrado"
+                };
+            }
+
+            string? token = null;
+
+            if (updateJWT)
+            {
+                token = GenerateJwtToken(usuario);
+            }
+
+            return new UpdateJwtResult
+            {
+                Success = true,
+                Message = updateJWT
+                    ? "JWT actualizado correctamente"
+                    : "JWT no actualizado",
+                Token = token,
+                Usuario = usuario
+            };
+        }
+        public async Task<ApiResponse<object>> CambiarPassword(ChangePasswordDto dto)
+        {
+            int userId = _jwtContext.GetUserId();
+
+            var usuario = await _repository.GetByIdAsync(userId);
+            if (usuario == null)
+                return ApiResponse<object>.Error("404", "Usuario no encontrado");
+
+            // 1️⃣ Validar password actual
+            bool passwordCorrecto = BCrypt.Net.BCrypt.Verify(
+                dto.PasswordActual,
+                usuario.PasswordHash
+            );
+
+            if (!passwordCorrecto)
+                return ApiResponse<object>.Error(
+                    "400",
+                    "La contraseña actual es incorrecta"
+                );
+
+            // 2️⃣ Validaciones básicas
+            if (dto.PasswordNueva.Length < 8)
+                return ApiResponse<object>.Error(
+                    "400",
+                    "La nueva contraseña debe tener al menos 8 caracteres"
+                );
+
+            // 3️⃣ Hashear nueva contraseña
+            usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.PasswordNueva);
+
+            // 4️⃣ Guardar cambios
+            await _repository.UpdateAsync(usuario);
+
+            return ApiResponse<object>.Success(
+                null,
+                "Contraseña actualizada correctamente"
+            );
         }
 
     }

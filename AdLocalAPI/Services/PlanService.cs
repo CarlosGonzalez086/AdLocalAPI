@@ -13,15 +13,19 @@ namespace AdLocalAPI.Services
             _repository = repository;
         }
 
-        // 🔹 Obtener todos los planes
-        public async Task<ApiResponse<object>> GetAllPlanes()
+        public async Task<ApiResponse<object>> GetAllPlanes(
+            int page,
+            int pageSize,
+            string orderBy,
+            string search
+        )
         {
             try
             {
-                var planes = await _repository.GetAllAsync();
+                var result = await _repository.GetAllAsync(page, pageSize, orderBy, search);
 
                 return ApiResponse<object>.Success(
-                    planes,
+                    result,
                     "Listado de planes obtenido correctamente"
                 );
             }
@@ -31,7 +35,6 @@ namespace AdLocalAPI.Services
             }
         }
 
-        // 🔹 Obtener plan por ID
         public async Task<ApiResponse<object>> GetPlanById(int id)
         {
             try
@@ -51,8 +54,6 @@ namespace AdLocalAPI.Services
                 return ApiResponse<object>.Error("500", ex.Message);
             }
         }
-
-        // 🔹 Crear plan (Admin)
         public async Task<ApiResponse<object>> CrearPlan(PlanCreateDto dto)
         {
             try
@@ -92,7 +93,6 @@ namespace AdLocalAPI.Services
             }
         }
 
-        // 🔹 Actualizar plan (Admin)
         public async Task<ApiResponse<object>> ActualizarPlan(int id, PlanCreateDto dto)
         {
             try
@@ -120,7 +120,6 @@ namespace AdLocalAPI.Services
             }
         }
 
-        // 🔹 Eliminar plan (Admin)
         public async Task<ApiResponse<object>> EliminarPlan(int id)
         {
             try

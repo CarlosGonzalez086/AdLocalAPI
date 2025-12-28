@@ -57,6 +57,7 @@ builder.Services.AddScoped<AdLocalAPI.Services.PlanService>();
 
 builder.Services.AddScoped<SuscripcionRepository>();
 
+
 // CORS
 builder.Services.AddCors(options =>
 {
