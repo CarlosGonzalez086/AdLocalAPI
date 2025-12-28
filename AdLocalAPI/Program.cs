@@ -77,14 +77,12 @@ builder.Services.AddScoped<IConfiguracionRepository, ConfiguracionRepository>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
-        policy
-            .WithOrigins(
-                "http://localhost:5173",
-                "https://localhost:5173",
-                "https://ad-local.vercel.app"
-            )
-            .AllowAnyHeader()
-            .AllowAnyMethod()
+        policy.WithOrigins(
+            "http://localhost:5173",
+            "https://ad-local-delta.vercel.app"
+        )
+        .AllowAnyHeader()
+        .AllowAnyMethod()
     );
 });
 
