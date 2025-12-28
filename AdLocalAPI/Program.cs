@@ -4,6 +4,7 @@ using AdLocalAPI.Interfaces;
 using AdLocalAPI.Repositories;
 using AdLocalAPI.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Stripe;
@@ -84,12 +85,19 @@ builder.Services.AddCors(options =>
 });
 
 
+
+
 var app = builder.Build();
 
 app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseCors("AllowFrontend");
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
+
 
 app.UseAuthentication(); // 🔑 CLAVE
 app.UseAuthorization();
