@@ -4,6 +4,7 @@ using AdLocalAPI.Interfaces;
 using AdLocalAPI.Repositories;
 using AdLocalAPI.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Stripe;
@@ -72,15 +73,19 @@ builder.Services.AddScoped<IConfiguracionRepository, ConfiguracionRepository>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
-        policy.WithOrigins(
-            "http://localhost:5173",
-            "https://localhost:5173",
-            "https://tudominio.com"
-        )
-        .AllowAnyHeader()
-        .AllowAnyMethod()
+        policy
+            .WithOrigins(
+                "http://localhost:5173",
+                "https://localhost:5173",
+                "https://ad-local.vercel.app"
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod()
     );
 });
+
+
+
 
 var app = builder.Build();
 
@@ -88,6 +93,11 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseCors("AllowFrontend");
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
+
 
 app.UseAuthentication(); // 🔑 CLAVE
 app.UseAuthorization();
