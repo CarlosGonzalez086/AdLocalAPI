@@ -1,5 +1,6 @@
 ﻿using AdLocalAPI.Data;
 using AdLocalAPI.Helpers;
+using AdLocalAPI.Interfaces;
 using AdLocalAPI.Repositories;
 using AdLocalAPI.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -56,6 +57,9 @@ builder.Services.AddScoped<PlanRepository>();
 builder.Services.AddScoped<AdLocalAPI.Services.PlanService>();
 
 builder.Services.AddScoped<SuscripcionRepository>();
+
+builder.Services.AddScoped<IConfiguracionService, ConfiguracionService>();
+builder.Services.AddScoped<IConfiguracionRepository, ConfiguracionRepository>();
 
 
 // CORS
