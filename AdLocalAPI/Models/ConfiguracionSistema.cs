@@ -17,7 +17,7 @@ namespace AdLocalAPI.Models
         public string Key { get; set; } = string.Empty;
 
         [Required]
-        [StringLength(100)]
+        [StringLength(500)]
         public string Val { get; set; } = string.Empty;
 
         [Required]
