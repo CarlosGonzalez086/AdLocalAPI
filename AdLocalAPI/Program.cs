@@ -1,4 +1,4 @@
-﻿using AdLocalAPI.Data;
+using AdLocalAPI.Data;
 using AdLocalAPI.Helpers;
 using AdLocalAPI.Interfaces;
 using AdLocalAPI.Repositories;
@@ -43,7 +43,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 {
     options.UseNpgsql(
         builder.Configuration.GetConnectionString("DefaultConnection"),
-        npgsqlOptions =>
+        npgsql =>
         {
             npgsqlOptions.EnableRetryOnFailure(
                 maxRetryCount: 3,
