@@ -43,10 +43,10 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 {
     options.UseNpgsql(
         builder.Configuration.GetConnectionString("DefaultConnection"),
-        npgsql =>
+        npgsqlOptions =>
         {
             npgsqlOptions.EnableRetryOnFailure(
-                maxRetryCount: 3,
+                maxRetryCount: 1,
                 maxRetryDelay: TimeSpan.FromSeconds(5),
                 errorCodesToAdd: null
             );
