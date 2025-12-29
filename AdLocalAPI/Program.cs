@@ -12,19 +12,36 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// JWT
-var key = builder.Configuration["Jwt:Key"] ?? "ClaveSuperSecreta123!";
-var issuer = builder.Configuration["Jwt:Issuer"] ?? "AdLocalAPI";
+// ======================================================
+// VARIABLES DE ENTORNO (Docker / Producción / Local)
+// ======================================================
 
+// Puerto (Railway / Docker)
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-
 builder.WebHost.UseUrls($"http://*:{port}");
 
-// Stripe
-var stripeSecret = builder.Configuration["Stripe:SecretKey"];
-StripeConfiguration.ApiKey = stripeSecret;
+// JWT
+var jwtKey = Environment.GetEnvironmentVariable("JWT__Key")
+    ?? throw new Exception("❌ JWT__Key no está definido");
 
-// AUTH
+var jwtIssuer = Environment.GetEnvironmentVariable("JWT__Issuer")
+    ?? "AdLocalAPI";
+
+// Stripe
+var stripeSecret = Environment.GetEnvironmentVariable("STRIPE__SecretKey");
+if (!string.IsNullOrEmpty(stripeSecret))
+{
+    StripeConfiguration.ApiKey = stripeSecret;
+}
+
+// PostgreSQL / Supabase
+var connectionString = Environment.GetEnvironmentVariable("SUPABASE_DB_CONNECTION")
+    ?? throw new Exception("❌ SUPABASE_DB_CONNECTION no está definida");
+
+// ======================================================
+// AUTH JWT
+// ======================================================
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 .AddJwtBearer(options =>
 {
@@ -34,15 +51,21 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         ValidateAudience = false,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-        ValidIssuer = issuer,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key))
+        ValidIssuer = jwtIssuer,
+        IssuerSigningKey = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(jwtKey)
+        )
     };
 });
+
+// ======================================================
+// ENTITY FRAMEWORK CORE - PostgreSQL (Supabase)
+// ======================================================
 
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     options.UseNpgsql(
-        builder.Configuration.GetConnectionString("DefaultConnection"),
+        connectionString,
         npgsqlOptions =>
         {
             npgsqlOptions.EnableRetryOnFailure(
@@ -53,17 +76,13 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         });
 });
 
+// ======================================================
+// SERVICIOS Y REPOSITORIOS
+// ======================================================
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<JwtContext>();
 
-// Controllers + Swagger
-builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
-
-// Repos & Services
 builder.Services.AddScoped<ComercioRepository>();
 builder.Services.AddScoped<ComercioService>();
 
@@ -78,8 +97,18 @@ builder.Services.AddScoped<SuscripcionRepository>();
 builder.Services.AddScoped<IConfiguracionService, ConfiguracionService>();
 builder.Services.AddScoped<IConfiguracionRepository, ConfiguracionRepository>();
 
+// ======================================================
+// CONTROLLERS + SWAGGER
+// ======================================================
 
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// ======================================================
 // CORS
+// ======================================================
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
@@ -92,8 +121,9 @@ builder.Services.AddCors(options =>
     );
 });
 
-
-
+// ======================================================
+// PIPELINE HTTP
+// ======================================================
 
 var app = builder.Build();
 
@@ -101,13 +131,15 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseCors("AllowFrontend");
+
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
-    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+    ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor |
+        ForwardedHeaders.XForwardedProto
 });
 
-
-app.UseAuthentication(); // 🔑 CLAVE
+app.UseAuthentication(); // 🔑 JWT
 app.UseAuthorization();
 
 app.MapControllers();
