@@ -25,7 +25,7 @@ ENV AllowedHosts=*
 ENV SUPABASE_DB_CONNECTION="User Id=postgres.uzgnfwbztoizcctyfdiv;Password=q8dZ1szsEYIOzKrM;Server=aws-1-us-east-2.pooler.supabase.com;Port=6543;Database=postgres;SSL Mode=Require;Trust Server Certificate=true"
 
 # JWT
-ENV JWT__Key=CLAVE_SUPER_SEGURA_PROD
+ENV JWT__Key=AdLocal_SUPER_SECRET_KEY_PROD_2025_256_BITS
 ENV JWT__Issuer=AdLocalAPI
 
 # ===============================
