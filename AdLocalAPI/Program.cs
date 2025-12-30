@@ -37,6 +37,7 @@ if (!string.IsNullOrEmpty(stripeSecret))
 // PostgreSQL / Supabase
 var connectionString = Environment.GetEnvironmentVariable("SUPABASE_DB_CONNECTION")
     ?? throw new Exception("❌ SUPABASE_DB_CONNECTION no está definida");
+//var connectionString = "User Id=postgres.uzgnfwbztoizcctyfdiv;Password=q8dZ1szsEYIOzKrM;Server=aws-1-us-east-2.pooler.supabase.com;Port=6543;Database=postgres;SSL Mode=Require;Trust Server Certificate=true";
 
 // ======================================================
 // AUTH JWT
@@ -62,19 +63,17 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 // ENTITY FRAMEWORK CORE - PostgreSQL (Supabase)
 // ======================================================
 
-builder.Services.AddDbContext<AppDbContext>(options =>
+builder.Services.AddDbContextPool<AppDbContext>(options =>
 {
-    options.UseNpgsql(
-        connectionString,
-        npgsqlOptions =>
-        {
-            npgsqlOptions.EnableRetryOnFailure(
-                maxRetryCount: 1,
-                maxRetryDelay: TimeSpan.FromSeconds(5),
-                errorCodesToAdd: null
-            );
-        });
+    options.UseNpgsql(connectionString, npgsql =>
+    {
+        npgsql.EnableRetryOnFailure(3);
+        npgsql.CommandTimeout(30);
+    });
+
+    options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);    
 });
+
 
 // ======================================================
 // SERVICIOS Y REPOSITORIOS
