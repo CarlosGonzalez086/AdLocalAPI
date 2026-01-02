@@ -102,7 +102,15 @@ builder.Services.AddScoped<IConfiguracionRepository, ConfiguracionRepository>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    {
+        Title = "AdLocal API",
+        Version = "v1"
+    });
+});
+
 
 
 // ======================================================
@@ -127,16 +135,6 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
-
-
-app.UseCors("AllowFrontend");
-
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
     ForwardedHeaders =
@@ -144,8 +142,18 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
         ForwardedHeaders.XForwardedProto
 });
 
-app.UseAuthentication(); // 🔑 JWT
+app.UseSwagger();
+app.UseSwaggerUI(options =>
+{
+    options.SwaggerEndpoint("/swagger/v1/swagger.json", "AdLocalAPI V1");
+    options.RoutePrefix = "swagger";
+});
+
+app.UseCors("AllowFrontend");
+
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
 app.Run();
+
