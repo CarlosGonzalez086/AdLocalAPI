@@ -7,6 +7,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace AdLocalAPI.Services
 {
@@ -15,12 +16,14 @@ namespace AdLocalAPI.Services
         private readonly UsuarioRepository _repository;
         private readonly IConfiguration _config;
         private readonly JwtContext _jwtContext;
+        private readonly ComercioRepository _comercioRepository;
 
-        public UsuarioService(UsuarioRepository repository, IConfiguration config, JwtContext jwtContext)
+        public UsuarioService(UsuarioRepository repository, IConfiguration config, JwtContext jwtContext,ComercioRepository comercioRepository)
         {
             _repository = repository;
             _config = config;
             _jwtContext = jwtContext;
+            _comercioRepository = comercioRepository;
         }
 
         public async Task<ApiResponse<List<Usuario>>> GetAllUsuarios()
@@ -196,7 +199,7 @@ namespace AdLocalAPI.Services
             if (!valid)
                 return ApiResponse<object>.Error("401", "Credenciales inválidas");
 
-            var token = GenerateJwtToken(usuario);
+            var token = await GenerateJwtToken(usuario);
 
             object respuesta;
 
@@ -234,7 +237,7 @@ namespace AdLocalAPI.Services
             );
         }
 
-        public string GenerateJwtToken(Usuario usuario)
+        public async Task<string> GenerateJwtToken(Usuario usuario)
         {
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -247,9 +250,17 @@ namespace AdLocalAPI.Services
                 new Claim("rol", usuario.Rol)
             };
 
-            if (usuario.Rol == "Comercio" && usuario.ComercioId.HasValue)
+            if (usuario.Rol == "Comercio")
             {
-                claims.Add(new Claim("comercioId", usuario.ComercioId.Value.ToString()));
+                Comercio comercio = await _comercioRepository.GetComercioByUser(usuario.Id);
+                if (comercio.IdUsuario == usuario.Id)
+                {
+                    claims.Add(new Claim("comercioId", comercio.IdUsuario.ToString()));
+                }
+                else 
+                {
+                    claims.Add(new Claim("comercioId", usuario.ComercioId.Value.ToString()));
+                }
             }
 
             var token = new JwtSecurityToken(
@@ -281,7 +292,7 @@ namespace AdLocalAPI.Services
 
             if (updateJWT)
             {
-                token = GenerateJwtToken(usuario);
+                token =  await GenerateJwtToken(usuario);
             }
 
             return new UpdateJwtResult
@@ -302,7 +313,7 @@ namespace AdLocalAPI.Services
             if (usuario == null)
                 return ApiResponse<object>.Error("404", "Usuario no encontrado");
 
-            // 1️⃣ Validar password actual
+
             bool passwordCorrecto = BCrypt.Net.BCrypt.Verify(
                 dto.PasswordActual,
                 usuario.PasswordHash
@@ -314,17 +325,14 @@ namespace AdLocalAPI.Services
                     "La contraseña actual es incorrecta"
                 );
 
-            // 2️⃣ Validaciones básicas
             if (dto.PasswordNueva.Length < 8)
                 return ApiResponse<object>.Error(
                     "400",
                     "La nueva contraseña debe tener al menos 8 caracteres"
                 );
 
-            // 3️⃣ Hashear nueva contraseña
             usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.PasswordNueva);
 
-            // 4️⃣ Guardar cambios
             await _repository.UpdateAsync(usuario);
 
             return ApiResponse<object>.Success(
