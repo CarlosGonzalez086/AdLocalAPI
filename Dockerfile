@@ -28,6 +28,10 @@ ENV SUPABASE_DB_CONNECTION="User Id=postgres.uzgnfwbztoizcctyfdiv;Password=q8dZ1
 ENV JWT__Key=AdLocal_SUPER_SECRET_KEY_PROD_2025_256_BITS
 ENV JWT__Issuer=AdLocalAPI
 
+# Supabase
+ENV SUPABASE__URL="https://uzgnfwbztoizcctyfdiv.supabase.co"
+ENV SUPABASE__KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6Z25md2J6dG9pemNjdHlmZGl2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2Njk0MzUyNywiZXhwIjoyMDgyNTE5NTI3fQ.opjCm_q7U9GX0ah7UUgRMzQJwBQhyBupWVGJQXY6v0I"
+
 # ===============================
 
 COPY --from=build /app/publish .

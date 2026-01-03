@@ -34,6 +34,12 @@ if (!string.IsNullOrEmpty(stripeSecret))
     StripeConfiguration.ApiKey = stripeSecret;
 }
 
+var supabaseUrl = Environment.GetEnvironmentVariable("SUPABASE__URL")
+    ?? "https://uzgnfwbztoizcctyfdiv.supabase.co";
+
+var supabaseKey = Environment.GetEnvironmentVariable("SUPABASE__KEY")
+    ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6Z25md2J6dG9pemNjdHlmZGl2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2Njk0MzUyNywiZXhwIjoyMDgyNTE5NTI3fQ.opjCm_q7U9GX0ah7UUgRMzQJwBQhyBupWVGJQXY6v0I";
+
 // PostgreSQL / Supabase
 var connectionString = Environment.GetEnvironmentVariable("SUPABASE_DB_CONNECTION")
     ?? throw new Exception("❌ SUPABASE_DB_CONNECTION no está definida");
@@ -95,6 +101,8 @@ builder.Services.AddScoped<SuscripcionRepository>();
 
 builder.Services.AddScoped<IConfiguracionService, ConfiguracionService>();
 builder.Services.AddScoped<IConfiguracionRepository, ConfiguracionRepository>();
+
+builder.Services.AddSingleton(new Supabase.Client(supabaseUrl, supabaseKey));
 
 // ======================================================
 // CONTROLLERS + SWAGGER

@@ -1,5 +1,4 @@
 ﻿using AdLocalAPI.DTOs;
-using AdLocalAPI.Models;
 using AdLocalAPI.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -82,6 +81,12 @@ namespace AdLocalAPI.Controllers
                     }
                 }
             });
+        }
+        [HttpPost("upload-photo")]
+        public async Task<IActionResult> UploadPhoto([FromBody] UploadPhotoDto dto)
+        {
+            var response = await _service.UploadPhotoAsync(dto);
+            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
 
     }

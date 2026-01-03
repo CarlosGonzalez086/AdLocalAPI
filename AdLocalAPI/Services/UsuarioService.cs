@@ -174,7 +174,8 @@ namespace AdLocalAPI.Services
                 Rol = usuario.Rol,
                 ComercioId = usuario.ComercioId,
                 FechaCreacion = usuario.FechaCreacion,
-                Activo = usuario.Activo
+                Activo = usuario.Activo,
+                FotoUrl = usuario.FotoUrl,
             };
 
             return ApiResponse<UsuarioInfoDto>.Success(info);
@@ -340,6 +341,49 @@ namespace AdLocalAPI.Services
                 "Contraseña actualizada correctamente"
             );
         }
+        public async Task<ApiResponse<string>> UploadPhotoAsync(UploadPhotoDto dto)
+        {
+            int id = _jwtContext.GetUserId();
+            if (string.IsNullOrEmpty(dto.Base64))
+                return ApiResponse<string>.Error("400", "No se recibió la imagen");
+
+            var tiposPermitidos = new List<string> { "image/jpeg", "image/jpg", "image/png", "image/webp" };
+
+            string base64Data = dto.Base64;
+            string tipoImagen = null;
+
+            if (base64Data.StartsWith("data:"))
+            {
+                var parts = base64Data.Split(',');
+                if (parts.Length != 2)
+                    return ApiResponse<string>.Error("400", "Formato de imagen inválido");
+
+                tipoImagen = parts[0].Replace("data:", "").Replace(";base64", "");
+                base64Data = parts[1];
+            }
+
+            if (tipoImagen != null && !tiposPermitidos.Contains(tipoImagen.ToLower()))
+                return ApiResponse<string>.Error("400", "Tipo de imagen no permitido. Solo JPEG, JPG, PNG o WEBP");
+
+            try
+            {
+                byte[] imageBytes = Convert.FromBase64String(base64Data);
+
+                // ✅ Pasar tipoImagen a UploadToSupabaseAsync
+                string url = await _repository.UploadToSupabaseAsync(imageBytes, id, tipoImagen ?? "image/png");
+
+                await _repository.UpdateUserPhotoUrlAsync(id, url);
+
+                return ApiResponse<string>.Success(url, "Foto subida correctamente");
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<string>.Error("500", ex.Message);
+            }
+        }
+
+
+
 
     }
 }
