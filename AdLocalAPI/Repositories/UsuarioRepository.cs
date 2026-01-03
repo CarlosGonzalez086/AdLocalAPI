@@ -58,14 +58,33 @@ namespace AdLocalAPI.Repositories
                 ContentType = contentType
             };
 
-            // Corrige los argumentos: primero los datos (byte[]), luego el nombre del archivo (string)
+
             await bucket.Upload(imageBytes, fileName, options);
 
             return bucket.GetPublicUrl(fileName);
         }
+        public async Task<bool> DeleteFromSupabaseByUrlAsync(string publicUrl)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(publicUrl))
+                    return false;
 
+                var uri = new Uri(publicUrl);
 
+                var path = uri.AbsolutePath.Split("/Perfil/").Last();
 
+                var bucket = _supabaseClient.Storage.From("Perfil");
+
+                await bucket.Remove(path);
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
         public async Task UpdateUserPhotoUrlAsync(int userId, string url)
         {
             var user = await _context.Usuarios.FirstOrDefaultAsync(u => u.Id == userId);

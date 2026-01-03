@@ -73,6 +73,7 @@ builder.Services.AddDbContextPool<AppDbContext>(options =>
 {
     options.UseNpgsql(connectionString, npgsql =>
     {
+        npgsql.UseNetTopologySuite();
         npgsql.EnableRetryOnFailure(3);
         npgsql.CommandTimeout(30);
     });

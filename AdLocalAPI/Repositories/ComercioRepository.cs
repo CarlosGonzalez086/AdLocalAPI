@@ -1,16 +1,19 @@
 ﻿using AdLocalAPI.Data;
 using AdLocalAPI.Models;
 using Microsoft.EntityFrameworkCore;
+using Supabase.Interfaces;
 
 namespace AdLocalAPI.Repositories
 {
     public class ComercioRepository
     {
         private readonly AppDbContext _context;
+        private readonly Supabase.Client _supabaseClient;
 
-        public ComercioRepository(AppDbContext context)
+        public ComercioRepository(AppDbContext context, Supabase.Client supabaseClient)
         {
             _context = context;
+            _supabaseClient = supabaseClient;
         }
 
         public async Task<List<Comercio>> GetAllAsync()
@@ -50,6 +53,43 @@ namespace AdLocalAPI.Repositories
             {
                 _context.Comercios.Remove(comercio);
                 await _context.SaveChangesAsync();
+            }
+        }
+        public async Task<string> UploadToSupabaseAsync(byte[] imageBytes, int userId, string contentType = "image/png")
+        {
+            string fileName = $"LogoComercio{userId}_{DateTime.UtcNow.Ticks}.png";
+            var bucket = _supabaseClient.Storage.From("LogoComercio");
+
+            var options = new Supabase.Storage.FileOptions
+            {
+                ContentType = contentType
+            };
+
+
+            await bucket.Upload(imageBytes, fileName, options);
+
+            return bucket.GetPublicUrl(fileName);
+        }
+        public async Task<bool> DeleteFromSupabaseByUrlAsync(string publicUrl)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(publicUrl))
+                    return false;
+
+                var uri = new Uri(publicUrl);
+
+                var path = uri.AbsolutePath.Split("/LogoComercio/").Last();
+
+                var bucket = _supabaseClient.Storage.From("LogoComercio");
+
+                await bucket.Remove(path);
+
+                return true;
+            }
+            catch
+            {
+                return false;
             }
         }
     }

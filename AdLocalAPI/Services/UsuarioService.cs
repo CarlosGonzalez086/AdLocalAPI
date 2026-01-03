@@ -257,10 +257,12 @@ namespace AdLocalAPI.Services
                 if (comercio.IdUsuario == usuario.Id)
                 {
                     claims.Add(new Claim("comercioId", comercio.IdUsuario.ToString()));
+                    claims.Add(new Claim("FotoUrl", usuario.FotoUrl));
                 }
                 else 
                 {
                     claims.Add(new Claim("comercioId", usuario.ComercioId.Value.ToString()));
+                    claims.Add(new Claim("FotoUrl", usuario.FotoUrl));
                 }
             }
 
@@ -344,6 +346,7 @@ namespace AdLocalAPI.Services
         public async Task<ApiResponse<string>> UploadPhotoAsync(UploadPhotoDto dto)
         {
             int id = _jwtContext.GetUserId();
+            var usuario = await _repository.GetByIdAsync(id);
             if (string.IsNullOrEmpty(dto.Base64))
                 return ApiResponse<string>.Error("400", "No se recibió la imagen");
 
@@ -369,12 +372,33 @@ namespace AdLocalAPI.Services
             {
                 byte[] imageBytes = Convert.FromBase64String(base64Data);
 
-                // ✅ Pasar tipoImagen a UploadToSupabaseAsync
-                string url = await _repository.UploadToSupabaseAsync(imageBytes, id, tipoImagen ?? "image/png");
+                if (!string.IsNullOrWhiteSpace(usuario.FotoUrl))
+                {
+                    bool deleted = await _repository.DeleteFromSupabaseByUrlAsync(usuario.FotoUrl);
 
-                await _repository.UpdateUserPhotoUrlAsync(id, url);
+                    if (!deleted)
+                    {
+                        return ApiResponse<string>.Error(
+                            "500",
+                            "No fue posible eliminar la imagen anterior"
+                        );
+                    }
+                }
 
-                return ApiResponse<string>.Success(url, "Foto subida correctamente");
+                string contentType = tipoImagen ?? "image/png";
+
+                string newUrl = await _repository.UploadToSupabaseAsync(
+                    imageBytes,
+                    id,
+                    contentType
+                );
+
+                await _repository.UpdateUserPhotoUrlAsync(id, newUrl);
+
+                return ApiResponse<string>.Success(
+                    newUrl,
+                    "La imagen se actualizó correctamente"
+                );
             }
             catch (Exception ex)
             {

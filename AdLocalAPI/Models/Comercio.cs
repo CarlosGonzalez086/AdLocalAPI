@@ -1,4 +1,7 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using NetTopologySuite.Geometries;
+using System.ComponentModel.DataAnnotations;
+
+
 
 namespace AdLocalAPI.Models
 {
@@ -18,6 +21,7 @@ namespace AdLocalAPI.Models
         public string? Email { get; set; }
         public string? Direccion { get; set; }
         public string? LogoUrl { get; set; }
+        public Point? Ubicacion { get; set; }
 
         public bool Activo { get; set; } = true;
         public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;

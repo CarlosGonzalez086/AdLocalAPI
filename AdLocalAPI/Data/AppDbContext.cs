@@ -63,6 +63,10 @@ namespace AdLocalAPI.Data
             modelBuilder.Entity<Comercio>()
                 .HasIndex(c => c.IdUsuario)
                 .IsUnique();
+
+            modelBuilder.Entity<Comercio>()
+                .Property(c => c.Ubicacion)
+                .HasColumnType("geography (point, 4326)");
         }
 
     }
