@@ -1,4 +1,5 @@
 ﻿using AdLocalAPI.DTOs;
+using AdLocalAPI.Helpers;
 using AdLocalAPI.Models;
 using AdLocalAPI.Repositories;
 
@@ -7,10 +8,12 @@ namespace AdLocalAPI.Services
     public class ComercioService
     {
         private readonly ComercioRepository _repository;
+        private readonly JwtContext _jwtContext;
 
-        public ComercioService(ComercioRepository repository)
+        public ComercioService(ComercioRepository repository, JwtContext jwtContext)
         {
             _repository = repository;
+            _jwtContext = jwtContext;
         }
 
         // 🔹 Obtener todos los comercios
@@ -51,6 +54,27 @@ namespace AdLocalAPI.Services
                 return ApiResponse<object>.Error("500", ex.Message);
             }
         }
+        // 🔹 Obtener comercio por ID
+        public async Task<ApiResponse<object>> GetComercioByUser()
+        {
+            try
+            {
+                long idUSer = _jwtContext.GetUserId();
+                var comercio = await _repository.GetComercioByUser(idUSer);
+
+                if (comercio == null)
+                    return ApiResponse<object>.Error("404", "Comercio no encontrado");
+
+                return ApiResponse<object>.Success(
+                    comercio,
+                    "Comercio obtenido correctamente"
+                );
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<object>.Error("500", ex.Message);
+            }
+        }
 
         // 🔹 Crear comercio
         public async Task<ApiResponse<object>> CreateComercio(ComercioCreateDto dto)
@@ -66,7 +90,8 @@ namespace AdLocalAPI.Services
                     Direccion = dto.Direccion,
                     Telefono = dto.Telefono,
                     Activo = true,
-                    FechaCreacion = DateTime.UtcNow
+                    FechaCreacion = DateTime.UtcNow,
+                    IdUsuario = _jwtContext.GetUserId(),
                 };
 
                 var creado = await _repository.CreateAsync(comercio);
@@ -92,6 +117,14 @@ namespace AdLocalAPI.Services
                 if (comercio == null)
                     return ApiResponse<object>.Error("404", "Comercio no encontrado");
 
+                long userId = _jwtContext.GetUserId();
+
+                if (comercio.IdUsuario != userId)
+                    return ApiResponse<object>.Error(
+                        "403",
+                        "No tienes permiso para modificar este comercio"
+                    );
+
                 comercio.Nombre = dto.Nombre;
                 comercio.Direccion = dto.Direccion;
                 comercio.Telefono = dto.Telefono;
@@ -108,6 +141,7 @@ namespace AdLocalAPI.Services
             {
                 return ApiResponse<object>.Error("500", ex.Message);
             }
+
         }
 
         // 🔹 Eliminar comercio

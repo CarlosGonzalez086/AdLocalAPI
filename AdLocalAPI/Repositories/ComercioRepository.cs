@@ -23,6 +23,13 @@ namespace AdLocalAPI.Repositories
             return await _context.Comercios.FindAsync(id);
         }
 
+        public async Task<Comercio> GetComercioByUser(long idUSer)
+        {
+            return await _context.Comercios
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.IdUsuario == idUSer && c.Activo);
+        }
+
         public async Task<Comercio> CreateAsync(Comercio comercio)
         {
             _context.Comercios.Add(comercio);

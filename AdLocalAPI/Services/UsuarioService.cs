@@ -6,6 +6,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace AdLocalAPI.Services
 {
@@ -45,6 +46,11 @@ namespace AdLocalAPI.Services
 
             if (string.IsNullOrEmpty(dto.Email))
                 return ApiResponse<object>.Error("400", "El email es obligatorio");
+
+            var emailRegex = new Regex(@"^[^@\s]+@[^@\s]+\.[^@\s]+$");
+
+            if (!emailRegex.IsMatch(dto.Email))
+                return ApiResponse<object>.Error("400", "El correo electrónico no es válido");
 
             if (string.IsNullOrEmpty(dto.Password))
                 return ApiResponse<object>.Error("400", "La contraseña es obligatoria");

@@ -43,6 +43,12 @@ namespace AdLocalAPI.Controllers
             var response = await _service.GetComercioById(id);
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
+        [HttpGet("mine")]
+        public async Task<IActionResult> GetMine()
+        {
+            var response = await _service.GetComercioByUser();
+            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+        }
 
         [HttpGet]
         public async Task<IActionResult> GetAll()
