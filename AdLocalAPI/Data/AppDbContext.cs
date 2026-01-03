@@ -59,6 +59,10 @@ namespace AdLocalAPI.Data
                 .HasOne(p => p.Usuario)
                 .WithMany()
                 .HasForeignKey(p => p.UsuarioId);
+
+            modelBuilder.Entity<Comercio>()
+                .HasIndex(c => c.IdUsuario)
+                .IsUnique();
         }
 
     }

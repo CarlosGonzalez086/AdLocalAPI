@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AdLocalAPI.Controllers
 {
+    [ApiController]
+    [Route("api/[controller]")]
     public class AuthController : ControllerBase
     {
         private readonly UsuarioService _service;

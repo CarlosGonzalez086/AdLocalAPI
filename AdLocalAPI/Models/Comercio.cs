@@ -9,6 +9,9 @@ namespace AdLocalAPI.Models
         [Required]
         [MaxLength(150)]
         public string Nombre { get; set; }
+        // 🔐 Relación con usuario
+        [Required]
+        public long IdUsuario { get; set; }
 
         public string? Descripcion { get; set; }
         public string? Telefono { get; set; }
