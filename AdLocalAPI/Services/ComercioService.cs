@@ -153,8 +153,20 @@ namespace AdLocalAPI.Services
 
                 var creado = await _repository.CreateAsync(comercio);
 
+                var responseDto = new ComercioMineDto
+                {
+                    Id = comercio.Id,
+                    Nombre = comercio.Nombre,
+                    Direccion = comercio.Direccion,
+                    Telefono = comercio.Telefono,
+                    Activo = comercio.Activo,
+                    LogoBase64 = comercio.LogoUrl,
+                    Lat = comercio.Ubicacion?.Y,
+                    Lng = comercio.Ubicacion?.X
+                };
+
                 return ApiResponse<object>.Success(
-                    creado,
+                    responseDto,
                     "El comercio se creó correctamente"
                 );
             }

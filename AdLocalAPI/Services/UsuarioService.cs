@@ -254,15 +254,15 @@ namespace AdLocalAPI.Services
             if (usuario.Rol == "Comercio")
             {
                 Comercio comercio = await _comercioRepository.GetComercioByUser(usuario.Id);
-                if (comercio.IdUsuario == usuario.Id)
+                if (comercio != null)
                 {
-                    claims.Add(new Claim("comercioId", comercio.IdUsuario.ToString()));
+                    claims.Add(new Claim("comercioId", comercio.Id.ToString()));
                     claims.Add(new Claim("FotoUrl", usuario.FotoUrl));
                 }
                 else 
                 {
-                    claims.Add(new Claim("comercioId", usuario.ComercioId.Value.ToString()));
-                    claims.Add(new Claim("FotoUrl", usuario.FotoUrl));
+                    claims.Add(new Claim("comercioId", usuario.ComercioId == null ? "0" : usuario.ComercioId.Value.ToString()));
+                    claims.Add(new Claim("FotoUrl", usuario.FotoUrl == null ? "" : usuario.FotoUrl));
                 }
             }
 
