@@ -16,9 +16,18 @@ namespace AdLocalAPI.Repositories
             _supabaseClient = supabaseClient;
             _env = env;
         }
-        public async Task<List<Usuario>> GetAllAsyncWihtoutPagination()
+        public async Task<bool> ExistePorCorreoAsync(string correo)
         {
-            return await _context.Usuarios.ToListAsync();
+            return await _context.Usuarios
+                .AsNoTracking()
+                .AnyAsync(u => u.Email == correo);
+        }
+
+        public async Task<Usuario?> GetByCorreoAsync(string correo)
+        {
+            return await _context.Usuarios
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Email == correo);
         }
 
         public async Task<object> GetAllAsync(int page,
