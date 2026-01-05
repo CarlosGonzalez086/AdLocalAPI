@@ -6,6 +6,7 @@ using AdLocalAPI.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.IdentityModel.Tokens;
 using Stripe;
 using System.Text;
@@ -71,14 +72,21 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
-    options.UseNpgsql(connectionString, npgsql =>
-    {
-        npgsql.UseNetTopologySuite();
-        npgsql.CommandTimeout(60);
-    });
+    options.UseNpgsql(
+        connectionString,
+        npgsql =>
+        {
+            npgsql.UseNetTopologySuite();
+            npgsql.CommandTimeout(60);
+            npgsql.ExecutionStrategy(deps =>
+                new NonRetryingExecutionStrategy(deps)
+            );
+        });
 
     options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
 });
+
+
 
 
 
