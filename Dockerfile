@@ -22,7 +22,8 @@ ENV ASPNETCORE_URLS=http://+:8080
 ENV AllowedHosts=*
 
 # Connection String (EF Core)
-ENV SUPABASE_DB_CONNECTION="User Id=postgres.uzgnfwbztoizcctyfdiv;Password=q8dZ1szsEYIOzKrM;Server=aws-1-us-east-2.pooler.supabase.com;Port=6543;Database=postgres;SSL Mode=Require;Trust Server Certificate=true"
+ENV SUPABASE_DB_CONNECTION="Host=aws-1-us-east-2.pooler.supabase.com;Port=6543;Database=postgres;Username=postgres.uzgnfwbztoizcctyfdiv;Password=q8dZ1szsEYIOzKrM;SSL Mode=Require;Trust Server Certificate=true;Pooling=true;Minimum Pool Size=0;Maximum Pool Size=5;Timeout=60;Command Timeout=60;Keepalive=30;"
+
 
 # JWT
 ENV JWT__Key=AdLocal_SUPER_SECRET_KEY_PROD_2025_256_BITS
