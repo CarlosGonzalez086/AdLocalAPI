@@ -69,15 +69,14 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 // ======================================================
 // ENTITY FRAMEWORK CORE - PostgreSQL (Supabase)
 // ======================================================
-
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     options.UseNpgsql(
         connectionString,
         npgsql =>
         {
-            npgsql.UseNetTopologySuite();
-            npgsql.CommandTimeout(60);
+            npgsql.UseNetTopologySuite(); // ✅ se queda
+            npgsql.CommandTimeout(30);
             npgsql.ExecutionStrategy(deps =>
                 new NonRetryingExecutionStrategy(deps)
             );
@@ -85,10 +84,6 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
     options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
 });
-
-
-
-
 
 
 // ======================================================
