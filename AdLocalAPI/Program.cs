@@ -74,12 +74,13 @@ builder.Services.AddDbContextPool<AppDbContext>(options =>
     options.UseNpgsql(connectionString, npgsql =>
     {
         npgsql.UseNetTopologySuite();
-        npgsql.EnableRetryOnFailure(3);
-        npgsql.CommandTimeout(30);
+        npgsql.CommandTimeout(40);
+        // ❌ NO retries automáticos en Postgres
     });
 
-    options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);    
+    options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
 });
+
 
 
 // ======================================================
