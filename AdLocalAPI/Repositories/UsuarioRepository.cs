@@ -18,7 +18,7 @@ namespace AdLocalAPI.Repositories
         }
         public async Task<List<Usuario>> GetAllAsyncWihtoutPagination()
         {
-            return await _context.Usuarios.Include(u => u.Comercio).ToListAsync();
+            return await _context.Usuarios.ToListAsync();
         }
 
         public async Task<object> GetAllAsync(int page,
