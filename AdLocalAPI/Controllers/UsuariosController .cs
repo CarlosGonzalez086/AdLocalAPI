@@ -15,9 +15,12 @@ namespace AdLocalAPI.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll(int page = 1,
+            int pageSize = 10,
+            string orderBy = "recent",
+            string search = "")
         {
-            var response = await _service.GetAllUsuarios();
+            var response = await _service.GetAllUsuarios(page, pageSize, orderBy, search);
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
 

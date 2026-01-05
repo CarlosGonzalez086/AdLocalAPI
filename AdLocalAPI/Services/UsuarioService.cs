@@ -26,22 +26,44 @@ namespace AdLocalAPI.Services
             _comercioRepository = comercioRepository;
         }
 
-        public async Task<ApiResponse<List<Usuario>>> GetAllUsuarios()
+        public async Task<ApiResponse<object>> GetAllUsuarios(int page,
+            int pageSize,
+            string orderBy,
+            string search)
         {
-            var usuarios = await _repository.GetAllAsync();
-            return ApiResponse<List<Usuario>>.Success(usuarios);
-        }
+            try
+            {
+                var result = await _repository.GetAllAsync(page, pageSize, orderBy, search);
 
-        public async Task<ApiResponse<Usuario>> GetUsuarioById(int id)
+                return ApiResponse<object>.Success(
+                    result,
+                    "Listado de usuarios obtenido correctamente"
+                );
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<object>.Error("500", ex.Message);
+            }
+        }
+        public async Task<ApiResponse<object>> GetUsuarioById(int id)
         {
-            var usuario = await _repository.GetByIdAsync(id);
+            try
+            {
+                var usuario = await _repository.GetByIdAsync(id);
 
-            if (usuario == null)
-                return ApiResponse<Usuario>.Error("404", "Usuario no encontrado");
+                if (usuario == null)
+                    return ApiResponse<object>.Error("404", "Usuario no encontrado");
 
-            return ApiResponse<Usuario>.Success(usuario);
+                return ApiResponse<object>.Success(
+                    usuario,
+                    "Usuario obtenido correctamente"
+                );
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<object>.Error("500", ex.Message);
+            }
         }
-
         public async Task<ApiResponse<object>> CrearUsuarioCliente(UsuarioRegistroDto dto)
         {
             if (string.IsNullOrEmpty(dto.Nombre))
@@ -58,7 +80,7 @@ namespace AdLocalAPI.Services
             if (string.IsNullOrEmpty(dto.Password))
                 return ApiResponse<object>.Error("400", "La contraseña es obligatoria");
 
-            var existente = (await _repository.GetAllAsync())
+            var existente = (await _repository.GetAllAsyncWihtoutPagination())
                 .FirstOrDefault(u => u.Email.ToLower() == dto.Email.ToLower());
 
             if (existente != null)
@@ -81,7 +103,6 @@ namespace AdLocalAPI.Services
                 "Usuario creado correctamente"
             );
         }
-
         public async Task<ApiResponse<object>> CrearAdmin(AdminCreateDto dto)
         {
             try
@@ -95,7 +116,7 @@ namespace AdLocalAPI.Services
                 if (string.IsNullOrEmpty(dto.Password))
                     return ApiResponse<object>.Error("400", "La contraseña es obligatoria");
 
-                var existente = (await _repository.GetAllAsync())
+                var existente = (await _repository.GetAllAsyncWihtoutPagination())
                     .FirstOrDefault(u => u.Email.ToLower() == dto.Email.ToLower());
 
                 if (existente != null)
@@ -129,7 +150,6 @@ namespace AdLocalAPI.Services
                 return ApiResponse<object>.Error("500", ex.Message);
             }
         }
-
         public async Task<ApiResponse<object>> ActualizarUsuario(UsuarioUpdateDto dto)
         {
             int id = _jwtContext.GetUserId();
@@ -138,7 +158,7 @@ namespace AdLocalAPI.Services
             if (usuario == null)
                 return ApiResponse<object>.Error("404", "Usuario no encontrado");
 
-            var existente = (await _repository.GetAllAsync())
+            var existente = (await _repository.GetAllAsyncWihtoutPagination())
                 .FirstOrDefault(u => u.Email.ToLower() == dto.Email.ToLower() && u.Id != id);
 
             if (existente != null)
@@ -157,7 +177,6 @@ namespace AdLocalAPI.Services
 
             return ApiResponse<object>.Success(null, "Usuario actualizado correctamente");
         }
-
         public async Task<ApiResponse<UsuarioInfoDto>> ObtenerInfoUsuario()
         {
             int id = _jwtContext.GetUserId();
@@ -180,16 +199,30 @@ namespace AdLocalAPI.Services
 
             return ApiResponse<UsuarioInfoDto>.Success(info);
         }
-
         public async Task<ApiResponse<object>> DeleteUsuario(int id)
         {
-            await _repository.DeleteAsync(id);
-            return ApiResponse<object>.Success(null, "Usuario eliminado correctamente");
-        }
+            try
+            {
+                var usuario = await _repository.GetByIdAsync(id);
 
+                if (usuario == null)
+                    return ApiResponse<object>.Error("404", "Usuario no encontrado");
+
+                await _repository.DeleteAsync(id);
+
+                return ApiResponse<object>.Success(
+                    null,
+                    "Usuario eliminado correctamente"
+                );
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<object>.Error("500", ex.Message);
+            }
+        }
         public async Task<ApiResponse<object>> Login(string email, string password)
         {
-            var usuario = (await _repository.GetAllAsync())
+            var usuario = (await _repository.GetAllAsyncWihtoutPagination())
                 .FirstOrDefault(u => u.Email == email);
 
             if (usuario == null)
@@ -237,7 +270,6 @@ namespace AdLocalAPI.Services
                 "Inicio de sesión exitoso"
             );
         }
-
         public async Task<string> GenerateJwtToken(Usuario usuario)
         {
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]));
@@ -257,7 +289,7 @@ namespace AdLocalAPI.Services
                 if (comercio != null)
                 {
                     claims.Add(new Claim("comercioId", comercio.Id.ToString()));
-                    claims.Add(new Claim("FotoUrl", usuario.FotoUrl));
+                    claims.Add(new Claim("FotoUrl", usuario.FotoUrl == null ? "" : usuario.FotoUrl));
                 }
                 else 
                 {
@@ -276,10 +308,9 @@ namespace AdLocalAPI.Services
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
-
         public async Task<UpdateJwtResult> ActualizarJwtAsync(string email, bool updateJWT)
         {
-            var usuario = (await _repository.GetAllAsync())
+            var usuario = (await _repository.GetAllAsyncWihtoutPagination())
                 .FirstOrDefault(u => u.Email == email);
 
             if (usuario == null)
@@ -405,9 +436,6 @@ namespace AdLocalAPI.Services
                 return ApiResponse<string>.Error("500", ex.Message);
             }
         }
-
-
-
 
     }
 }

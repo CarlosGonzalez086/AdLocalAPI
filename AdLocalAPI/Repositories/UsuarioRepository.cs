@@ -8,16 +8,58 @@ namespace AdLocalAPI.Repositories
     {
         private readonly AppDbContext _context;
         private readonly Supabase.Client _supabaseClient;
+        private readonly IWebHostEnvironment _env;
 
-        public UsuarioRepository(AppDbContext context, Supabase.Client supabaseClient)
+        public UsuarioRepository(AppDbContext context, Supabase.Client supabaseClient, IWebHostEnvironment env)
         {
             _context = context;
             _supabaseClient = supabaseClient;
+            _env = env;
         }
-
-        public async Task<List<Usuario>> GetAllAsync()
+        public async Task<List<Usuario>> GetAllAsyncWihtoutPagination()
         {
             return await _context.Usuarios.Include(u => u.Comercio).ToListAsync();
+        }
+
+        public async Task<object> GetAllAsync(int page,
+            int pageSize,
+            string orderBy,
+            string search)
+        {
+            var query = _context.Usuarios.AsQueryable();
+
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                query = query.Where(p =>
+                    EF.Functions.ILike(p.Nombre, $"%{search}%")
+                );
+            }
+
+            query = query.Where(p => p.Rol == "Comercio");
+            query = orderBy switch
+            {
+                "recent" => query.OrderByDescending(p => p.FechaCreacion),
+                "old" => query.OrderBy(p => p.FechaCreacion),
+                "az" => query.OrderBy(p => p.Nombre),
+                "za" => query.OrderByDescending(p => p.Nombre),
+                _ => query.OrderByDescending(p => p.FechaCreacion)
+            };
+
+            var totalRecords = await query.CountAsync();
+
+            var plans = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new
+            {
+                totalRecords,
+                page,
+                pageSize,
+                data = plans
+            };
         }
 
         public async Task<Usuario> GetByIdAsync(int id)
@@ -50,7 +92,9 @@ namespace AdLocalAPI.Repositories
         }
         public async Task<string> UploadToSupabaseAsync(byte[] imageBytes, int userId, string contentType = "image/png")
         {
-            string fileName = $"perfil_{userId}_{DateTime.UtcNow.Ticks}.png";
+
+            string envPrefix = _env.IsProduction() ? "prod" : "local";
+            string fileName = $"{envPrefix}_Perfil_{userId}_{DateTime.UtcNow.Ticks}.png";
             var bucket = _supabaseClient.Storage.From("Perfil");
 
             var options = new Supabase.Storage.FileOptions
