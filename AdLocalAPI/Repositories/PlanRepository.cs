@@ -1,4 +1,5 @@
 ﻿using AdLocalAPI.Data;
+using AdLocalAPI.Models;
 using Microsoft.EntityFrameworkCore;
 
 
@@ -12,7 +13,6 @@ namespace AdLocalAPI.Repositories
         {
             _context = context;
         }
-
         public async Task<object> GetAllAsync(
             int page,
             int pageSize,

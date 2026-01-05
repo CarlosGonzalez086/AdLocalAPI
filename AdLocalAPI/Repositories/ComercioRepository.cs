@@ -9,11 +9,13 @@ namespace AdLocalAPI.Repositories
     {
         private readonly AppDbContext _context;
         private readonly Supabase.Client _supabaseClient;
+        private readonly IWebHostEnvironment _env;
 
-        public ComercioRepository(AppDbContext context, Supabase.Client supabaseClient)
+        public ComercioRepository(AppDbContext context, Supabase.Client supabaseClient, IWebHostEnvironment env)
         {
             _context = context;
             _supabaseClient = supabaseClient;
+            _env = env;
         }
 
         public async Task<List<Comercio>> GetAllAsync()
@@ -57,7 +59,8 @@ namespace AdLocalAPI.Repositories
         }
         public async Task<string> UploadToSupabaseAsync(byte[] imageBytes, int userId, string contentType = "image/png")
         {
-            string fileName = $"LogoComercio{userId}_{DateTime.UtcNow.Ticks}.png";
+            string envPrefix = _env.IsProduction() ? "prod" : "local";
+            string fileName = $"{envPrefix}_LogoComercio{userId}_{DateTime.UtcNow.Ticks}.png";
             var bucket = _supabaseClient.Storage.From("LogoComercio");
 
             var options = new Supabase.Storage.FileOptions
