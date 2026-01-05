@@ -80,10 +80,9 @@ namespace AdLocalAPI.Services
             if (string.IsNullOrEmpty(dto.Password))
                 return ApiResponse<object>.Error("400", "La contraseña es obligatoria");
 
-            var existente = (await _repository.GetAllAsyncWihtoutPagination())
-                .FirstOrDefault(u => u.Email.ToLower() == dto.Email.ToLower());
+            bool existente = await _repository.ExistePorCorreoAsync(dto.Email);
 
-            if (existente != null)
+            if (existente)
                 return ApiResponse<object>.Error("400", "El correo ya está registrado");
 
             var usuario = new Usuario
@@ -116,10 +115,9 @@ namespace AdLocalAPI.Services
                 if (string.IsNullOrEmpty(dto.Password))
                     return ApiResponse<object>.Error("400", "La contraseña es obligatoria");
 
-                var existente = (await _repository.GetAllAsyncWihtoutPagination())
-                    .FirstOrDefault(u => u.Email.ToLower() == dto.Email.ToLower());
+                bool existente = await _repository.ExistePorCorreoAsync(dto.Email);
 
-                if (existente != null)
+                if (existente)
                     return ApiResponse<object>.Error("400", "El correo ya está registrado");
 
                 var admin = new Usuario
@@ -158,10 +156,9 @@ namespace AdLocalAPI.Services
             if (usuario == null)
                 return ApiResponse<object>.Error("404", "Usuario no encontrado");
 
-            var existente = (await _repository.GetAllAsyncWihtoutPagination())
-                .FirstOrDefault(u => u.Email.ToLower() == dto.Email.ToLower() && u.Id != id);
+            bool existente = await _repository.ExistePorCorreoAsync(dto.Email);
 
-            if (existente != null)
+            if (existente)
                 return ApiResponse<object>.Error("400", "El correo ya está registrado");
 
             usuario.Nombre = dto.Nombre;
@@ -222,8 +219,7 @@ namespace AdLocalAPI.Services
         }
         public async Task<ApiResponse<object>> Login(string email, string password)
         {
-            var usuario = (await _repository.GetAllAsyncWihtoutPagination())
-                .FirstOrDefault(u => u.Email == email);
+            var usuario = await _repository.GetByCorreoAsync(email);
 
             if (usuario == null)
                 return ApiResponse<object>.Error("401", "Credenciales inválidas");
@@ -310,8 +306,7 @@ namespace AdLocalAPI.Services
         }
         public async Task<UpdateJwtResult> ActualizarJwtAsync(string email, bool updateJWT)
         {
-            var usuario = (await _repository.GetAllAsyncWihtoutPagination())
-                .FirstOrDefault(u => u.Email == email);
+            var usuario = await _repository.GetByCorreoAsync(email);
 
             if (usuario == null)
             {
