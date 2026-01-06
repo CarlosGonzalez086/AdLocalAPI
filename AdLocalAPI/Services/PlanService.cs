@@ -34,6 +34,22 @@ namespace AdLocalAPI.Services
                 return ApiResponse<object>.Error("500", ex.Message);
             }
         }
+        public async Task<ApiResponse<object>> GetAllPlanesUser()
+        {
+            try
+            {
+                var planes = await _repository.GetAllPlanesUser();
+
+                return ApiResponse<object>.Success(
+                    planes,
+                    "Listado de planes obtenido correctamente"
+                );
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<object>.Error("500", ex.Message);
+            }
+        }
 
         public async Task<ApiResponse<object>> GetPlanById(int id)
         {

@@ -25,6 +25,7 @@ namespace AdLocalAPI.Models
         // Relación opcional con Comercio
         public int? ComercioId { get; set; }
         public string? FotoUrl { get; set; }
+        public string? StripeCustomerId { get; set; }
         public Comercio? Comercio { get; set; }
     }
 }

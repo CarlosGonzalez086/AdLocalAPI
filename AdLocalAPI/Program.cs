@@ -1,8 +1,10 @@
 using AdLocalAPI.Data;
 using AdLocalAPI.Helpers;
 using AdLocalAPI.Interfaces;
+using AdLocalAPI.Interfaces.Tarjetas;
 using AdLocalAPI.Repositories;
 using AdLocalAPI.Services;
+using AdLocalAPI.Utils;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +14,9 @@ using Stripe;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+
+//Singlenton variable
+builder.Services.AddSingleton<StripeSettings>();
 
 // ======================================================
 // VARIABLES DE ENTORNO (Docker / Producción / Local)
@@ -29,11 +34,11 @@ var jwtIssuer = Environment.GetEnvironmentVariable("JWT__Issuer")
     ?? "AdLocalAPI";
 
 // Stripe
-var stripeSecret = Environment.GetEnvironmentVariable("STRIPE__SecretKey");
-if (!string.IsNullOrEmpty(stripeSecret))
-{
-    StripeConfiguration.ApiKey = stripeSecret;
-}
+//var stripeSecret = Environment.GetEnvironmentVariable("STRIPE__SecretKey");
+//if (!string.IsNullOrEmpty(stripeSecret))
+//{
+//    StripeConfiguration.ApiKey = stripeSecret;
+//}
 
 var supabaseUrl = Environment.GetEnvironmentVariable("SUPABASE__URL")
     ?? "https://uzgnfwbztoizcctyfdiv.supabase.co";
@@ -107,6 +112,11 @@ builder.Services.AddScoped<SuscripcionRepository>();
 builder.Services.AddScoped<IConfiguracionService, ConfiguracionService>();
 builder.Services.AddScoped<IConfiguracionRepository, ConfiguracionRepository>();
 
+builder.Services.AddScoped<ITarjetaService, TarjetaService>();
+builder.Services.AddScoped<ITarjetaRepository, TarjetaRepository>();
+builder.Services.AddScoped<IStripeService, StripeService>();
+
+
 builder.Services.AddSingleton(new Supabase.Client(supabaseUrl, supabaseKey));
 
 // ======================================================
@@ -142,11 +152,30 @@ builder.Services.AddCors(options =>
     );
 });
 
+
+
 // ======================================================
 // PIPELINE HTTP
 // ======================================================
 
+
 var app = builder.Build();
+
+
+//Asignacion de la variable singleton
+
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var stripeSettings = scope.ServiceProvider.GetRequiredService<StripeSettings>();
+
+    var secretKey = await dbContext.ConfiguracionSistema
+        .Where(c => c.Key == "STRIPE_SECRET_KEY")
+        .Select(c => c.Val)
+        .FirstOrDefaultAsync();
+
+    stripeSettings.Inicializar(secretKey ?? "sk_test_default_value");
+}
 
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
