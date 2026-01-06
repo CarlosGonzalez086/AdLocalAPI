@@ -1,8 +1,6 @@
 ﻿using AdLocalAPI.DTOs;
 using AdLocalAPI.Interfaces.Tarjetas;
-using AdLocalAPI.UseCases;
 using Microsoft.AspNetCore.Mvc;
-using Supabase.Gotrue;
 
 namespace AdLocalAPI.Controllers
 {
