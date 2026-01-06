@@ -22,7 +22,7 @@ ENV ASPNETCORE_URLS=http://+:8080
 ENV AllowedHosts=*
 
 # Connection String (EF Core)
-ENV SUPABASE_DB_CONNECTION="Host=aws-1-us-east-2.pooler.supabase.com;Port=6543;Database=postgres;Username=postgres.uzgnfwbztoizcctyfdiv;Password=q8dZ1szsEYIOzKrM;SSL Mode=Require;Trust Server Certificate=true;Pooling=true;Minimum Pool Size=0;Maximum Pool Size=3;Timeout=15;Command Timeout=30;Keepalive=30;"
+ENV SUPABASE_DB_CONNECTION="postgresql://neondb_owner:npg_vXt9sekfG3rY@ep-empty-moon-adsd2mcc-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 
 
 # JWT
