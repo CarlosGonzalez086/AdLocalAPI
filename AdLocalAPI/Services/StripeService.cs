@@ -66,13 +66,11 @@ namespace AdLocalAPI.Services
             }
             catch (StripeException ex)
             {
-                // Error específico de Stripe
                 Console.WriteLine($"Error al crear el cliente en Stripe: {ex.Message}");
-                return null; // o lanza una excepción personalizada
+                return null; 
             }
             catch (Exception ex)
             {
-                // Cualquier otro error inesperado
                 Console.WriteLine($"Error inesperado al crear el cliente: {ex.Message}");
                 return null;
             }
