@@ -15,6 +15,7 @@ namespace AdLocalAPI.Data
         public DbSet<Promocion> Promociones { get; set; }
         public DbSet<Publicidad> Publicidades { get; set; }
         public DbSet<ConfiguracionSistema> ConfiguracionSistema { get; set; }
+        public DbSet<Tarjeta> Tarjeta { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -25,6 +26,12 @@ namespace AdLocalAPI.Data
                 .HasOne(u => u.Comercio)
                 .WithMany()
                 .HasForeignKey(u => u.ComercioId);
+
+            modelBuilder.Entity<Usuario>()
+                .Property(u => u.StripeCustomerId)
+                .HasColumnName("stripecustomerid") // coincide con la columna real
+                .HasMaxLength(100); // opcional
+
 
             // Suscripcion -> Usuario
             modelBuilder.Entity<Suscripcion>()
@@ -67,6 +74,43 @@ namespace AdLocalAPI.Data
             modelBuilder.Entity<Comercio>()
                 .Property(c => c.Ubicacion)
                 .HasColumnType("geography (point, 4326)");
+
+            modelBuilder.Entity<Tarjeta>(entity =>
+            {
+                entity.ToTable("tarjetas");
+
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.StripeCustomerId)
+                      .IsRequired()
+                      .HasMaxLength(100);
+
+                entity.Property(e => e.StripePaymentMethodId)
+                      .IsRequired()
+                      .HasMaxLength(100);
+
+                entity.HasIndex(e => e.StripePaymentMethodId)
+                      .IsUnique();
+
+                entity.Property(e => e.Brand)
+                      .IsRequired()
+                      .HasMaxLength(50);
+
+                entity.Property(e => e.Last4)
+                      .IsRequired()
+                      .HasMaxLength(4);
+
+                entity.Property(e => e.CardType)
+                      .IsRequired()
+                      .HasMaxLength(20);
+
+                entity.Property(e => e.Status)
+                      .HasMaxLength(20)
+                      .HasDefaultValue(true);
+
+                entity.Property(e => e.CreatedAt)
+                      .HasDefaultValueSql("NOW()");
+            });
         }
 
     }

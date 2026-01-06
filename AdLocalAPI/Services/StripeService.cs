@@ -1,16 +1,85 @@
-﻿using AdLocalAPI.Models;
+﻿using AdLocalAPI.Interfaces;
+using AdLocalAPI.Models;
+using AdLocalAPI.Utils;
+using Stripe;
 using Stripe.Checkout;
 
 namespace AdLocalAPI.Services
 {
-    public class StripeService
+    public class StripeService : IStripeService
     {
-        public StripeService(IConfiguration config)
+
+        private readonly StripeSettings _stripeSettings;
+
+        public StripeService(StripeSettings stripeSettings)
         {
-            Stripe.StripeConfiguration.ApiKey = config["Stripe:SecretKey"];
+            _stripeSettings = stripeSettings;
+
+            StripeConfiguration.ApiKey = _stripeSettings.SecretKey;
         }
 
-        public Session CreateCheckoutSession(Plan plan, int usuarioId)
+        public async Task<PaymentMethod> GetPaymentMethod(string id)
+        {
+            var service = new PaymentMethodService();
+            return await service.GetAsync(id);
+        }
+
+        public async Task AttachToCustomer(string pmId, string customerId)
+        {
+            var service = new PaymentMethodService();
+            await service.AttachAsync(pmId, new PaymentMethodAttachOptions
+            {
+                Customer = customerId
+            });
+        }
+
+        public async Task Detach(string pmId)
+        {
+            var service = new PaymentMethodService();
+            await service.DetachAsync(pmId);
+        }
+
+        public async Task SetDefault(string customerId, string pmId)
+        {
+            var service = new CustomerService();
+            await service.UpdateAsync(customerId, new CustomerUpdateOptions
+            {
+                InvoiceSettings = new CustomerInvoiceSettingsOptions
+                {
+                    DefaultPaymentMethod = pmId
+                }
+            });
+        }
+
+        public async Task<string?> CreateCustomer(string email)
+        {
+            try
+            {
+                var service = new CustomerService();
+
+                var customer = await service.CreateAsync(new CustomerCreateOptions
+                {
+                    Email = email
+                });
+
+                return customer.Id;
+            }
+            catch (StripeException ex)
+            {
+                // Error específico de Stripe
+                Console.WriteLine($"Error al crear el cliente en Stripe: {ex.Message}");
+                return null; // o lanza una excepción personalizada
+            }
+            catch (Exception ex)
+            {
+                // Cualquier otro error inesperado
+                Console.WriteLine($"Error inesperado al crear el cliente: {ex.Message}");
+                return null;
+            }
+        }
+
+
+        public Session CreateCheckoutSession(Models.Plan plan, int usuarioId)
         {
             var options = new SessionCreateOptions
             {

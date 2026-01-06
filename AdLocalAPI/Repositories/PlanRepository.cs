@@ -55,6 +55,22 @@ namespace AdLocalAPI.Repositories
                 data = plans
             };
         }
+        public async Task<List<Models.Plan>> GetAllPlanesUser()
+        {
+            List<Models.Plan> plans = new List<Models.Plan>();
+            var query = _context.Plans.AsQueryable();
+            query = query.Where(p => p.Activo == true);
+            try
+            {
+                plans = await query.ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+                return plans;
+            }
+            return plans;
+        }
 
         public async Task<Models.Plan> GetByIdAsync(int id) 
         {

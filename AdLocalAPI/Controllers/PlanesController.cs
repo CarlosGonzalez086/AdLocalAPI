@@ -51,6 +51,12 @@ namespace AdLocalAPI.Controllers
             var response = await _service.GetAllPlanes(page, pageSize, orderBy, search);
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
+        [HttpGet("AllPlanesUser")]
+        public async Task<IActionResult> GetAllPlanesUser()
+        {
+            var response = await _service.GetAllPlanesUser();
+            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+        }
 
     }
 }
