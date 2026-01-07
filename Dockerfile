@@ -22,7 +22,10 @@ ENV ASPNETCORE_URLS=http://+:8080
 ENV AllowedHosts=*
 
 # Connection String (EF Core)
-ENV SUPABASE_DB_CONNECTION="postgresql://neondb_owner:npg_vXt9sekfG3rY@ep-empty-moon-adsd2mcc-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+ENV SUPABASE_DB_CONNECTION=Host=ep-empty-moon-adsd2mcc-pooler.c-2.us-east-1.aws.neon.tech;Port=5432;Database=neondb;Username=neondb_owner;Password=npg_vXt9sekfG3rY;SSL Mode=Require;
+
+
+
 
 
 # JWT
