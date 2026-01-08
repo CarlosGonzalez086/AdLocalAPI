@@ -148,7 +148,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowFrontend", policy =>
         policy.WithOrigins(
             "http://localhost:5173",
-            "https://ad-local-delta.vercel.app"
+            "https://ad-local-gamma.vercel.app/"
         )
         .AllowAnyHeader()
         .AllowAnyMethod()
