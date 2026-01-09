@@ -18,12 +18,13 @@ namespace AdLocalAPI.Controllers
             _service = service;
         }
 
-        [HttpPost("contratar")]
+        [HttpPost]
         public async Task<IActionResult> Contratar([FromBody] SuscripcionCreateDto dto)
         {
-            var response = await _service.ContratarPlan(dto.PlanId);
+            var response = await _service.ContratarPlan(dto);
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
+
 
         [HttpGet("mi-suscripcion")]
         public async Task<IActionResult> MiSuscripcion()

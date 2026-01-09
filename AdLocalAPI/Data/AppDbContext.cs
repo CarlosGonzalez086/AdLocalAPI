@@ -16,6 +16,7 @@ namespace AdLocalAPI.Data
         public DbSet<Publicidad> Publicidades { get; set; }
         public DbSet<ConfiguracionSistema> ConfiguracionSistema { get; set; }
         public DbSet<Tarjeta> Tarjeta { get; set; }
+        public DbSet<ProductosServicios> ProductosServicios { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -110,6 +111,14 @@ namespace AdLocalAPI.Data
 
                 entity.Property(e => e.CreatedAt)
                       .HasDefaultValueSql("NOW()");
+            });
+            modelBuilder.Entity<ProductosServicios>(entity =>
+            {
+                entity.HasIndex(e => e.IdComercio);
+                entity.HasIndex(e => e.IdUsuario);
+                entity.HasIndex(e => e.Activo);
+                entity.HasIndex(e => e.Eliminado);
+                entity.HasQueryFilter(e => !e.Eliminado);
             });
         }
 

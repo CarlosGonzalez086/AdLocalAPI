@@ -16,10 +16,31 @@ namespace AdLocalAPI.Repositories
         // 🔹 Crear suscripción
         public async Task<Suscripcion> CreateAsync(Suscripcion suscripcion)
         {
-            _context.Suscripcions.Add(suscripcion);
-            await _context.SaveChangesAsync();
-            return suscripcion;
+            try
+            {
+                _context.Suscripcions.Add(suscripcion);
+                await _context.SaveChangesAsync();
+                return suscripcion;
+            }
+            catch (DbUpdateException ex)
+            {
+                // 🔐 Stripe puede mandar el mismo evento varias veces
+                // Si ya existe, NO fallamos el webhook
+                throw new InvalidOperationException(
+                    "Error al guardar la suscripción. Posible duplicado o violación de integridad.",
+                    ex
+                );
+            }
+            catch (Exception ex)
+            {
+                // ❌ Error inesperado
+                throw new ApplicationException(
+                    "Error inesperado al crear la suscripción.",
+                    ex
+                );
+            }
         }
+
 
         // 🔹 Actualizar suscripción
         public async Task UpdateAsync(Suscripcion suscripcion)
@@ -37,7 +58,7 @@ namespace AdLocalAPI.Repositories
                 .FirstOrDefaultAsync(s =>
                     s.UsuarioId == usuarioId &&
                     s.Activa &&
-                    s.Estado == "Activa" &&
+                    s.Estado == "active" &&
                     s.FechaFin >= DateTime.UtcNow
                 );
         }
@@ -94,5 +115,11 @@ namespace AdLocalAPI.Repositories
                 .OrderByDescending(s => s.FechaFin)
                 .FirstOrDefaultAsync();
         }
+        public async Task<bool> ExistePorSessionAsync(string sessionId)
+        {
+            return await _context.Suscripcions
+                .AnyAsync(x => x.StripeSessionId == sessionId);
+        }
+
     }
 }
