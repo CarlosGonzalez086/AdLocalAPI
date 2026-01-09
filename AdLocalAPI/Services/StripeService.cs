@@ -1,8 +1,10 @@
 ﻿using AdLocalAPI.Interfaces;
 using AdLocalAPI.Models;
+using AdLocalAPI.Repositories;
 using AdLocalAPI.Utils;
 using Stripe;
 using Stripe.Checkout;
+using Supabase.Gotrue;
 
 namespace AdLocalAPI.Services
 {
@@ -10,10 +12,12 @@ namespace AdLocalAPI.Services
     {
 
         private readonly StripeSettings _stripeSettings;
+        private readonly UsuarioRepository _usuarioRepository;
 
-        public StripeService(StripeSettings stripeSettings)
+        public StripeService(StripeSettings stripeSettings, UsuarioRepository usuarioRepository)
         {
             _stripeSettings = stripeSettings;
+            _usuarioRepository = usuarioRepository;
 
             StripeConfiguration.ApiKey = _stripeSettings.SecretKey;
         }
@@ -76,40 +80,39 @@ namespace AdLocalAPI.Services
             }
         }
 
-
-        public Session CreateCheckoutSession(Models.Plan plan, int usuarioId)
+        public async Task<PaymentIntent> CreatePaymentIntent(
+    Models.Plan plan,
+    int usuarioId,
+    string paymentMethodId
+)
         {
-            var options = new SessionCreateOptions
+            var usuario = await _usuarioRepository.GetByIdAsync(usuarioId);
+            if (string.IsNullOrEmpty(usuario.StripeCustomerId))
             {
-                Mode = "payment",
-                PaymentMethodTypes = new List<string> { "card" },
-                LineItems = new List<SessionLineItemOptions>
-            {
-                new()
-                {
-                    PriceData = new SessionLineItemPriceDataOptions
-                    {
-                        Currency = "mxn",
-                        UnitAmount = (long)(plan.Precio * 100),
-                        ProductData = new SessionLineItemPriceDataProductDataOptions
-                        {
-                            Name = plan.Nombre
-                        }
-                    },
-                    Quantity = 1
-                }
-            },
-                SuccessUrl = $"https://tu-frontend.com/success?session_id={{CHECKOUT_SESSION_ID}}",
-                CancelUrl = $"https://tu-frontend.com/cancel",
-                Metadata = new Dictionary<string, string>
-            {
-                { "usuarioId", usuarioId.ToString() },
-                { "planId", plan.Id.ToString() }
+                var customerId = await CreateCustomer(usuario.Email);
+                usuario.StripeCustomerId = customerId;
+                await _usuarioRepository.UpdateAsync(usuario);
             }
+            var options = new PaymentIntentCreateOptions
+            {
+                Amount = (long)(plan.Precio * 100),
+                Currency = "mxn",
+                Customer = usuario.StripeCustomerId,
+                PaymentMethod = paymentMethodId,
+                Confirm = true,
+                OffSession = true,
+                Metadata = new Dictionary<string, string>
+        {
+            { "usuarioId", usuarioId.ToString() },
+            { "planId", plan.Id.ToString() }
+        }
             };
 
-            var service = new SessionService();
-            return service.Create(options);
+            var service = new PaymentIntentService();
+            return await service.CreateAsync(options);
         }
+
+
+
     }
 }

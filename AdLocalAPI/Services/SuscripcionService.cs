@@ -24,21 +24,30 @@ namespace AdLocalAPI.Services
             _stripe = stripe;
         }
 
-        public async Task<ApiResponse<object>> ContratarPlan(int planId)
+        public async Task<ApiResponse<object>> ContratarPlan(SuscripcionCreateDto dto)
         {
             int usuarioId = _jwt.GetUserId();
-            var plan = await _planRepo.GetByIdAsync(planId);
 
+            var plan = await _planRepo.GetByIdAsync(dto.PlanId);
             if (plan == null || !plan.Activo)
                 return ApiResponse<object>.Error("404", "Plan no disponible");
 
-            var session = _stripe.CreateCheckoutSession(plan, usuarioId);
+            var paymentIntent = await _stripe.CreatePaymentIntent(
+                plan,
+                usuarioId,
+                dto.StripePaymentMethodId
+            );
 
             return ApiResponse<object>.Success(
-                new { checkoutUrl = session.Url },
-                "Redirigiendo a pago"
+                new
+                {
+                    paymentIntentId = paymentIntent.Id,
+                    status = paymentIntent.Status
+                },
+                "Pago procesado"
             );
         }
+
 
         public async Task<ApiResponse<object>> ObtenerMiSuscripcion()
         {
@@ -56,7 +65,10 @@ namespace AdLocalAPI.Services
                     FechaInicio = suscripcion.FechaInicio,
                     FechaFin = suscripcion.FechaFin,
                     Activa = suscripcion.Activa,
-                    Estado = suscripcion.Estado
+                    Estado = suscripcion.Estado,
+                    Monto = suscripcion.Monto,
+                    Tipo = "",
+                    Moneda = suscripcion.Moneda,
                 }
             );
         }
@@ -69,13 +81,15 @@ namespace AdLocalAPI.Services
             if (suscripcion == null)
                 return ApiResponse<object>.Error("404", "No hay suscripción activa");
 
-            suscripcion.Activa = false;
+            suscripcion.AutoRenovacion = false;
             suscripcion.Estado = "Cancelada";
-            suscripcion.FechaFin = DateTime.UtcNow;
 
             await _repository.UpdateAsync(suscripcion);
 
-            return ApiResponse<object>.Success(null, "Suscripción cancelada");
+            return ApiResponse<object>.Success(
+                null,
+                "La suscripción se cancelará al finalizar el periodo actual"
+            );
         }
         public async Task<bool> TieneSuscripcionActiva(int usuarioId)
         {

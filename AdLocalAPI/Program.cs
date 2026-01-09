@@ -1,6 +1,7 @@
 using AdLocalAPI.Data;
 using AdLocalAPI.Helpers;
 using AdLocalAPI.Interfaces;
+using AdLocalAPI.Interfaces.ProductosServicios;
 using AdLocalAPI.Interfaces.Tarjetas;
 using AdLocalAPI.Repositories;
 using AdLocalAPI.Services;
@@ -32,6 +33,13 @@ var jwtKey = Environment.GetEnvironmentVariable("JWT__Key")
 
 var jwtIssuer = Environment.GetEnvironmentVariable("JWT__Issuer")
     ?? "AdLocalAPI";
+
+var webhookSecret = Environment.GetEnvironmentVariable("STRIPE_WEBHOOK_SECRET");
+
+if (string.IsNullOrWhiteSpace(webhookSecret))
+{
+    throw new Exception("Stripe Webhook Secret no configurado");
+}
 
 // Stripe
 //var stripeSecret = Environment.GetEnvironmentVariable("STRIPE__SecretKey");
@@ -107,10 +115,16 @@ builder.Services.AddScoped<ComercioService>();
 builder.Services.AddScoped<UsuarioRepository>();
 builder.Services.AddScoped<UsuarioService>();
 
+builder.Services.AddScoped<IProductosServiciosRepository, ProductosServiciosRepository>();
+builder.Services.AddScoped<IProductosServiciosService, ProductosServiciosService>();
+
 builder.Services.AddScoped<PlanRepository>();
 builder.Services.AddScoped<AdLocalAPI.Services.PlanService>();
 
 builder.Services.AddScoped<SuscripcionRepository>();
+builder.Services.AddScoped<SuscripcionService>();
+
+builder.Services.AddScoped<StripeService>();
 
 builder.Services.AddScoped<IConfiguracionService, ConfiguracionService>();
 builder.Services.AddScoped<IConfiguracionRepository, ConfiguracionRepository>();
