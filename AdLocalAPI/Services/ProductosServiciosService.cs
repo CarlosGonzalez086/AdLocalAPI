@@ -22,6 +22,13 @@ namespace AdLocalAPI.Services
             {
                 long idUser = _jwtContext.GetUserId();
                 long idComercio = (int)_jwtContext.GetComercioId();
+                if (idComercio == 0 || idComercio == null)
+                {
+                    return ApiResponse<ProductosServiciosDto>.Error(
+                        "900",
+                        "Debes registrar un comercio o negocio antes de agregar un producto o servicio."
+                    );
+                }
                 var entity = new ProductosServicios
                 {
                     IdComercio = idComercio,
