@@ -34,12 +34,12 @@ var jwtKey = Environment.GetEnvironmentVariable("JWT__Key")
 var jwtIssuer = Environment.GetEnvironmentVariable("JWT__Issuer")
     ?? "AdLocalAPI";
 
-var webhookSecret = Environment.GetEnvironmentVariable("STRIPE_WEBHOOK_SECRET");
+//var webhookSecret = Environment.GetEnvironmentVariable("STRIPE_WEBHOOK_SECRET");
 
-if (string.IsNullOrWhiteSpace(webhookSecret))
-{
-    throw new Exception("Stripe Webhook Secret no configurado");
-}
+//if (string.IsNullOrWhiteSpace(webhookSecret))
+//{
+//    throw new Exception("Stripe Webhook Secret no configurado");
+//}
 
 // Stripe
 //var stripeSecret = Environment.GetEnvironmentVariable("STRIPE__SecretKey");
