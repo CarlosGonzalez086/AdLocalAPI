@@ -1,6 +1,7 @@
 using AdLocalAPI.Data;
 using AdLocalAPI.Helpers;
 using AdLocalAPI.Interfaces;
+using AdLocalAPI.Interfaces.Comercio;
 using AdLocalAPI.Interfaces.ProductosServicios;
 using AdLocalAPI.Interfaces.Tarjetas;
 using AdLocalAPI.Repositories;
@@ -113,6 +114,8 @@ builder.Services.AddScoped<JwtContext>();
 
 builder.Services.AddScoped<ComercioRepository>();
 builder.Services.AddScoped<ComercioService>();
+builder.Services.AddScoped<IRelComercioImagenRepositorio, RelComercioImagenRepositorio>();
+
 
 builder.Services.AddScoped<UsuarioRepository>();
 builder.Services.AddScoped<UsuarioService>();

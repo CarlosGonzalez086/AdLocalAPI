@@ -18,6 +18,7 @@ namespace AdLocalAPI.Data
         public DbSet<ConfiguracionSistema> ConfiguracionSistema { get; set; }
         public DbSet<Tarjeta> Tarjeta { get; set; }
         public DbSet<ProductosServicios> ProductosServicios { get; set; }
+        public DbSet<RelComercioImagen> RelComercioImagen { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -129,6 +130,28 @@ namespace AdLocalAPI.Data
                 .Property(e => e.FechaCreacion)
                 .ValueGeneratedOnAdd()
                 .Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Ignore);
+
+            modelBuilder.Entity<RelComercioImagen>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.Id)
+                      .HasColumnName("id");
+
+                entity.Property(e => e.IdComercio)
+                      .HasColumnName("id_comercio");
+
+                entity.Property(e => e.FotoUrl)
+                      .HasColumnName("foto_url")
+                      .IsRequired();
+
+                entity.Property(e => e.FechaCreacion)
+                      .HasColumnName("fecha_creacion")
+                      .HasDefaultValueSql("NOW()");
+
+                entity.Property(e => e.FechaActualizacion)
+                      .HasColumnName("fecha_actualizacion");
+            });
         }
 
     }
