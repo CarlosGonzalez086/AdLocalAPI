@@ -1,6 +1,7 @@
 ﻿using AdLocalAPI.DTOs;
 using AdLocalAPI.Models;
 using AdLocalAPI.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AdLocalAPI.Controllers
@@ -15,34 +16,34 @@ namespace AdLocalAPI.Controllers
         {
             _service = service;
         }
-
+        [Authorize]
         [HttpPost]
         public async Task<IActionResult> Crear([FromBody] ComercioCreateDto dto)
         {
             var response = await _service.CreateComercio(dto);
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
-
+        [Authorize]
         [HttpPut("{id}")]
-        public async Task<IActionResult> Actualizar(int id, [FromBody] ComercioUpdateDto dto)
+        public async Task<IActionResult> Actualizar([FromBody] ComercioUpdateDto dto)
         {
-            var response = await _service.UpdateComercio(id, dto);
+            var response = await _service.UpdateComercio(dto);
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
-
+        [Authorize]
         [HttpDelete("{id}")]
         public async Task<IActionResult> Eliminar(int id)
         {
             var response = await _service.DeleteComercio(id);
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
-
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
             var response = await _service.GetComercioById(id);
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
+        [Authorize]
         [HttpGet("mine")]
         public async Task<IActionResult> GetMine()
         {
