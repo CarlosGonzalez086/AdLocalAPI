@@ -1,5 +1,6 @@
 ﻿using AdLocalAPI.DTOs;
 using AdLocalAPI.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AdLocalAPI.Controllers
@@ -32,6 +33,7 @@ namespace AdLocalAPI.Controllers
                 ? Ok(response)
                 : BadRequest(response);
         }
+        [Authorize]
         [HttpPut]
         public async Task<IActionResult> UpdateAdmin([FromBody] UsuarioUpdateDto dto)
         {
@@ -40,6 +42,7 @@ namespace AdLocalAPI.Controllers
           ? Ok(response)
           : BadRequest(response);
         }
+        [Authorize]
         [HttpPut("cambiar-password")]
         public async Task<IActionResult> CambiarPassword([FromBody] ChangePasswordDto dto)
         {
@@ -49,7 +52,7 @@ namespace AdLocalAPI.Controllers
                 ? Ok(response)
                 : BadRequest(response);
         }
-
+        [Authorize]
         [HttpGet]
         public async Task<IActionResult> VerAdmin()
         {
@@ -58,6 +61,7 @@ namespace AdLocalAPI.Controllers
           ? Ok(response)
           : BadRequest(response);
         }
+        [Authorize]
         [HttpPost("actualizar-jwt")]
         public async Task<IActionResult> ActualizarJwt([FromBody] UpdateJwtRequest request)
         {

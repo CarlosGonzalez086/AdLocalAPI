@@ -239,18 +239,18 @@ namespace AdLocalAPI.Services
 
                 var responseDto = new ComercioMineDto
                 {
-                    Id = comercio.Id,
-                    Nombre = comercio.Nombre,
-                    Direccion = comercio.Direccion,
-                    Telefono = comercio.Telefono,
-                    Descripcion = comercio.Descripcion,
-                    Email = comercio.Email,
-                    Activo = comercio.Activo,
-                    LogoBase64 = comercio.LogoUrl,
-                    Lat = comercio.Ubicacion.Y,
-                    Lng = comercio.Ubicacion.X,
-                    ColorPrimario = comercio.ColorPrimario,
-                    ColorSecundario = comercio.ColorSecundario,
+                    Id = creado.Id,
+                    Nombre = creado.Nombre,
+                    Direccion = creado.Direccion,
+                    Telefono = creado.Telefono,
+                    Descripcion = creado.Descripcion,
+                    Email = creado.Email,
+                    Activo = creado.Activo,
+                    LogoBase64 = creado.LogoUrl,
+                    Lat = creado.Ubicacion.Y,
+                    Lng = creado.Ubicacion.X,
+                    ColorPrimario = creado.ColorPrimario,
+                    ColorSecundario = creado.ColorSecundario,
                 };
 
                 return ApiResponse<object>.Success(

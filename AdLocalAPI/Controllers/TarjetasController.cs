@@ -1,9 +1,11 @@
 ﻿using AdLocalAPI.DTOs;
 using AdLocalAPI.Interfaces.Tarjetas;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AdLocalAPI.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class TarjetasController : ControllerBase

@@ -1,9 +1,11 @@
 ﻿using AdLocalAPI.Models;
 using AdLocalAPI.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AdLocalAPI.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public class UsuariosController : ControllerBase
