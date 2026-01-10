@@ -1,5 +1,6 @@
 ﻿using AdLocalAPI.DTOs;
 using AdLocalAPI.Helpers;
+using AdLocalAPI.Interfaces.Comercio;
 using AdLocalAPI.Models;
 using AdLocalAPI.Repositories;
 using NetTopologySuite.Geometries;
@@ -10,11 +11,13 @@ namespace AdLocalAPI.Services
     {
         private readonly ComercioRepository _repository;
         private readonly JwtContext _jwtContext;
+        private readonly IRelComercioImagenRepositorio _comercioImagenRepositorio;
 
-        public ComercioService(ComercioRepository repository, JwtContext jwtContext)
+        public ComercioService(ComercioRepository repository, JwtContext jwtContext, IRelComercioImagenRepositorio comercioImagenRepositorio)
         {
             _repository = repository;
             _jwtContext = jwtContext;
+            _comercioImagenRepositorio = comercioImagenRepositorio;
         }
 
         // 🔹 Obtener todos los comercios
@@ -36,35 +39,24 @@ namespace AdLocalAPI.Services
         }
 
         // 🔹 Obtener comercio por ID
-        public async Task<ApiResponse<object>> GetComercioById(int id)
+        public async Task<ApiResponse<ComercioMineDto>> GetComercioById(int id)
         {
             try
             {
                 var comercio = await _repository.GetByIdAsync(id);
 
                 if (comercio == null)
-                    return ApiResponse<object>.Error("404", "Comercio no encontrado");
+                    return ApiResponse<ComercioMineDto>.Error("404", "Comercio no encontrado");
 
-                return ApiResponse<object>.Success(
-                    comercio,
-                    "Comercio obtenido correctamente"
-                );
-            }
-            catch (Exception ex)
-            {
-                return ApiResponse<object>.Error("500", ex.Message);
-            }
-        }
-        // 🔹 Obtener comercio por ID
-        public async Task<ApiResponse<object>> GetComercioByUser()
-        {
-            try
-            {
-                long idUser = _jwtContext.GetUserId();
-                var comercio = await _repository.GetComercioByUser(idUser);
-
-                if (comercio == null)
-                    return ApiResponse<object>.Error("404", "Comercio no encontrado");
+                var listaImagenes = await _comercioImagenRepositorio.ObtenerPorComercio(comercio.Id);
+                List<string> Imagenes = new List<string>();
+                if (listaImagenes.Count > 0)
+                {
+                    foreach (var item in listaImagenes)
+                    {
+                        Imagenes.Add(item.FotoUrl);
+                    }
+                }
 
                 var dto = new ComercioMineDto
                 {
@@ -72,20 +64,73 @@ namespace AdLocalAPI.Services
                     Nombre = comercio.Nombre,
                     Direccion = comercio.Direccion,
                     Telefono = comercio.Telefono,
+                    Descripcion = comercio.Descripcion,
+                    Email = comercio.Email,
                     Activo = comercio.Activo,
                     LogoBase64 = comercio.LogoUrl,
-                    Lat = comercio.Ubicacion != null ? comercio.Ubicacion.Y : null,
-                    Lng = comercio.Ubicacion != null ? comercio.Ubicacion.X : null
+                    Lat = comercio.Ubicacion.Y,
+                    Lng = comercio.Ubicacion.X,
+                    ColorPrimario = comercio.ColorPrimario,
+                    ColorSecundario = comercio.ColorSecundario,
+                    Imagenes = Imagenes,
                 };
 
-                return ApiResponse<object>.Success(
+                return ApiResponse<ComercioMineDto>.Success(
                     dto,
                     "Comercio obtenido correctamente"
                 );
             }
             catch (Exception ex)
             {
-                return ApiResponse<object>.Error("500", ex.Message);
+                return ApiResponse<ComercioMineDto>.Error("500", ex.Message);
+            }
+        }
+        // 🔹 Obtener comercio por ID
+        public async Task<ApiResponse<ComercioMineDto>> GetComercioByUser()
+        {
+            try
+            {
+                long idUser = _jwtContext.GetUserId();
+                var comercio = await _repository.GetComercioByUser(idUser);
+
+                if (comercio == null)
+                    return ApiResponse<ComercioMineDto>.Error("404", "Comercio no encontrado");
+
+                var listaImagenes = await _comercioImagenRepositorio.ObtenerPorComercio(comercio.Id);
+                List<string> Imagenes = new List<string>();
+                if (listaImagenes.Count > 0)
+                {
+                    foreach (var item in listaImagenes)
+                    {
+                        Imagenes.Add(item.FotoUrl);
+                    }
+                }
+
+                var dto = new ComercioMineDto
+                {
+                    Id = comercio.Id,
+                    Nombre = comercio.Nombre,
+                    Direccion = comercio.Direccion,
+                    Telefono = comercio.Telefono,
+                    Descripcion = comercio.Descripcion,
+                    Email = comercio.Email,
+                    Activo = comercio.Activo,
+                    LogoBase64 = comercio.LogoUrl,
+                    Lat = comercio.Ubicacion.Y,
+                    Lng = comercio.Ubicacion.X,
+                    ColorPrimario = comercio.ColorPrimario,
+                    ColorSecundario = comercio.ColorSecundario,
+                    Imagenes = Imagenes,
+                };
+
+                return ApiResponse<ComercioMineDto>.Success(
+                    dto,
+                    "Comercio obtenido correctamente"
+                );
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<ComercioMineDto>.Error("500", ex.Message);
             }
         }
 
@@ -136,6 +181,8 @@ namespace AdLocalAPI.Services
                     );
                 }
 
+
+
                 var comercio = new Comercio
                 {
                     Nombre = dto.Nombre,
@@ -145,6 +192,10 @@ namespace AdLocalAPI.Services
                     Activo = true,
                     FechaCreacion = DateTime.UtcNow,
                     IdUsuario = userId,
+                    ColorPrimario = dto.ColorPrimario,
+                    ColorSecundario = dto.ColorSecundario,
+                    Descripcion = dto.Descripcion,      
+                    Email = dto.Email,
                     Ubicacion = new NetTopologySuite.Geometries.Point(dto.Lng, dto.Lat)
                     {
                         SRID = 4326
@@ -153,16 +204,53 @@ namespace AdLocalAPI.Services
 
                 var creado = await _repository.CreateAsync(comercio);
 
+                if (dto.Imagenes?.Count > 0)
+                {
+                    foreach (var item in dto.Imagenes)
+                    {
+                        try
+                        {
+                            string? contentType = TiposImagenPermitidos
+                                .FirstOrDefault(x => item.StartsWith(x.Value))
+                                .Key;
+
+                            if (contentType == null)
+                                continue;
+
+                            string base64Clean = item
+                                .Replace($"data:{contentType};base64,", string.Empty);
+
+                            byte[] imageBytes = Convert.FromBase64String(base64Clean);
+
+                            var imagenUrl = await _comercioImagenRepositorio
+                                .UploadToSupabaseAsync(imageBytes, (int)userId, contentType);
+
+                            if (string.IsNullOrEmpty(imagenUrl))
+                                continue;
+
+                            await _comercioImagenRepositorio.Crear(creado.Id, imagenUrl);
+                        }
+                        catch
+                        {
+                            continue;
+                        }
+                    }
+                }
+
                 var responseDto = new ComercioMineDto
                 {
                     Id = comercio.Id,
                     Nombre = comercio.Nombre,
                     Direccion = comercio.Direccion,
                     Telefono = comercio.Telefono,
+                    Descripcion = comercio.Descripcion,
+                    Email = comercio.Email,
                     Activo = comercio.Activo,
                     LogoBase64 = comercio.LogoUrl,
-                    Lat = comercio.Ubicacion?.Y,
-                    Lng = comercio.Ubicacion?.X
+                    Lat = comercio.Ubicacion.Y,
+                    Lng = comercio.Ubicacion.X,
+                    ColorPrimario = comercio.ColorPrimario,
+                    ColorSecundario = comercio.ColorSecundario,
                 };
 
                 return ApiResponse<object>.Success(
@@ -212,6 +300,10 @@ namespace AdLocalAPI.Services
                 comercio.Nombre = dto.Nombre;
                 comercio.Direccion = dto.Direccion;
                 comercio.Telefono = dto.Telefono;
+                comercio.Descripcion = dto.Descripcion;
+                comercio.ColorPrimario = dto.ColorPrimario;
+                comercio.ColorSecundario = dto.ColorSecundario;
+                comercio.Email = dto.Email;
                 comercio.Activo = dto.Activo;
 
                 if (!string.IsNullOrWhiteSpace(dto.LogoBase64) &&
@@ -257,17 +349,15 @@ namespace AdLocalAPI.Services
 
 
                 if (
-                    dto.Lat.HasValue &&
-                    dto.Lng.HasValue &&
-                    !double.IsNaN(dto.Lat.Value) &&
-                    !double.IsNaN(dto.Lng.Value) &&
-                    !double.IsInfinity(dto.Lat.Value) &&
-                    !double.IsInfinity(dto.Lng.Value)
+                    !double.IsNaN(dto.Lat) &&
+                    !double.IsNaN(dto.Lng) &&
+                    !double.IsInfinity(dto.Lat) &&
+                    !double.IsInfinity(dto.Lng)
                 )
                 {
                     comercio.Ubicacion = new NetTopologySuite.Geometries.Point(
-                        dto.Lng.Value,
-                        dto.Lat.Value
+                        dto.Lng,
+                        dto.Lat
                     )
                     {
                         SRID = 4326
@@ -281,18 +371,68 @@ namespace AdLocalAPI.Services
 
                 await _repository.UpdateAsync(comercio);
 
+                if (dto.Imagenes?.Count > 0)
+                {
+                    var imagenesActuales = await _comercioImagenRepositorio.ObtenerPorComercio(comercio.Id);
+                    var urlsRecibidas = dto.Imagenes.Where(x => !string.IsNullOrWhiteSpace(x) && EsUrl(x)).ToList();
+                    foreach (var img in imagenesActuales)
+                    {
+                        if (!urlsRecibidas.Contains(img.FotoUrl))
+                        {
+                            await _comercioImagenRepositorio
+                                .Eliminar(comercio.Id, img.FotoUrl);
+                        }
+                    }
+
+                    foreach (var item in dto.Imagenes)
+                    {
+                        try
+                        {
+                            if (!string.IsNullOrWhiteSpace(item) &&!EsUrl(item)) 
+                            {
+                                string? contentType = TiposImagenPermitidos.FirstOrDefault(x => item.StartsWith(x.Value)).Key;
+
+                                if (contentType == null)
+                                    continue;
+
+                                string base64Clean = item
+                                    .Replace($"data:{contentType};base64,", string.Empty);
+
+                                byte[] imageBytes = Convert.FromBase64String(base64Clean);
+
+                                var imagenUrl = await _comercioImagenRepositorio
+                                    .UploadToSupabaseAsync(imageBytes, (int)userId, contentType);
+
+                                if (string.IsNullOrEmpty(imagenUrl))
+                                    continue;
+
+                                await _comercioImagenRepositorio
+                                    .Crear(comercio.Id, imagenUrl);
+                            }
+  
+                        }
+                        catch
+                        {
+                            continue;
+                        }
+                    }
+                }
+
                 var responseDto = new ComercioMineDto
                 {
                     Id = comercio.Id,
                     Nombre = comercio.Nombre,
                     Direccion = comercio.Direccion,
                     Telefono = comercio.Telefono,
+                    Descripcion = comercio.Descripcion,
+                    Email = comercio.Email,
                     Activo = comercio.Activo,
                     LogoBase64 = comercio.LogoUrl,
-                    Lat = comercio.Ubicacion?.Y,
-                    Lng = comercio.Ubicacion?.X
+                    Lat = comercio.Ubicacion.Y,
+                    Lng = comercio.Ubicacion.X,
+                    ColorPrimario = comercio.ColorPrimario,
+                    ColorSecundario = comercio.ColorSecundario,
                 };
-
 
                 return ApiResponse<object>.Success(
                     responseDto,
@@ -342,6 +482,16 @@ namespace AdLocalAPI.Services
                 {
                     await _repository.DeleteFromSupabaseByUrlAsync(comercio.LogoUrl);
                 }
+                var listaImagenes = await _comercioImagenRepositorio.ObtenerPorComercio(comercio.Id);
+                if (listaImagenes.Count > 0)
+                {
+                    foreach (var img in listaImagenes)
+                    {
+                        await _comercioImagenRepositorio
+                            .Eliminar(comercio.Id, img.FotoUrl);
+                    }
+                }
+
                 await _repository.DeleteAsync(id);
 
                 return ApiResponse<object>.Success(
@@ -377,8 +527,5 @@ namespace AdLocalAPI.Services
         {
             return value.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase);
         }
-
-
-
     }
 }

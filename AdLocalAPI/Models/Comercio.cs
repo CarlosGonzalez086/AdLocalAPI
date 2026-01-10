@@ -22,6 +22,11 @@ namespace AdLocalAPI.Models
         public string? Direccion { get; set; }
         public string? LogoUrl { get; set; }
         public Point? Ubicacion { get; set; }
+        [MaxLength(7)]
+        public string? ColorPrimario { get; set; }  
+
+        [MaxLength(7)]
+        public string? ColorSecundario { get; set; } 
 
         public bool Activo { get; set; } = true;
         public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
