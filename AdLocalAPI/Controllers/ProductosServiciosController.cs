@@ -40,7 +40,7 @@ namespace AdLocalAPI.Controllers
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
 
-        [HttpPatch("desactivar/{id}")]
+        [HttpPut("desactivar/{id}")]
         public async Task<IActionResult> Desactivar(long id)
         {
             var response = await _service.DesactivarAsync(id);

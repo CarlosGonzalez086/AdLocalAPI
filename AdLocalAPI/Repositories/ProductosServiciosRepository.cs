@@ -3,16 +3,21 @@ using AdLocalAPI.DTOs;
 using AdLocalAPI.Interfaces.ProductosServicios;
 using AdLocalAPI.Models;
 using Microsoft.EntityFrameworkCore;
+using Supabase.Interfaces;
 
 namespace AdLocalAPI.Repositories
 {
     public class ProductosServiciosRepository : IProductosServiciosRepository
     {
         private readonly AppDbContext _context;
+        private readonly Supabase.Client _supabaseClient;
+        private readonly IWebHostEnvironment _env;
 
-        public ProductosServiciosRepository(AppDbContext context)
+        public ProductosServiciosRepository(AppDbContext context, Supabase.Client supabaseClient, IWebHostEnvironment env)
         {
             _context = context;
+            _supabaseClient = supabaseClient;
+            _env = env;
         }
 
         public async Task<ProductosServicios> CreateAsync(ProductosServicios entity)
@@ -67,8 +72,9 @@ namespace AdLocalAPI.Repositories
                     Descripcion = x.Descripcion,
                     Tipo = (int)x.Tipo,
                     Precio = x.Precio,
-                    Stock = x.Stock,
-                    Activo = x.Activo
+                    Stock = (int)x.Stock,
+                    Activo = x.Activo,
+                    ImagenBase64 = x.LogoUrl,
                 })
                 .ToListAsync();
 
@@ -82,6 +88,58 @@ namespace AdLocalAPI.Repositories
             };
 
             return ApiResponse<PagedResponse<ProductosServiciosDto>>.Success(pagedResponse, "Listado de productos/servicios");
+        }
+        public async Task<string> UploadToSupabaseAsync(
+            byte[] imageBytes,
+            int userId,
+            string contentType = "image/png")
+        {
+            try
+            {
+                string envPrefix = _env.IsProduction() ? "prod" : "local";
+                string fileName = $"{envPrefix}_ProductosServicios_{userId}_{DateTime.UtcNow.Ticks}.png";
+
+                var bucket = _supabaseClient.Storage.From("ProductosServicios");
+
+                var options = new Supabase.Storage.FileOptions
+                {
+                    ContentType = contentType
+                };
+
+                await bucket.Upload(imageBytes, fileName, options);
+
+                return bucket.GetPublicUrl(fileName);
+            }
+            catch (Exception ex)
+            {
+                // aquí puedes usar ILogger si lo tienes
+                // _logger.LogError(ex, "Error al subir imagen a Supabase");
+
+                throw new Exception("Error al subir la imagen a Supabase.", ex);
+            }
+        }
+
+        public async Task<bool> DeleteFromSupabaseByUrlAsync(string publicUrl)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(publicUrl))
+                    return false;
+
+                var uri = new Uri(publicUrl);
+
+                var path = uri.AbsolutePath.Split("/ProductosServicios/").Last();
+
+                var bucket = _supabaseClient.Storage.From("ProductosServicios");
+
+                await bucket.Remove(path);
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }

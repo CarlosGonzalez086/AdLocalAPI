@@ -2,6 +2,8 @@
 using AdLocalAPI.Helpers;
 using AdLocalAPI.Interfaces.ProductosServicios;
 using AdLocalAPI.Models;
+using FluentValidation;
+using Supabase.Gotrue;
 
 namespace AdLocalAPI.Services
 {
@@ -9,24 +11,72 @@ namespace AdLocalAPI.Services
     {
         private readonly IProductosServiciosRepository _repository;
         private readonly JwtContext _jwtContext;
+        private readonly IValidator<ProductosServiciosDto> _validator; 
 
-        public ProductosServiciosService(IProductosServiciosRepository repository,JwtContext jwtContext)
+        public ProductosServiciosService(
+            IProductosServiciosRepository repository,
+            JwtContext jwtContext,
+            IValidator<ProductosServiciosDto> validator)
         {
             _repository = repository;
             _jwtContext = jwtContext;
+            _validator = validator;
         }
+
 
         public async Task<ApiResponse<ProductosServiciosDto>> CreateAsync(ProductosServiciosDto dto)
         {
+            long idUser = _jwtContext.GetUserId();
+            long idComercio = (int)_jwtContext.GetComercioId();
+            // Validación aquí
+            var validationResult = await _validator.ValidateAsync(dto);
+
+            if (!validationResult.IsValid)
+            {
+                var errors = validationResult.Errors
+                    .GroupBy(e => e.PropertyName)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.Select(e => e.ErrorMessage).ToArray()
+                    );
+
+                return ApiResponse<ProductosServiciosDto>.Error("400", "Validación fallida");
+            }
+
             try
             {
-                long idUser = _jwtContext.GetUserId();
-                long idComercio = (int)_jwtContext.GetComercioId();
+
                 if (idComercio == 0 || idComercio == null)
                 {
                     return ApiResponse<ProductosServiciosDto>.Error(
                         "900",
                         "Debes registrar un comercio o negocio antes de agregar un producto o servicio."
+                    );
+                }
+                string? logoUrl = null;
+                if (!string.IsNullOrWhiteSpace(dto.ImagenBase64))
+                {
+                    string? contentType = TiposImagenPermitidos
+                        .FirstOrDefault(x => dto.ImagenBase64.StartsWith(x.Value))
+                        .Key;
+
+                    if (contentType == null)
+                    {
+                        return ApiResponse<ProductosServiciosDto>.Error(
+                            "400",
+                            "Formato de imagen no permitido. Usa JPG, PNG o WEBP"
+                        );
+                    }
+
+                    string base64Clean = dto.ImagenBase64
+                        .Replace($"data:{contentType};base64,", string.Empty);
+
+                    byte[] imageBytes = Convert.FromBase64String(base64Clean);
+
+                    logoUrl = await _repository.UploadToSupabaseAsync(
+                        imageBytes,
+                        (int)idUser,
+                        contentType
                     );
                 }
                 var entity = new ProductosServicios
@@ -38,12 +88,12 @@ namespace AdLocalAPI.Services
                     Tipo = (TipoProductoServicio)dto.Tipo,
                     Precio = dto.Precio,
                     Stock = dto.Stock,
-                    FechaCreacion = DateTime.UtcNow
+                    FechaCreacion = DateTime.UtcNow,
+                    LogoUrl = logoUrl,
                 };
 
                 var result = await _repository.CreateAsync(entity);
                 dto.Id = result.Id;
-
                 return ApiResponse<ProductosServiciosDto>.Success(dto, "Producto/Servicio creado correctamente");
             }
             catch (Exception ex)
@@ -62,7 +112,7 @@ namespace AdLocalAPI.Services
                 Descripcion = x.Descripcion,
                 Tipo = (int)x.Tipo,
                 Precio = x.Precio,
-                Stock = x.Stock,
+                Stock = (int)x.Stock,
                 Activo = x.Activo
             });
 
@@ -86,7 +136,7 @@ namespace AdLocalAPI.Services
                 Descripcion = entity.Descripcion,
                 Tipo = (int)entity.Tipo,
                 Precio = entity.Precio,
-                Stock = entity.Stock,
+                Stock = (int)entity.Stock,
                 Activo = entity.Activo
             };
 
@@ -101,6 +151,46 @@ namespace AdLocalAPI.Services
 
             if (entity == null)
                 return ApiResponse<bool>.Error("404", "Producto/Servicio no encontrado");
+
+            if (!string.IsNullOrWhiteSpace(dto.ImagenBase64) && !EsUrl(dto.ImagenBase64))
+            {
+                if (!EsImagenBase64(dto.ImagenBase64))
+                {
+                    return ApiResponse<bool>.Error(
+                        "400",
+                        "Formato de imagen inválido"
+                    );
+                }
+
+                string? contentType = TiposImagenPermitidos
+                    .FirstOrDefault(x => dto.ImagenBase64.StartsWith(x.Value))
+                    .Key;
+
+                if (contentType == null)
+                {
+                    return ApiResponse<bool>.Error(
+                        "400",
+                        "Formato de imagen no permitido. Usa JPG, PNG o WEBP"
+                    );
+                }
+
+                string base64Clean = dto.ImagenBase64.Replace(
+                    $"data:{contentType};base64,", string.Empty
+                );
+
+                byte[] imageBytes = Convert.FromBase64String(base64Clean);
+
+                if (!string.IsNullOrWhiteSpace(entity.LogoUrl))
+                {
+                    await _repository.DeleteFromSupabaseByUrlAsync(entity.LogoUrl);
+                }
+
+                entity.LogoUrl = await _repository.UploadToSupabaseAsync(
+                    imageBytes,
+                    (int)idUser,
+                    contentType
+                );
+            }
 
             entity.Nombre = dto.Nombre;
             entity.Descripcion = dto.Descripcion;
@@ -122,6 +212,11 @@ namespace AdLocalAPI.Services
 
             if (entity == null)
                 return ApiResponse<bool>.Error("404", "Producto/Servicio no encontrado");
+
+            if (!string.IsNullOrWhiteSpace(entity.LogoUrl))
+            {
+                await _repository.DeleteFromSupabaseByUrlAsync(entity.LogoUrl);
+            }
 
             entity.Eliminado = true;
             entity.Activo = false;
@@ -146,7 +241,7 @@ namespace AdLocalAPI.Services
 
             await _repository.UpdateAsync(entity);
 
-            return ApiResponse<bool>.Success(true, "Desactivado correctamente");
+            return ApiResponse<bool>.Success(true, entity.Activo ? "Activado correctamente" : "Desactivado correctamente");
         }
 
         public async Task<ApiResponse<PagedResponse<ProductosServiciosDto>>> GetAllPagedAsync(
@@ -155,6 +250,25 @@ namespace AdLocalAPI.Services
             long idUser = _jwtContext.GetUserId();
             long idComercio = (int)_jwtContext.GetComercioId();
             return await _repository.GetAllPagedAsync(idUser,idComercio, page, pageSize, orderBy, search);
+        }
+        private static readonly Dictionary<string, string> TiposImagenPermitidos = new()
+        {
+            { "image/jpeg", "data:image/jpeg;base64," },
+            { "image/jpg",  "data:image/jpg;base64,"  },
+            { "image/png",  "data:image/png;base64,"  },
+            { "image/webp", "data:image/webp;base64," }
+        };
+        private bool EsUrl(string value)
+        {
+            if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
+                return false;
+
+            return uri.Scheme == Uri.UriSchemeHttp
+                || uri.Scheme == Uri.UriSchemeHttps;
+        }
+        private bool EsImagenBase64(string value)
+        {
+            return value.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase);
         }
     }
 }

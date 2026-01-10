@@ -367,7 +367,11 @@ namespace AdLocalAPI.Services
         };
         private bool EsUrl(string value)
         {
-            return Uri.TryCreate(value, UriKind.Absolute, out _);
+            if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
+                return false;
+
+            return uri.Scheme == Uri.UriSchemeHttp
+                || uri.Scheme == Uri.UriSchemeHttps;
         }
         private bool EsImagenBase64(string value)
         {

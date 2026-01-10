@@ -156,19 +156,8 @@ namespace AdLocalAPI.Services
             if (usuario == null)
                 return ApiResponse<object>.Error("404", "Usuario no encontrado");
 
-            bool existente = await _repository.ExistePorCorreoAsync(dto.Email);
-
-            if (existente)
-                return ApiResponse<object>.Error("400", "El correo ya está registrado");
-
             usuario.Nombre = dto.Nombre;
             usuario.Email = dto.Email;
-
-            if (!string.IsNullOrEmpty(dto.Password))
-                usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
-
-            if (usuario.Rol == "Comercio")
-                usuario.ComercioId = dto.ComercioId;
 
             await _repository.UpdateAsync(usuario);
 
