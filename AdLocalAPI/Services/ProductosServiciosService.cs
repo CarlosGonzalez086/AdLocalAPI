@@ -113,7 +113,8 @@ namespace AdLocalAPI.Services
                 Tipo = (int)x.Tipo,
                 Precio = x.Precio,
                 Stock = (int)x.Stock,
-                Activo = x.Activo
+                Activo = x.Activo,
+                ImagenBase64 = x.LogoUrl,
             });
 
             return ApiResponse<IEnumerable<ProductosServiciosDto>>
