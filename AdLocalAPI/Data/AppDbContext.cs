@@ -120,6 +120,10 @@ namespace AdLocalAPI.Data
                 entity.HasIndex(e => e.Activo);
                 entity.HasIndex(e => e.Eliminado);
                 entity.HasQueryFilter(e => !e.Eliminado);
+                entity.Property(e => e.FechaCreacion)
+                    .ValueGeneratedOnAdd()
+                    .HasDefaultValueSql("NOW()")
+                    .Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Ignore);
             });
             modelBuilder.Entity<ProductosServicios>()
                 .Property(e => e.FechaCreacion)
