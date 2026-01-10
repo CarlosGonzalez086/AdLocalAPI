@@ -221,6 +221,7 @@ namespace AdLocalAPI.Services
             entity.Eliminado = true;
             entity.Activo = false;
             entity.FechaEliminado = DateTime.UtcNow;
+            entity.FechaActualizacion = DateTime.UtcNow;
 
             await _repository.UpdateAsync(entity);
 
