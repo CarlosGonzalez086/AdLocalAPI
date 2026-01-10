@@ -28,6 +28,9 @@ namespace AdLocalAPI.Models
         [Column("descripcion")]
         public string? Descripcion { get; set; }
 
+        [Column("LogoUrl")]
+        public string? LogoUrl { get; set; }
+
         [Required]
         [Column("tipo")]
         public TipoProductoServicio Tipo { get; set; }

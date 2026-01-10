@@ -6,6 +6,8 @@ using AdLocalAPI.Interfaces.Tarjetas;
 using AdLocalAPI.Repositories;
 using AdLocalAPI.Services;
 using AdLocalAPI.Utils;
+using AdLocalAPI.Validators;
+using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
@@ -51,8 +53,7 @@ var jwtIssuer = Environment.GetEnvironmentVariable("JWT__Issuer")
 var supabaseUrl = Environment.GetEnvironmentVariable("SUPABASE__URL")
     ?? "https://uzgnfwbztoizcctyfdiv.supabase.co";
 
-var supabaseKey = Environment.GetEnvironmentVariable("SUPABASE__KEY")
-    ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6Z25md2J6dG9pemNjdHlmZGl2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2Njk0MzUyNywiZXhwIjoyMDgyNTE5NTI3fQ.opjCm_q7U9GX0ah7UUgRMzQJwBQhyBupWVGJQXY6v0I";
+var supabaseKey =  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6Z25md2J6dG9pemNjdHlmZGl2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2Njk0MzUyNywiZXhwIjoyMDgyNTE5NTI3fQ.opjCm_q7U9GX0ah7UUgRMzQJwBQhyBupWVGJQXY6v0I";
 
 // PostgreSQL / Supabase
 var connectionString = Environment
@@ -101,6 +102,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
 });
 
+builder.Services.AddValidatorsFromAssemblyContaining<ProductosServiciosDtoValidator>();
 
 // ======================================================
 // SERVICIOS Y REPOSITORIOS
