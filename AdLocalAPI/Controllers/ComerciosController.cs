@@ -25,9 +25,9 @@ namespace AdLocalAPI.Controllers
         }
         [Authorize]
         [HttpPut("{id}")]
-        public async Task<IActionResult> Actualizar(int id, [FromBody] ComercioUpdateDto dto)
+        public async Task<IActionResult> Actualizar([FromBody] ComercioUpdateDto dto)
         {
-            var response = await _service.UpdateComercio(id, dto);
+            var response = await _service.UpdateComercio(dto);
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
         [Authorize]

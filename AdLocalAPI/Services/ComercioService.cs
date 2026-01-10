@@ -139,6 +139,16 @@ namespace AdLocalAPI.Services
         {
             try
             {
+                long idUser = _jwtContext.GetUserId();
+                var comercioExistente = await _repository.GetComercioByUser(idUser);
+
+                if (comercioExistente != null)
+                {
+                    return ApiResponse<object>.Error(
+                        "409",
+                        "Ya existe un comercio registrado asociado a este usuario"
+                    );
+                }
                 if (string.IsNullOrWhiteSpace(dto.Nombre))
                     return ApiResponse<object>.Error(
                         "400",
@@ -277,11 +287,12 @@ namespace AdLocalAPI.Services
 
 
         // 🔹 Actualizar comercio
-        public async Task<ApiResponse<object>> UpdateComercio(int id, ComercioUpdateDto dto)
+        public async Task<ApiResponse<object>> UpdateComercio(ComercioUpdateDto dto)
         {
             try
             {
-                var comercio = await _repository.GetByIdAsync(id);
+                int idComercio = (int)_jwtContext.GetComercioId();
+                var comercio = await _repository.GetByIdAsync(idComercio);
 
                 if (comercio == null)
                     return ApiResponse<object>.Error(
