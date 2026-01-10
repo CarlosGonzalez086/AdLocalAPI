@@ -1,5 +1,6 @@
 ﻿using AdLocalAPI.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace AdLocalAPI.Data
 {
@@ -120,6 +121,10 @@ namespace AdLocalAPI.Data
                 entity.HasIndex(e => e.Eliminado);
                 entity.HasQueryFilter(e => !e.Eliminado);
             });
+            modelBuilder.Entity<ProductosServicios>()
+                .Property(e => e.FechaCreacion)
+                .ValueGeneratedOnAdd()
+                .Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Ignore);
         }
 
     }
