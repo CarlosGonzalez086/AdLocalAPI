@@ -390,7 +390,7 @@ namespace AdLocalAPI.Services
                     {
                         if (!urlsRecibidas.Contains(img.FotoUrl))
                         {
-                            await _repository.DeleteFromSupabaseByUrlAsync(img.FotoUrl);
+                            await _comercioImagenRepositorio.DeleteFromSupabaseByUrlAsync(img.FotoUrl);
                             await _comercioImagenRepositorio.Eliminar(comercio.Id, img.FotoUrl);
                         }
                     }
