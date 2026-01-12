@@ -122,6 +122,8 @@ builder.Services.AddScoped<UsuarioService>();
 
 builder.Services.AddScoped<IProductosServiciosRepository, ProductosServiciosRepository>();
 builder.Services.AddScoped<IProductosServiciosService, ProductosServiciosService>();
+builder.Services.AddScoped<IHorarioComercioService, HorarioComercioRepository>();
+
 
 builder.Services.AddScoped<PlanRepository>();
 builder.Services.AddScoped<AdLocalAPI.Services.PlanService>();
