@@ -1,4 +1,6 @@
-﻿namespace AdLocalAPI.DTOs
+﻿using AdLocalAPI.Models;
+
+namespace AdLocalAPI.DTOs
 {
     public class ComercioCreateDto
     {
@@ -14,5 +16,6 @@
         public string ColorPrimario { get; set; } = "";
         public string ColorSecundario { get; set; } = "";
         public bool Activo { get; set; } = false;
+        public ICollection<HorarioComercio> Horarios { get; set; } = new List<HorarioComercio>();
     }
 }

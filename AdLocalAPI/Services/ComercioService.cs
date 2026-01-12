@@ -12,12 +12,14 @@ namespace AdLocalAPI.Services
         private readonly ComercioRepository _repository;
         private readonly JwtContext _jwtContext;
         private readonly IRelComercioImagenRepositorio _comercioImagenRepositorio;
+        private readonly IHorarioComercioService _horarioComercioService;
 
-        public ComercioService(ComercioRepository repository, JwtContext jwtContext, IRelComercioImagenRepositorio comercioImagenRepositorio)
+        public ComercioService(ComercioRepository repository, JwtContext jwtContext, IRelComercioImagenRepositorio comercioImagenRepositorio, IHorarioComercioService horarioComercioService)
         {
             _repository = repository;
             _jwtContext = jwtContext;
             _comercioImagenRepositorio = comercioImagenRepositorio;
+            _horarioComercioService = horarioComercioService;
         }
 
         // 🔹 Obtener todos los comercios
@@ -58,6 +60,16 @@ namespace AdLocalAPI.Services
                     }
                 }
 
+                var listaHorarios = await _horarioComercioService.ObtenerHorariosPorComercioAsync(id);
+                List<HorarioComercio> Horarios = new List<HorarioComercio>();
+                if (listaHorarios.Count > 0)
+                {
+                    foreach (var item in listaHorarios)
+                    {
+                        Horarios.Add(item);
+                    }
+                }
+
                 var dto = new ComercioMineDto
                 {
                     Id = comercio.Id,
@@ -73,6 +85,7 @@ namespace AdLocalAPI.Services
                     ColorPrimario = comercio.ColorPrimario,
                     ColorSecundario = comercio.ColorSecundario,
                     Imagenes = Imagenes,
+                    Horarios = Horarios
                 };
 
                 return ApiResponse<ComercioMineDto>.Success(
@@ -106,6 +119,16 @@ namespace AdLocalAPI.Services
                     }
                 }
 
+                var listaHorarios = await _horarioComercioService.ObtenerHorariosPorComercioAsync(comercio.Id);
+                List<HorarioComercio> Horarios = new List<HorarioComercio>();
+                if (listaHorarios.Count > 0)
+                {
+                    foreach (var item in listaHorarios)
+                    {
+                        Horarios.Add(item);
+                    }
+                }
+
                 var dto = new ComercioMineDto
                 {
                     Id = comercio.Id,
@@ -121,6 +144,7 @@ namespace AdLocalAPI.Services
                     ColorPrimario = comercio.ColorPrimario,
                     ColorSecundario = comercio.ColorSecundario,
                     Imagenes = Imagenes,
+                    Horarios = Horarios
                 };
 
                 return ApiResponse<ComercioMineDto>.Success(
@@ -214,6 +238,14 @@ namespace AdLocalAPI.Services
 
                 var creado = await _repository.CreateAsync(comercio);
 
+                if (dto.Horarios.Count > 0)
+                {
+                    await _horarioComercioService.CrearHorariosAsync(
+                        creado.Id,
+                        dto.Horarios.ToList()
+                    );
+                }
+
                 if (dto.Imagenes?.Count > 0)
                 {
                     foreach (var item in dto.Imagenes)
@@ -247,24 +279,9 @@ namespace AdLocalAPI.Services
                     }
                 }
 
-                var responseDto = new ComercioMineDto
-                {
-                    Id = creado.Id,
-                    Nombre = creado.Nombre,
-                    Direccion = creado.Direccion,
-                    Telefono = creado.Telefono,
-                    Descripcion = creado.Descripcion,
-                    Email = creado.Email,
-                    Activo = creado.Activo,
-                    LogoBase64 = creado.LogoUrl,
-                    Lat = creado.Ubicacion.Y,
-                    Lng = creado.Ubicacion.X,
-                    ColorPrimario = creado.ColorPrimario,
-                    ColorSecundario = creado.ColorSecundario,
-                };
 
                 return ApiResponse<object>.Success(
-                    responseDto,
+                    null,
                     "El comercio se creó correctamente"
                 );
             }
@@ -381,6 +398,19 @@ namespace AdLocalAPI.Services
 
 
                 await _repository.UpdateAsync(comercio);
+
+                if (dto.Horarios.Count > 0)
+                {
+                    bool siTiene = await _horarioComercioService.ComercioTieneHorariosAsync(comercio.Id);
+                    if (siTiene)
+                    {
+                        await _horarioComercioService.ActualizarHorariosAsync(comercio.Id,dto.Horarios.ToList());
+                    }
+                    else 
+                    {                      
+                        await _horarioComercioService.CrearHorariosAsync(comercio.Id,dto.Horarios.ToList());
+                    }
+                }
 
                 if (dto.Imagenes?.Count > 0)
                 {
@@ -501,6 +531,11 @@ namespace AdLocalAPI.Services
                         await _comercioImagenRepositorio
                             .Eliminar(comercio.Id, img.FotoUrl);
                     }
+                }
+                bool siTiene = await _horarioComercioService.ComercioTieneHorariosAsync(comercio.Id);
+                if (siTiene)
+                {
+                    await _horarioComercioService.EliminarHorariosPorComercioAsync(comercio.Id);
                 }
 
                 await _repository.DeleteAsync(id);

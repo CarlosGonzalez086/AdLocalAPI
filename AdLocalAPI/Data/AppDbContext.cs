@@ -19,12 +19,12 @@ namespace AdLocalAPI.Data
         public DbSet<Tarjeta> Tarjeta { get; set; }
         public DbSet<ProductosServicios> ProductosServicios { get; set; }
         public DbSet<RelComercioImagen> RelComercioImagen { get; set; }
+        public DbSet<HorarioComercio> HorarioComercio { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
 
-            // Usuario -> Comercio (opcional)
             modelBuilder.Entity<Usuario>()
                 .HasOne(u => u.Comercio)
                 .WithMany()
@@ -32,25 +32,21 @@ namespace AdLocalAPI.Data
 
             modelBuilder.Entity<Usuario>()
                 .Property(u => u.StripeCustomerId)
-                .HasColumnName("stripecustomerid") // coincide con la columna real
-                .HasMaxLength(100); // opcional
+                .HasColumnName("stripecustomerid") 
+                .HasMaxLength(100);
 
-
-            // Suscripcion -> Usuario
             modelBuilder.Entity<Suscripcion>()
                 .HasOne(s => s.Usuario)
                 .WithMany()
                 .HasForeignKey(s => s.UsuarioId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // Suscripcion -> Plan
             modelBuilder.Entity<Suscripcion>()
                 .HasOne(s => s.Plan)
                 .WithMany()
                 .HasForeignKey(s => s.PlanId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // ✅ Plan -> FechaCreacion (PostgreSQL)
             modelBuilder.Entity<Plan>()
                 .Property(p => p.FechaCreacion)
                 .HasDefaultValueSql("NOW()");
@@ -152,6 +148,15 @@ namespace AdLocalAPI.Data
                 entity.Property(e => e.FechaActualizacion)
                       .HasColumnName("fecha_actualizacion");
             });
+            modelBuilder.Entity<HorarioComercio>()
+                .HasOne<Comercio>()              
+                .WithMany()
+                .HasForeignKey(h => h.ComercioId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<HorarioComercio>()
+                .HasIndex(h => new { h.ComercioId, h.Dia })
+                .IsUnique();
         }
 
     }
