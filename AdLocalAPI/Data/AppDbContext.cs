@@ -157,6 +157,10 @@ namespace AdLocalAPI.Data
             modelBuilder.Entity<HorarioComercio>()
                 .HasIndex(h => new { h.ComercioId, h.Dia })
                 .IsUnique();
+
+            modelBuilder.Entity<Comercio>()
+                        .Property(c => c.Ubicacion)
+                        .HasColumnType("geometry(Point,4326)");
         }
 
     }

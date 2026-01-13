@@ -1,6 +1,7 @@
 ﻿using AdLocalAPI.DTOs;
 using AdLocalAPI.Helpers;
 using AdLocalAPI.Interfaces.Comercio;
+using AdLocalAPI.Interfaces.ProductosServicios;
 using AdLocalAPI.Models;
 using AdLocalAPI.Repositories;
 using NetTopologySuite.Geometries;
@@ -13,32 +14,43 @@ namespace AdLocalAPI.Services
         private readonly JwtContext _jwtContext;
         private readonly IRelComercioImagenRepositorio _comercioImagenRepositorio;
         private readonly IHorarioComercioService _horarioComercioService;
+        private readonly IProductosServiciosRepository _productosServiciosRepository;
 
-        public ComercioService(ComercioRepository repository, JwtContext jwtContext, IRelComercioImagenRepositorio comercioImagenRepositorio, IHorarioComercioService horarioComercioService)
+        public ComercioService(ComercioRepository repository, JwtContext jwtContext, IRelComercioImagenRepositorio comercioImagenRepositorio, IHorarioComercioService horarioComercioService, IProductosServiciosRepository productosServiciosRepository)
         {
             _repository = repository;
             _jwtContext = jwtContext;
             _comercioImagenRepositorio = comercioImagenRepositorio;
             _horarioComercioService = horarioComercioService;
+            _productosServiciosRepository = productosServiciosRepository;
         }
 
-        // 🔹 Obtener todos los comercios
-        public async Task<ApiResponse<object>> GetAllComercios()
+        public async Task<ApiResponse<object>> GetAllComercios(
+            string tipo,
+            double? lat,
+            double? lng
+        )
         {
             try
             {
-                var comercios = await _repository.GetAllAsync();
+                var comercios = await _repository.GetAllAsync(tipo, lat, lng);
 
                 return ApiResponse<object>.Success(
                     comercios,
                     "Listado de comercios obtenido correctamente"
                 );
             }
+            catch (ArgumentException ex)
+            {
+                return ApiResponse<object>.Error("400", ex.Message);
+            }
             catch (Exception ex)
             {
                 return ApiResponse<object>.Error("500", ex.Message);
             }
         }
+
+
 
         // 🔹 Obtener comercio por ID
         public async Task<ApiResponse<ComercioMineDto>> GetComercioById(int id)
@@ -61,12 +73,30 @@ namespace AdLocalAPI.Services
                 }
 
                 var listaHorarios = await _horarioComercioService.ObtenerHorariosPorComercioAsync(id);
-                List<HorarioComercio> Horarios = new List<HorarioComercio>();
+                List<HorariosMineDto> Horarios = new List<HorariosMineDto>();
                 if (listaHorarios.Count > 0)
                 {
                     foreach (var item in listaHorarios)
                     {
-                        Horarios.Add(item);
+                        var dtoHorario = new HorariosMineDto
+                        {
+                            Id = item.Id,
+                            ComercioId = item.ComercioId,
+                            Dia = item.Dia,
+                            Abierto = item.Abierto,
+                            HoraApertura = item.HoraApertura,
+                            HoraCierre = item.HoraCierre
+                        };
+                        Horarios.Add(dtoHorario);
+                    }
+                }
+                var listaProductos = await _productosServiciosRepository.GetAllAsync(id);
+                List<ProductosServicios> productos = new List<ProductosServicios>();
+                if (listaProductos.Count() > 0)
+                {
+                    foreach (var item in listaProductos)
+                    {
+                        productos.Add(item);
                     }
                 }
 
@@ -85,7 +115,8 @@ namespace AdLocalAPI.Services
                     ColorPrimario = comercio.ColorPrimario,
                     ColorSecundario = comercio.ColorSecundario,
                     Imagenes = Imagenes,
-                    Horarios = Horarios
+                    Horarios = Horarios,
+                    Productos = productos,
                 };
 
                 return ApiResponse<ComercioMineDto>.Success(
@@ -120,12 +151,21 @@ namespace AdLocalAPI.Services
                 }
 
                 var listaHorarios = await _horarioComercioService.ObtenerHorariosPorComercioAsync(comercio.Id);
-                List<HorarioComercio> Horarios = new List<HorarioComercio>();
+                List<HorariosMineDto> Horarios = new List<HorariosMineDto>();
                 if (listaHorarios.Count > 0)
                 {
                     foreach (var item in listaHorarios)
                     {
-                        Horarios.Add(item);
+                        var dtoHorario = new HorariosMineDto
+                        {
+                            Id = item.Id,
+                            ComercioId = item.ComercioId,
+                            Dia = item.Dia,
+                            Abierto = item.Abierto,
+                            HoraApertura = item.HoraApertura,
+                            HoraCierre = item.HoraCierre
+                        };
+                        Horarios.Add(dtoHorario);
                     }
                 }
 
@@ -459,24 +499,8 @@ namespace AdLocalAPI.Services
                     }
                 }
 
-                var responseDto = new ComercioMineDto
-                {
-                    Id = comercio.Id,
-                    Nombre = comercio.Nombre,
-                    Direccion = comercio.Direccion,
-                    Telefono = comercio.Telefono,
-                    Descripcion = comercio.Descripcion,
-                    Email = comercio.Email,
-                    Activo = comercio.Activo,
-                    LogoBase64 = comercio.LogoUrl,
-                    Lat = comercio.Ubicacion.Y,
-                    Lng = comercio.Ubicacion.X,
-                    ColorPrimario = comercio.ColorPrimario,
-                    ColorSecundario = comercio.ColorSecundario,
-                };
-
                 return ApiResponse<object>.Success(
-                    responseDto,
+                    null,
                     "El comercio se actualizó correctamente"
                 );
             }

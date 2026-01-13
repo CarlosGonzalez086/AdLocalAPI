@@ -1,7 +1,9 @@
 ﻿using AdLocalAPI.Data;
+using AdLocalAPI.DTOs;
 using AdLocalAPI.Models;
 using Microsoft.EntityFrameworkCore;
-using Supabase.Interfaces;
+using NetTopologySuite.Geometries;
+
 
 namespace AdLocalAPI.Repositories
 {
@@ -18,10 +20,72 @@ namespace AdLocalAPI.Repositories
             _env = env;
         }
 
-        public async Task<List<Comercio>> GetAllAsync()
+        public async Task<List<Comercio>> GetAllWitoutFilterAsync()
         {
             return await _context.Comercios.ToListAsync();
         }
+
+        public async Task<List<ComercioPublicDto>> GetAllAsync(
+            string tipo,
+            double? lat,
+            double? lng
+        )
+        {
+            IQueryable<Comercio> query = _context.Comercios
+                .Where(c => c.Activo);
+
+            switch (tipo.ToLower())
+            {
+                case "recientes":
+                    query = query.OrderByDescending(c => c.FechaCreacion);
+                    break;
+
+                case "cercanos":
+                    if (lat == null || lng == null)
+                        throw new ArgumentException("Latitud y longitud son requeridas");
+
+
+                    double maxKm = 5;
+
+                    var userLocation = new Point(lng.Value, lat.Value)
+                    {
+                        SRID = 4326
+                    };
+
+                    query = query
+                        .Where(c => c.Ubicacion != null &&
+                                    c.Ubicacion.Distance(userLocation) <= maxKm / 111.32)
+                        .OrderBy(c => c.Ubicacion.Distance(userLocation));
+
+                    break;
+
+                default:
+                    query = query.OrderBy(c => c.Nombre);
+                    break;
+            }
+
+            return await query
+                .Where(c => c.Ubicacion != null)
+                .Select(c => new ComercioPublicDto
+                {
+                    Id = c.Id,
+                    Nombre = c.Nombre,
+                    Direccion = c.Direccion,
+                    Telefono = c.Telefono,
+                    Email = c.Email,
+                    LogoUrl = c.LogoUrl,
+                    Lat = c.Ubicacion!.Y,
+                    Lng = c.Ubicacion!.X,
+
+                    ColorPrimario = c.ColorPrimario,
+                    ColorSecundario = c.ColorSecundario,
+                    Activo = c.Activo,
+                    FechaCreacion = c.FechaCreacion
+                })
+                .ToListAsync();
+        }
+
+
 
         public async Task<Comercio> GetByIdAsync(int id)
         {
