@@ -12,5 +12,7 @@ namespace AdLocalAPI.Models
         public bool Abierto { get; set; }
         public TimeSpan? HoraApertura { get; set; }
         public TimeSpan? HoraCierre { get; set; }
+
+
     }
 }
