@@ -88,6 +88,39 @@ namespace AdLocalAPI.Repositories
             }
         }
 
+        public async Task<Usuario?> GetByCodeAsync(string code)
+        {
+            try
+            {
+                return await _context.Usuarios
+                                     .Include(u => u.Comercio)
+                                     .FirstOrDefaultAsync(u => u.Codigo == code);
+            }
+            catch (Exception ex)
+            {
+                // Aquí puedes loguear el error si quieres
+                Console.WriteLine($"Error al obtener usuario por code {code}: {ex.Message}");
+                // Opcionalmente podrías lanzar otra excepción o devolver null
+                return null;
+            }
+        }
+        public async Task<Usuario?> GetByTokenAsync(string token)
+        {
+            try
+            {
+                return await _context.Usuarios
+                                     .Include(u => u.Comercio)
+                                     .FirstOrDefaultAsync(u => u.Token == token);
+            }
+            catch (Exception ex)
+            {
+                // Aquí puedes loguear el error si quieres
+                Console.WriteLine($"Error al obtener usuario por token {token}: {ex.Message}");
+                // Opcionalmente podrías lanzar otra excepción o devolver null
+                return null;
+            }
+        }
+
 
         public async Task<Usuario> CreateAsync(Usuario usuario)
         {
