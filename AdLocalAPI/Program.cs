@@ -140,6 +140,11 @@ builder.Services.AddScoped<ITarjetaService, TarjetaService>();
 builder.Services.AddScoped<ITarjetaRepository, TarjetaRepository>();
 builder.Services.AddScoped<IStripeService, StripeService>();
 
+builder.Services.Configure<EmailSettings>(
+    builder.Configuration.GetSection("EmailSettings"));
+
+builder.Services.AddScoped<EmailService>();
+
 
 builder.Services.AddSingleton(new Supabase.Client(supabaseUrl, supabaseKey));
 
@@ -170,6 +175,7 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(
             "http://localhost:5173",
             "http://localhost:4321",
+            "http://localhost:3001",
             "https://ad-local-gamma.vercel.app",
             "https://ad-local-web.vercel.app"
         )

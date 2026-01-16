@@ -2,6 +2,7 @@
 using AdLocalAPI.Helpers;
 using AdLocalAPI.Models;
 using AdLocalAPI.Repositories;
+using AdLocalAPI.Utils;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -17,13 +18,18 @@ namespace AdLocalAPI.Services
         private readonly IConfiguration _config;
         private readonly JwtContext _jwtContext;
         private readonly ComercioRepository _comercioRepository;
+        private readonly EmailService _emailService;
+        private readonly IWebHostEnvironment _env;
 
-        public UsuarioService(UsuarioRepository repository, IConfiguration config, JwtContext jwtContext,ComercioRepository comercioRepository)
+        public UsuarioService(UsuarioRepository repository, IConfiguration config, JwtContext jwtContext,ComercioRepository comercioRepository, EmailService emailService, IWebHostEnvironment env)
         {
             _repository = repository;
             _config = config;
             _jwtContext = jwtContext;
             _comercioRepository = comercioRepository;
+            _emailService = emailService;
+            _env = env;
+
         }
 
         public async Task<ApiResponse<object>> GetAllUsuarios(int page,
@@ -420,6 +426,84 @@ namespace AdLocalAPI.Services
                 return ApiResponse<string>.Error("500", ex.Message);
             }
         }
+        public async Task<ApiResponse<object>> ForgetPassword(string email)
+        {
+            try
+            {
+                var usuario = await _repository.GetByCorreoAsync(email);
+
+                if (usuario == null)
+                    return ApiResponse<object>.Error("404", "Usuario no encontrado");
+
+                string codigo = ServicesGenerals.GenerarCodigoAlfanumerico(6);
+                string token = Guid.NewGuid().ToString();
+
+                usuario.Codigo = codigo;
+                usuario.Token = token;
+
+                await _repository.UpdateAsync(usuario);
+
+                bool esProduccion = _env.IsProduction();
+                var link = UrlHelper.GenerarLinkCambioPassword(token, esProduccion);
+
+                var html = TemplatesEmail.PlantillaCorreoCambioPasswordCoffee(codigo, link);
+
+                await _emailService.EnviarCorreoAsync(
+                    usuario.Email,
+                    "Restablecer contraseña - AdLocal",
+                    html
+                );
+
+                return ApiResponse<object>.Success(
+                    null,
+                    "Correo de recuperación enviado correctamente"
+                );
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<object>.Error("500", ex.Message);
+            }
+        }
+        public async Task<ApiResponse<object>> NewPassword(NewPasswordDto dto)
+        {
+            var usuario = await _repository.GetByCodeAsync(dto.Codigo);
+            if (usuario == null)
+                return ApiResponse<object>.Error("404", "Usuario no encontrado");
+
+            if (dto.PasswordNueva.Length < 8)
+                return ApiResponse<object>.Error(
+                    "400",
+                    "La nueva contraseña debe tener al menos 8 caracteres"
+                );
+            usuario.Token = null;
+            usuario.Codigo = null;
+            usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.PasswordNueva);
+
+            await _repository.UpdateAsync(usuario);
+
+            return ApiResponse<object>.Success(
+                null,
+                "Contraseña actualizada correctamente"
+            );
+        }
+        public async Task<ApiResponse<object>> CheckToken(string token)
+        {
+            var usuario = await _repository.GetByTokenAsync(token);
+
+            if (usuario == null)
+            {
+                return ApiResponse<object>.Error(
+                    "404",
+                    "El enlace de recuperación no es válido o ya ha expirado. Solicita uno nuevo."
+                );
+            }
+
+            return ApiResponse<object>.Success(
+                null,
+                "El token es válido. Puedes continuar con el cambio de contraseña."
+            );
+        }
+
 
     }
 }
