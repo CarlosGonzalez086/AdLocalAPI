@@ -81,8 +81,8 @@ namespace AdLocalAPI.Repositories
                     Activo = c.Activo,
                     FechaCreacion = c.FechaCreacion,
 
-                    EstadoNombre = c.Estado!.EstadoNombre,
-                    MunicipioNombre = c.Municipio!.MunicipioNombre
+                    EstadoNombre = c.Estado!.EstadoNombre == null ? "" :c.Estado!.EstadoNombre,
+                    MunicipioNombre = c.Municipio!.MunicipioNombre == null ? "" : c.Municipio!.MunicipioNombre,
                 })
                 .ToListAsync();
 
