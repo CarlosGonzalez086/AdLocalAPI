@@ -16,6 +16,8 @@ namespace AdLocalAPI.DTOs
         public string ColorPrimario { get; set; } = "";
         public string ColorSecundario { get; set; } = "";
         public bool Activo { get; set; } = false;
+        public int EstadoId { get; set; } = 0;
+        public int MunicipioId { get; set; } = 0;
         public ICollection<HorarioComercio> Horarios { get; set; } = new List<HorarioComercio>();
     }
 }

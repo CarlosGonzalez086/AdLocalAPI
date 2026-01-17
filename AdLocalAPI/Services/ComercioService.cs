@@ -1,6 +1,7 @@
 ﻿using AdLocalAPI.DTOs;
 using AdLocalAPI.Helpers;
 using AdLocalAPI.Interfaces.Comercio;
+using AdLocalAPI.Interfaces.Location;
 using AdLocalAPI.Interfaces.ProductosServicios;
 using AdLocalAPI.Models;
 using AdLocalAPI.Repositories;
@@ -15,14 +16,16 @@ namespace AdLocalAPI.Services
         private readonly IRelComercioImagenRepositorio _comercioImagenRepositorio;
         private readonly IHorarioComercioService _horarioComercioService;
         private readonly IProductosServiciosRepository _productosServiciosRepository;
+        private readonly ILocationRepository _locationRepository;
 
-        public ComercioService(ComercioRepository repository, JwtContext jwtContext, IRelComercioImagenRepositorio comercioImagenRepositorio, IHorarioComercioService horarioComercioService, IProductosServiciosRepository productosServiciosRepository)
+        public ComercioService(ComercioRepository repository, JwtContext jwtContext, IRelComercioImagenRepositorio comercioImagenRepositorio, IHorarioComercioService horarioComercioService, IProductosServiciosRepository productosServiciosRepository, ILocationRepository locationRepository)
         {
             _repository = repository;
             _jwtContext = jwtContext;
             _comercioImagenRepositorio = comercioImagenRepositorio;
             _horarioComercioService = horarioComercioService;
             _productosServiciosRepository = productosServiciosRepository;
+            _locationRepository = locationRepository;
         }
 
         public async Task<ApiResponse<object>> GetAllComercios(
@@ -100,6 +103,15 @@ namespace AdLocalAPI.Services
                     }
                 }
 
+                Estado estado = null;
+                Municipio municipio = null;
+                if (comercio.EstadoId != 0)
+                {
+                    estado = await _locationRepository.GetStateByIdAsync(comercio.EstadoId);
+                    municipio = await _locationRepository.GetMunicipalityByIdAsync(comercio.MunicipioId);
+                }
+
+
                 var dto = new ComercioMineDto
                 {
                     Id = comercio.Id,
@@ -117,6 +129,10 @@ namespace AdLocalAPI.Services
                     Imagenes = Imagenes,
                     Horarios = Horarios,
                     Productos = productos,
+                    EstadoNombre = estado == null ? "" : estado.EstadoNombre,
+                    MunicipioNombre = municipio == null ? "" : municipio.MunicipioNombre,
+                    EstadoId = estado == null ? 0 : estado.Id,
+                    MunicipioId = municipio == null ? 0 : municipio.Id,
                 };
 
                 return ApiResponse<ComercioMineDto>.Success(
@@ -169,6 +185,15 @@ namespace AdLocalAPI.Services
                     }
                 }
 
+                Estado estado = null;
+                Municipio municipio = null;
+                if (comercio.EstadoId != 0)
+                {
+                     estado = await _locationRepository.GetStateByIdAsync(comercio.EstadoId);
+                     municipio = await _locationRepository.GetMunicipalityByIdAsync(comercio.MunicipioId);
+                }
+
+
                 var dto = new ComercioMineDto
                 {
                     Id = comercio.Id,
@@ -184,7 +209,11 @@ namespace AdLocalAPI.Services
                     ColorPrimario = comercio.ColorPrimario,
                     ColorSecundario = comercio.ColorSecundario,
                     Imagenes = Imagenes,
-                    Horarios = Horarios
+                    Horarios = Horarios,
+                    EstadoNombre = estado == null ? "" : estado.EstadoNombre,
+                    MunicipioNombre = municipio == null ? "" : municipio.MunicipioNombre,
+                    EstadoId = estado == null ? 0 : comercio.EstadoId,
+                    MunicipioId = municipio == null ? 0 : municipio.Id,
                 };
 
                 return ApiResponse<ComercioMineDto>.Success(
@@ -224,6 +253,17 @@ namespace AdLocalAPI.Services
                         "400",
                         "La ubicación del comercio es obligatoria"
                     );
+                if (dto.EstadoId == 0)                
+                    return ApiResponse<object>.Error(
+                       "400",
+                       "El estado del comercio es obligatorrio"
+                   );
+                if (dto.MunicipioId == 0)                
+                    return ApiResponse<object>.Error(
+                       "400",
+                       "El municipio del comercio es obligatorrio"
+                   );
+                
 
                 long userId = _jwtContext.GetUserId();
 
@@ -270,10 +310,13 @@ namespace AdLocalAPI.Services
                     ColorSecundario = dto.ColorSecundario,
                     Descripcion = dto.Descripcion,      
                     Email = dto.Email,
+                    EstadoId = dto.EstadoId,
+                    MunicipioId = dto.MunicipioId,                    
                     Ubicacion = new NetTopologySuite.Geometries.Point(dto.Lng, dto.Lat)
                     {
                         SRID = 4326
                     }
+                    
                 };
 
                 var creado = await _repository.CreateAsync(comercio);
@@ -356,6 +399,27 @@ namespace AdLocalAPI.Services
                         "404",
                         "Comercio no encontrado"
                     );
+                if (string.IsNullOrWhiteSpace(dto.Nombre))
+                    return ApiResponse<object>.Error(
+                        "400",
+                        "El nombre del comercio es obligatorio"
+                    );
+
+                if (dto.Lat == 0 || dto.Lng == 0)
+                    return ApiResponse<object>.Error(
+                        "400",
+                        "La ubicación del comercio es obligatoria"
+                    );
+                if (dto.EstadoId == 0)
+                    return ApiResponse<object>.Error(
+                       "400",
+                       "El estado del comercio es obligatorrio"
+                   );
+                if (dto.MunicipioId == 0)
+                    return ApiResponse<object>.Error(
+                       "400",
+                       "El municipio del comercio es obligatorrio"
+                   );
 
                 long userId = _jwtContext.GetUserId();
 
@@ -364,7 +428,8 @@ namespace AdLocalAPI.Services
                         "403",
                         "No tienes permiso para modificar este comercio"
                     );
-
+                comercio.EstadoId = dto.EstadoId;
+                comercio.MunicipioId = dto.MunicipioId;
                 comercio.Nombre = dto.Nombre;
                 comercio.Direccion = dto.Direccion;
                 comercio.Telefono = dto.Telefono;
@@ -577,6 +642,28 @@ namespace AdLocalAPI.Services
                 );
             }
         }
+        public async Task<ApiResponse<object>> GetByFiltros(int estadoId, int municipioId, string orden)
+        {
+            try
+            {
+                var comercios = await _repository.GetByFiltros(estadoId, municipioId, orden);
+
+                return ApiResponse<object>.Success(
+                    comercios,
+                    "Listado de comercios obtenido correctamente"
+                );
+            }
+            catch (ArgumentException ex)
+            {
+                return ApiResponse<object>.Error("400", ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<object>.Error("500", ex.Message);
+            }
+        }
+
+
 
         private static readonly Dictionary<string, string> TiposImagenPermitidos = new()
         {

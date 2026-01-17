@@ -2,6 +2,7 @@ using AdLocalAPI.Data;
 using AdLocalAPI.Helpers;
 using AdLocalAPI.Interfaces;
 using AdLocalAPI.Interfaces.Comercio;
+using AdLocalAPI.Interfaces.Location;
 using AdLocalAPI.Interfaces.ProductosServicios;
 using AdLocalAPI.Interfaces.Tarjetas;
 using AdLocalAPI.Repositories;
@@ -140,6 +141,9 @@ builder.Services.AddScoped<ITarjetaService, TarjetaService>();
 builder.Services.AddScoped<ITarjetaRepository, TarjetaRepository>();
 builder.Services.AddScoped<IStripeService, StripeService>();
 
+builder.Services.AddScoped<ILocationRepository, LocationRepository>();
+builder.Services.AddScoped<ILocationService, LocationService>();
+
 builder.Services.Configure<EmailSettings>(
     builder.Configuration.GetSection("EmailSettings"));
 
@@ -175,7 +179,7 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(
             "http://localhost:5173",
             "http://localhost:4321",
-            "http://localhost:3001",
+            "http://localhost:3000",
             "https://ad-local-gamma.vercel.app",
             "https://ad-local-web.vercel.app"
         )

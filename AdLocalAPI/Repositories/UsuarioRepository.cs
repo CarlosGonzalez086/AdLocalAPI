@@ -76,7 +76,6 @@ namespace AdLocalAPI.Repositories
             try
             {
                 return await _context.Usuarios
-                                     .Include(u => u.Comercio)
                                      .FirstOrDefaultAsync(u => u.Id == id);
             }
             catch (Exception ex)
@@ -93,7 +92,6 @@ namespace AdLocalAPI.Repositories
             try
             {
                 return await _context.Usuarios
-                                     .Include(u => u.Comercio)
                                      .FirstOrDefaultAsync(u => u.Codigo == code);
             }
             catch (Exception ex)
@@ -109,7 +107,7 @@ namespace AdLocalAPI.Repositories
             try
             {
                 return await _context.Usuarios
-                                     .Include(u => u.Comercio)
+                                     
                                      .FirstOrDefaultAsync(u => u.Token == token);
             }
             catch (Exception ex)

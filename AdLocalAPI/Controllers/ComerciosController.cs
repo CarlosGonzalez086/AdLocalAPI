@@ -61,5 +61,17 @@ namespace AdLocalAPI.Controllers
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
 
+        [HttpGet("por-filtros")]
+        public async Task<IActionResult> GetByFiltros(
+            [FromQuery] int estadoId = 0,
+            [FromQuery] int municipioId = 0,
+            [FromQuery] string orden = "alfabetico"
+        )
+        {
+            var response = await _service.GetByFiltros(estadoId, municipioId, orden);
+            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+        }
+
+
     }
 }
