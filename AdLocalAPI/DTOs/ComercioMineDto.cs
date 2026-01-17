@@ -17,6 +17,10 @@ namespace AdLocalAPI.DTOs
         public string ColorPrimario { get; set; } = "";
         public string ColorSecundario { get; set; } = "";
         public bool Activo { get; set; } = false;
+        public int EstadoId { get; set; } = 0;
+        public int MunicipioId { get; set; } = 0;
+        public string EstadoNombre { get; set; } = "";
+        public string MunicipioNombre { get; set; } = "";
         public ICollection<HorariosMineDto> Horarios { get; set; } = new List<HorariosMineDto>();
         public ICollection<ProductosServicios> Productos { get; set; } = new List<ProductosServicios>();
     }

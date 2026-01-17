@@ -20,6 +20,9 @@ namespace AdLocalAPI.Data
         public DbSet<ProductosServicios> ProductosServicios { get; set; }
         public DbSet<RelComercioImagen> RelComercioImagen { get; set; }
         public DbSet<HorarioComercio> HorarioComercio { get; set; }
+        public DbSet<Estado> Estados { get; set; }
+        public DbSet<Municipio> Municipios { get; set; }
+        public DbSet<EstadoMunicipio> EstadosMunicipios { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -161,6 +164,27 @@ namespace AdLocalAPI.Data
             modelBuilder.Entity<Comercio>()
                         .Property(c => c.Ubicacion)
                         .HasColumnType("geometry(Point,4326)");
+            modelBuilder.Entity<EstadoMunicipio>()
+                        .HasOne(em => em.Estado)
+                        .WithMany(e => e.EstadosMunicipios)
+                        .HasForeignKey(em => em.EstadoId);
+
+            modelBuilder.Entity<EstadoMunicipio>()
+                        .HasOne(em => em.Municipio)
+                        .WithMany(m => m.EstadosMunicipios)
+                        .HasForeignKey(em => em.MunicipioId);
+
+            modelBuilder.Entity<Comercio>()
+                        .HasOne(c => c.Estado)
+                        .WithMany()
+                        .HasForeignKey(c => c.EstadoId)
+                        .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Comercio>()
+                        .HasOne(c => c.Municipio)
+                        .WithMany()
+                        .HasForeignKey(c => c.MunicipioId)
+                        .OnDelete(DeleteBehavior.Restrict);
         }
 
     }

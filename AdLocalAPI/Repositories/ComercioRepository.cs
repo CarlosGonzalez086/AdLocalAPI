@@ -3,6 +3,7 @@ using AdLocalAPI.DTOs;
 using AdLocalAPI.Models;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
+using Supabase.Gotrue;
 
 
 namespace AdLocalAPI.Repositories
@@ -32,7 +33,10 @@ namespace AdLocalAPI.Repositories
         )
         {
             IQueryable<Comercio> query = _context.Comercios
-                .Where(c => c.Activo);
+                .Where(c => c.Activo)
+                .Include(c => c.Estado)      
+                .Include(c => c.Municipio);
+
 
             switch (tipo.ToLower())
             {
@@ -44,19 +48,13 @@ namespace AdLocalAPI.Repositories
                     if (lat == null || lng == null)
                         throw new ArgumentException("Latitud y longitud son requeridas");
 
-
                     double maxKm = 5;
-
-                    var userLocation = new Point(lng.Value, lat.Value)
-                    {
-                        SRID = 4326
-                    };
+                    var userLocation = new Point(lng.Value, lat.Value) { SRID = 4326 };
 
                     query = query
                         .Where(c => c.Ubicacion != null &&
                                     c.Ubicacion.Distance(userLocation) <= maxKm / 111.32)
                         .OrderBy(c => c.Ubicacion.Distance(userLocation));
-
                     break;
 
                 default:
@@ -64,7 +62,8 @@ namespace AdLocalAPI.Repositories
                     break;
             }
 
-            return await query
+            // Proyección a DTO incluyendo Estado y Municipio
+            var result = await query
                 .Where(c => c.Ubicacion != null)
                 .Select(c => new ComercioPublicDto
                 {
@@ -80,10 +79,16 @@ namespace AdLocalAPI.Repositories
                     ColorPrimario = c.ColorPrimario,
                     ColorSecundario = c.ColorSecundario,
                     Activo = c.Activo,
-                    FechaCreacion = c.FechaCreacion
+                    FechaCreacion = c.FechaCreacion,
+
+                    EstadoNombre = c.Estado!.EstadoNombre,
+                    MunicipioNombre = c.Municipio!.MunicipioNombre
                 })
                 .ToListAsync();
+
+            return result;
         }
+
 
 
 
@@ -94,9 +99,20 @@ namespace AdLocalAPI.Repositories
 
         public async Task<Comercio> GetComercioByUser(long idUSer)
         {
-            return await _context.Comercios
-                .AsNoTracking()
-                .FirstOrDefaultAsync(c => c.IdUsuario == idUSer && c.Activo);
+            try
+            {
+                return await _context.Comercios
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(c =>
+                        c.IdUsuario == idUSer &&
+                        c.Activo
+                    );
+            }
+            catch (Exception ex) 
+            {
+                Console.WriteLine(ex);
+                return null;
+            }
         }
 
         public async Task<Comercio> CreateAsync(Comercio comercio)
@@ -159,5 +175,56 @@ namespace AdLocalAPI.Repositories
                 return false;
             }
         }
+        public async Task<List<ComercioPublicDto>> GetByFiltros(int estadoId, int municipioId, string orden)
+        {
+            IQueryable<Comercio> query = _context.Comercios
+                .Where(c => c.Activo)
+                .Include(c => c.Estado)
+                .Include(c => c.Municipio);
+
+
+            if (estadoId != 0)
+                query = query.Where(c => c.EstadoId == estadoId);
+
+            if (municipioId != 0)
+                query = query.Where(c => c.MunicipioId == municipioId);
+
+
+            switch (orden.ToLower())
+            {
+                case "recientes":
+                    query = query.OrderByDescending(c => c.FechaCreacion);
+                    break;
+                case "antiguos":
+                    query = query.OrderBy(c => c.FechaCreacion);
+                    break;
+                default:
+                    query = query.OrderBy(c => c.Nombre); 
+                    break;
+            }
+
+
+            var result = await query.Select(c => new ComercioPublicDto
+            {
+                Id = c.Id,
+                Nombre = c.Nombre,
+                Direccion = c.Direccion,
+                Telefono = c.Telefono,
+                Email = c.Email,
+                LogoUrl = c.LogoUrl,
+                Lat = c.Ubicacion!.Y,
+                Lng = c.Ubicacion!.X,
+                ColorPrimario = c.ColorPrimario,
+                ColorSecundario = c.ColorSecundario,
+                Activo = c.Activo,
+                FechaCreacion = c.FechaCreacion,
+                EstadoNombre = c.Estado!.EstadoNombre,
+                MunicipioNombre = c.Municipio!.MunicipioNombre
+            }).ToListAsync();
+
+            return result;
+        }
+
+
     }
 }
