@@ -2,7 +2,7 @@
 {
     public class ComercioPublicDto
     {
-        public int Id { get; set; }
+        public long Id { get; set; }
         public string Nombre { get; set; }
         public string? Direccion { get; set; }
         public string? Telefono { get; set; }
@@ -18,5 +18,7 @@
         public string EstadoNombre { get; set; } = "";
         public string MunicipioNombre { get; set; } = "";
         public DateTime FechaCreacion { get; set; }
+        // 🔹 Nuevo campo para promedio de calificaciones
+        public double PromedioCalificacion { get; set; } = 0;
     }
 }

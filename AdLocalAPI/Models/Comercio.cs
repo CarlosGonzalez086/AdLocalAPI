@@ -8,7 +8,7 @@ namespace AdLocalAPI.Models
 {
     public class Comercio
     {
-        public int Id { get; set; }
+        public long Id { get; set; }
         [Required]
         [MaxLength(150)]
         public string Nombre { get; set; }
@@ -42,5 +42,7 @@ namespace AdLocalAPI.Models
 
         public bool Activo { get; set; } = true;
         public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
+        // 🔹 Relación con calificaciones
+        public ICollection<CalificacionComentario> CalificacionesComentarios { get; set; } = new List<CalificacionComentario>();
     }
 }

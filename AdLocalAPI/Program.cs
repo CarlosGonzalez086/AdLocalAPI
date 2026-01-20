@@ -144,6 +144,9 @@ builder.Services.AddScoped<IStripeService, StripeService>();
 builder.Services.AddScoped<ILocationRepository, LocationRepository>();
 builder.Services.AddScoped<ILocationService, LocationService>();
 
+builder.Services.AddScoped<CalificacionComentarioRepository>();
+builder.Services.AddScoped<CalificacionComentarioService>();
+
 builder.Services.Configure<EmailSettings>(
     builder.Configuration.GetSection("EmailSettings"));
 
@@ -180,6 +183,7 @@ builder.Services.AddCors(options =>
             "http://localhost:5173",
             "http://localhost:4321",
             "http://localhost:3000",
+            "http://localhost:3001",
             "https://ad-local-gamma.vercel.app",
             "https://ad-local-web.vercel.app"
         )

@@ -3,6 +3,7 @@ using System;
 using AdLocalAPI.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NetTopologySuite.Geometries;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AdLocalAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260120014148_CrearTablaCalificacionesComentarios")]
+    partial class CrearTablaCalificacionesComentarios
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -55,18 +58,16 @@ namespace AdLocalAPI.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("IdComercio");
-
                     b.ToTable("calificaciones_comentarios");
                 });
 
             modelBuilder.Entity("AdLocalAPI.Models.Comercio", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("integer");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<bool>("Activo")
                         .HasColumnType("boolean");
@@ -263,8 +264,8 @@ namespace AdLocalAPI.Migrations
                     b.Property<bool>("Abierto")
                         .HasColumnType("boolean");
 
-                    b.Property<long>("ComercioId")
-                        .HasColumnType("bigint");
+                    b.Property<int>("ComercioId")
+                        .HasColumnType("integer");
 
                     b.Property<int>("Dia")
                         .HasColumnType("integer");
@@ -705,8 +706,8 @@ namespace AdLocalAPI.Migrations
                     b.Property<string>("Codigo")
                         .HasColumnType("text");
 
-                    b.Property<long?>("ComercioId")
-                        .HasColumnType("bigint");
+                    b.Property<int?>("ComercioId")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -743,17 +744,6 @@ namespace AdLocalAPI.Migrations
                     b.HasIndex("ComercioId");
 
                     b.ToTable("Usuarios");
-                });
-
-            modelBuilder.Entity("AdLocalAPI.Models.CalificacionComentario", b =>
-                {
-                    b.HasOne("AdLocalAPI.Models.Comercio", "Comercio")
-                        .WithMany("CalificacionesComentarios")
-                        .HasForeignKey("IdComercio")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Comercio");
                 });
 
             modelBuilder.Entity("AdLocalAPI.Models.Comercio", b =>
@@ -862,11 +852,6 @@ namespace AdLocalAPI.Migrations
                         .HasForeignKey("ComercioId");
 
                     b.Navigation("Comercio");
-                });
-
-            modelBuilder.Entity("AdLocalAPI.Models.Comercio", b =>
-                {
-                    b.Navigation("CalificacionesComentarios");
                 });
 
             modelBuilder.Entity("AdLocalAPI.Models.Estado", b =>
