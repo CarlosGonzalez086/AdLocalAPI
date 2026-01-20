@@ -7,7 +7,7 @@
         public string Email { get; set; }
         public string? FotoUrl { get; set; }
         public string Rol { get; set; }
-        public long? ComercioId { get; set; } // Solo para usuario/comercio
+        public long? ComercioId { get; set; }
         public DateTime FechaCreacion { get; set; }
         public bool Activo { get; set; }
     }
