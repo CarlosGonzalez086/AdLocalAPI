@@ -109,7 +109,21 @@ namespace AdLocalAPI.Repositories
 
         public async Task<Comercio> GetByIdAsync(int id)
         {
-            return await _context.Comercios.FindAsync(id);
+
+            try
+            {
+                return await _context.Comercios
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(c =>
+                        c.Id == id &&
+                        c.Activo
+                    );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+                return null;
+            }
         }
 
         public async Task<Comercio> GetComercioByUser(long idUSer)
