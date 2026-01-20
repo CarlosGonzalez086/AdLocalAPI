@@ -52,5 +52,12 @@ namespace AdLocalAPI.Repositories
                 data = comentarios
             };
         }
+        public async Task<IEnumerable<Models.CalificacionComentario>> GetCalificacionByComercioAsync(long idComercio) 
+        {
+            var query = _context.CalificacionComentario.AsQueryable();
+
+            query.Where(c => c.IdComercio == idComercio);
+            return query;
+        }
     }
 }

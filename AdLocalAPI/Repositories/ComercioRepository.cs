@@ -73,7 +73,6 @@ namespace AdLocalAPI.Repositories
                     break;
             }
 
-            // Proyección a DTO incluyendo Estado y Municipio
             var result = await query
                 .Where(c => c.Ubicacion != null)
                 .Select(c => new ComercioPublicDto
@@ -227,6 +226,13 @@ namespace AdLocalAPI.Repositories
                 case "antiguos":
                     query = query.OrderBy(c => c.FechaCreacion);
                     break;
+                case "populares":
+                    query = query
+                        .OrderByDescending(c => c.CalificacionesComentarios.Any()
+                            ? c.CalificacionesComentarios.Sum(cc => cc.Calificacion)
+                              / (double)c.CalificacionesComentarios.Count()
+                            : 0);
+                    break;
                 default:
                     query = query.OrderBy(c => c.Nombre); 
                     break;
@@ -248,7 +254,11 @@ namespace AdLocalAPI.Repositories
                 Activo = c.Activo,
                 FechaCreacion = c.FechaCreacion,
                 EstadoNombre = c.Estado!.EstadoNombre,
-                MunicipioNombre = c.Municipio!.MunicipioNombre
+                MunicipioNombre = c.Municipio!.MunicipioNombre,
+                PromedioCalificacion = c.CalificacionesComentarios.Any()
+                                            ? c.CalificacionesComentarios.Sum(cc => cc.Calificacion)
+                                              / (double)c.CalificacionesComentarios.Count()
+                                            : 0
             }).ToListAsync();
 
             return result;
