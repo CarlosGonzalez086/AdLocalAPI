@@ -6,6 +6,7 @@ using AdLocalAPI.Interfaces.ProductosServicios;
 using AdLocalAPI.Models;
 using AdLocalAPI.Repositories;
 using NetTopologySuite.Geometries;
+using System.Linq;
 
 namespace AdLocalAPI.Services
 {
@@ -17,8 +18,12 @@ namespace AdLocalAPI.Services
         private readonly IHorarioComercioService _horarioComercioService;
         private readonly IProductosServiciosRepository _productosServiciosRepository;
         private readonly ILocationRepository _locationRepository;
+        private readonly CalificacionComentarioRepository _calificacionComentarioRepository;
 
-        public ComercioService(ComercioRepository repository, JwtContext jwtContext, IRelComercioImagenRepositorio comercioImagenRepositorio, IHorarioComercioService horarioComercioService, IProductosServiciosRepository productosServiciosRepository, ILocationRepository locationRepository)
+        public ComercioService(ComercioRepository repository, JwtContext jwtContext, 
+                               IRelComercioImagenRepositorio comercioImagenRepositorio, IHorarioComercioService horarioComercioService, 
+                               IProductosServiciosRepository productosServiciosRepository, ILocationRepository locationRepository,
+                               CalificacionComentarioRepository calificacionComentarioRepository)
         {
             _repository = repository;
             _jwtContext = jwtContext;
@@ -26,6 +31,7 @@ namespace AdLocalAPI.Services
             _horarioComercioService = horarioComercioService;
             _productosServiciosRepository = productosServiciosRepository;
             _locationRepository = locationRepository;
+            _calificacionComentarioRepository = calificacionComentarioRepository;
         }
 
         public async Task<ApiResponse<object>> GetAllComercios(
@@ -53,10 +59,6 @@ namespace AdLocalAPI.Services
                 return ApiResponse<object>.Error("500", ex.Message);
             }
         }
-
-
-
-        // 🔹 Obtener comercio por ID
         public async Task<ApiResponse<ComercioMineDto>> GetComercioById(int id)
         {
             try
@@ -104,6 +106,18 @@ namespace AdLocalAPI.Services
                     }
                 }
 
+                var listaCalificaciones =
+                    await _calificacionComentarioRepository.GetCalificacionByComercioAsync(id);
+
+                double calificacionPromedio = 0;
+                double totalCalif = listaCalificaciones.Count();
+
+                if (listaCalificaciones.Any())
+                {
+                    int sumaCalificaciones = listaCalificaciones.Sum(x => x.Calificacion);
+                    calificacionPromedio = (double)sumaCalificaciones / totalCalif;
+                }
+
                 Estado estado = null;
                 Municipio municipio = null;
                 if (comercio.EstadoId != 0)
@@ -134,6 +148,8 @@ namespace AdLocalAPI.Services
                     MunicipioNombre = municipio == null ? "" : municipio.MunicipioNombre,
                     EstadoId = estado == null ? 0 : estado.Id,
                     MunicipioId = municipio == null ? 0 : municipio.Id,
+                    Calificacion = calificacionPromedio
+
                 };
 
                 return ApiResponse<ComercioMineDto>.Success(
@@ -146,7 +162,6 @@ namespace AdLocalAPI.Services
                 return ApiResponse<ComercioMineDto>.Error("500", ex.Message);
             }
         }
-        // 🔹 Obtener comercio por ID
         public async Task<ApiResponse<ComercioMineDto>> GetComercioByUser()
         {
             try
@@ -186,6 +201,18 @@ namespace AdLocalAPI.Services
                     }
                 }
 
+                var listaCalificaciones =
+                    await _calificacionComentarioRepository.GetCalificacionByComercioAsync(comercio.Id);
+
+                double calificacionPromedio = 0;
+                double totalCalif = listaCalificaciones.Count();
+
+                if (listaCalificaciones.Any())
+                {
+                    int sumaCalificaciones = listaCalificaciones.Sum(x => x.Calificacion);
+                    calificacionPromedio = (double)sumaCalificaciones / totalCalif;
+                }
+
                 Estado estado = null;
                 Municipio municipio = null;
                 if (comercio.EstadoId != 0)
@@ -215,6 +242,7 @@ namespace AdLocalAPI.Services
                     MunicipioNombre = municipio == null ? "" : municipio.MunicipioNombre,
                     EstadoId = estado == null ? 0 : comercio.EstadoId,
                     MunicipioId = municipio == null ? 0 : municipio.Id,
+                    Calificacion = calificacionPromedio
                 };
 
                 return ApiResponse<ComercioMineDto>.Success(
@@ -384,10 +412,6 @@ namespace AdLocalAPI.Services
                 );
             }
         }
-
-
-
-        // 🔹 Actualizar comercio
         public async Task<ApiResponse<object>> UpdateComercio(ComercioUpdateDto dto)
         {
             try
@@ -585,9 +609,6 @@ namespace AdLocalAPI.Services
                 );
             }
         }
-
-
-        // 🔹 Eliminar comercio
         public async Task<ApiResponse<object>> DeleteComercio(int id)
         {
             try

@@ -23,5 +23,6 @@ namespace AdLocalAPI.DTOs
         public string MunicipioNombre { get; set; } = "";
         public ICollection<HorariosMineDto> Horarios { get; set; } = new List<HorariosMineDto>();
         public ICollection<ProductosServicios> Productos { get; set; } = new List<ProductosServicios>();
+        public double Calificacion { get; set; } = 0.0;
     }
 }
