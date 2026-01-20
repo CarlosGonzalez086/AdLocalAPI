@@ -31,12 +31,13 @@ namespace AdLocalAPI.Services
         public async Task<ApiResponse<object>> GetAllComercios(
             string tipo,
             double? lat,
-            double? lng
+            double? lng,
+            string? municipio
         )
         {
             try
             {
-                var comercios = await _repository.GetAllAsync(tipo, lat, lng);
+                var comercios = await _repository.GetAllAsync(tipo, lat, lng,municipio);
 
                 return ApiResponse<object>.Success(
                     comercios,

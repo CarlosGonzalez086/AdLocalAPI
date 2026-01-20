@@ -4,7 +4,7 @@
     {
         public int Id { get; set; }
 
-        public int ComercioId { get; set; }
+        public long ComercioId { get; set; }
 
         public DayOfWeek Dia { get; set; }
         public bool Abierto { get; set; }

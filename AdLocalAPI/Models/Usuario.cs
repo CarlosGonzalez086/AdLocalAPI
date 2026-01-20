@@ -21,7 +21,7 @@ namespace AdLocalAPI.Models
         public bool Activo { get; set; } = true;
 
         public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
-        public int? ComercioId { get; set; }
+        public long? ComercioId { get; set; }
         public string? FotoUrl { get; set; }
         public string? StripeCustomerId { get; set; }
         public string? Token { get; set; }

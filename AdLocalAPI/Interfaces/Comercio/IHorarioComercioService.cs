@@ -5,21 +5,21 @@ namespace AdLocalAPI.Interfaces.Comercio
     public interface IHorarioComercioService
     {
         Task<bool> CrearHorariosAsync(
-            int comercioId,
+            long comercioId,
             List<HorarioComercio> horarios
         );
         Task<bool> ActualizarHorariosAsync(
-            int comercioId,
+            long comercioId,
             List<HorarioComercio> horarios
         );
         Task<List<HorarioComercio>> ObtenerHorariosPorComercioAsync(
-            int comercioId
+            long comercioId
         );
         Task<bool> EliminarHorariosPorComercioAsync(
-            int comercioId
+            long comercioId
         );
         Task<bool> ComercioTieneHorariosAsync(
-            int comercioId
+            long comercioId
         );
     }
 }

@@ -6,7 +6,7 @@ namespace AdLocalAPI.Models
     {
         public int Id { get; set; }
         [Required]
-        public int ComercioId { get; set; }
+        public long ComercioId { get; set; }
         [Required]
         public DayOfWeek Dia { get; set; } 
         public bool Abierto { get; set; }

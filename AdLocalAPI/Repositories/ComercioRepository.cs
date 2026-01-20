@@ -29,7 +29,8 @@ namespace AdLocalAPI.Repositories
         public async Task<List<ComercioPublicDto>> GetAllAsync(
             string tipo,
             double? lat,
-            double? lng
+            double? lng,
+            string? municipio
         )
         {
             IQueryable<Comercio> query = _context.Comercios
@@ -37,9 +38,19 @@ namespace AdLocalAPI.Repositories
                 .Include(c => c.Estado)      
                 .Include(c => c.Municipio);
 
+            query = query.Where(c => c.Municipio.MunicipioNombre == municipio);
+
 
             switch (tipo.ToLower())
             {
+                case "populares":
+                    query = query
+                        .OrderByDescending(c => c.CalificacionesComentarios.Any()
+                            ? c.CalificacionesComentarios.Sum(cc => cc.Calificacion)
+                              / (double)c.CalificacionesComentarios.Count()
+                            : 0);
+                    break;
+
                 case "recientes":
                     query = query.OrderByDescending(c => c.FechaCreacion);
                     break;
@@ -83,6 +94,10 @@ namespace AdLocalAPI.Repositories
 
                     EstadoNombre = c.Estado!.EstadoNombre == null ? "" :c.Estado!.EstadoNombre,
                     MunicipioNombre = c.Municipio!.MunicipioNombre == null ? "" : c.Municipio!.MunicipioNombre,
+                    PromedioCalificacion = c.CalificacionesComentarios.Any()
+                                            ? c.CalificacionesComentarios.Sum(cc => cc.Calificacion)
+                                              / (double)c.CalificacionesComentarios.Count()
+                                            : 0
                 })
                 .ToListAsync();
 

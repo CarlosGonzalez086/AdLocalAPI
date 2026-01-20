@@ -15,7 +15,7 @@ namespace AdLocalAPI.Repositories
         }
 
         public async Task<bool> CrearHorariosAsync(
-            int comercioId,
+            long comercioId,
             List<HorarioComercio> horarios)
         {
             if (horarios == null || !horarios.Any())
@@ -34,7 +34,7 @@ namespace AdLocalAPI.Repositories
             return true;
         }
         public async Task<bool> ActualizarHorariosAsync(
-            int comercioId,
+            long comercioId,
             List<HorarioComercio> horarios)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
@@ -65,7 +65,7 @@ namespace AdLocalAPI.Repositories
             }
         }
         public async Task<List<HorarioComercio>> ObtenerHorariosPorComercioAsync(
-            int comercioId)
+            long comercioId)
         {
             return await _context.HorarioComercio
                 .Where(h => h.ComercioId == comercioId)
@@ -74,7 +74,7 @@ namespace AdLocalAPI.Repositories
                 .ToListAsync();
         }
         public async Task<bool> EliminarHorariosPorComercioAsync(
-            int comercioId)
+            long comercioId)
         {
             var horarios = await _context.HorarioComercio
                 .Where(h => h.ComercioId == comercioId)
@@ -88,7 +88,7 @@ namespace AdLocalAPI.Repositories
             return true;
         }
         public async Task<bool> ComercioTieneHorariosAsync(
-            int comercioId)
+            long comercioId)
         {
             return await _context.HorarioComercio
                 .AnyAsync(h => h.ComercioId == comercioId);

@@ -23,6 +23,7 @@ namespace AdLocalAPI.Data
         public DbSet<Estado> Estados { get; set; }
         public DbSet<Municipio> Municipios { get; set; }
         public DbSet<EstadoMunicipio> EstadosMunicipios { get; set; }
+        public DbSet<CalificacionComentario> CalificacionComentario { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -185,6 +186,22 @@ namespace AdLocalAPI.Data
                         .WithMany()
                         .HasForeignKey(c => c.MunicipioId)
                         .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<CalificacionComentario>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Comentario).HasMaxLength(250).IsRequired();
+                entity.Property(e => e.NombrePersona).HasMaxLength(100).IsRequired();
+                entity.Property(e => e.Calificacion).IsRequired();
+                entity.Property(e => e.FechaCreacion)
+                      .HasDefaultValueSql("NOW()") 
+                      .IsRequired();
+            });
+            modelBuilder.Entity<Comercio>()
+             .HasMany(c => c.CalificacionesComentarios)
+             .WithOne(cc => cc.Comercio)
+             .HasForeignKey(cc => cc.IdComercio)
+             .OnDelete(DeleteBehavior.Cascade);
+
         }
 
     }

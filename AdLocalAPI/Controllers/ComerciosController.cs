@@ -54,10 +54,11 @@ namespace AdLocalAPI.Controllers
         public async Task<IActionResult> GetAll(
             [FromQuery] string tipo = "populares",
             [FromQuery] double? lat = null,
-            [FromQuery] double? lng = null
+            [FromQuery] double? lng = null,
+            [FromQuery] string? municipio = null
         )
         {
-            var response = await _service.GetAllComercios(tipo, lat, lng);
+            var response = await _service.GetAllComercios(tipo, lat, lng, municipio);
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
 
