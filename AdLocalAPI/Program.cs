@@ -58,11 +58,10 @@ var supabaseUrl = Environment.GetEnvironmentVariable("SUPABASE__URL")
 var supabaseKey =  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6Z25md2J6dG9pemNjdHlmZGl2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2Njk0MzUyNywiZXhwIjoyMDgyNTE5NTI3fQ.opjCm_q7U9GX0ah7UUgRMzQJwBQhyBupWVGJQXY6v0I";
 
 // PostgreSQL / Supabase
-var connectionString = "Host=ep-empty-moon-adsd2mcc-pooler.c-2.us-east-1.aws.neon.tech;Port=5432;Database=neondb;Username=neondb_owner;Password=npg_vXt9sekfG3rY;SslMode=Require";
-    //Environment
-    //.GetEnvironmentVariable("SUPABASE_DB_CONNECTION")
-    //?.Trim()
-    //?? throw new Exception("❌ SUPABASE_DB_CONNECTION no está definida");
+var connectionString = Environment
+    .GetEnvironmentVariable("SUPABASE_DB_CONNECTION")
+    ?.Trim()
+    ?? throw new Exception("❌ SUPABASE_DB_CONNECTION no está definida");
 
 //var connectionString = "User Id=postgres.uzgnfwbztoizcctyfdiv;Password=q8dZ1szsEYIOzKrM;Server=aws-1-us-east-2.pooler.supabase.com;Port=6543;Database=postgres;SSL Mode=Require;Trust Server Certificate=true";
 
