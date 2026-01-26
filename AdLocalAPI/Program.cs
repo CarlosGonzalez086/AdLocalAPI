@@ -38,12 +38,12 @@ var jwtKey = Environment.GetEnvironmentVariable("JWT__Key")
 var jwtIssuer = Environment.GetEnvironmentVariable("JWT__Issuer")
     ?? "AdLocalAPI";
 
-//var webhookSecret = Environment.GetEnvironmentVariable("STRIPE_WEBHOOK_SECRET");
+var webhookSecret = Environment.GetEnvironmentVariable("STRIPE_WEBHOOK_SECRET");
 
-//if (string.IsNullOrWhiteSpace(webhookSecret))
-//{
-//    throw new Exception("Stripe Webhook Secret no configurado");
-//}
+if (string.IsNullOrWhiteSpace(webhookSecret))
+{
+    throw new Exception("Stripe Webhook Secret no configurado");
+}
 
 // Stripe
 //var stripeSecret = Environment.GetEnvironmentVariable("STRIPE__SecretKey");
@@ -62,6 +62,9 @@ var connectionString = Environment
     .GetEnvironmentVariable("SUPABASE_DB_CONNECTION")
     ?.Trim()
     ?? throw new Exception("❌ SUPABASE_DB_CONNECTION no está definida");
+
+Stripe.StripeConfiguration.ApiKey =
+    builder.Configuration["Stripe:SecretKey"];
 
 //var connectionString = "User Id=postgres.uzgnfwbztoizcctyfdiv;Password=q8dZ1szsEYIOzKrM;Server=aws-1-us-east-2.pooler.supabase.com;Port=6543;Database=postgres;SSL Mode=Require;Trust Server Certificate=true";
 
@@ -133,6 +136,7 @@ builder.Services.AddScoped<SuscripcionRepository>();
 builder.Services.AddScoped<SuscripcionService>();
 
 builder.Services.AddScoped<StripeService>();
+builder.Services.AddScoped<StripeServiceSub>();
 
 builder.Services.AddScoped<IConfiguracionService, ConfiguracionService>();
 builder.Services.AddScoped<IConfiguracionRepository, ConfiguracionRepository>();
@@ -151,6 +155,15 @@ builder.Services.Configure<EmailSettings>(
     builder.Configuration.GetSection("EmailSettings"));
 
 builder.Services.AddScoped<EmailService>();
+builder.Services.AddHostedService<SuscripcionBackgroundService>();
+builder.Services.AddScoped<SuscripcionServiceAuto>();
+
+builder.Services.AddScoped<SuscripcionAutoRenewBackgroundService>();
+builder.Services.AddScoped<SuscripcionAutoRenewService>();
+
+builder.Services.AddScoped<ISuscriptionService, SuscriptionService>();
+builder.Services.AddScoped<ISuscriptionRepository, SuscriptionRepository>();
+
 
 
 builder.Services.AddSingleton(new Supabase.Client(supabaseUrl, supabaseKey));

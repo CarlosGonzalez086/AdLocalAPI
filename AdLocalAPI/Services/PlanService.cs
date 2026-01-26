@@ -74,16 +74,16 @@ namespace AdLocalAPI.Services
         {
             try
             {
-                if (string.IsNullOrEmpty(dto.Nombre))
+                if (string.IsNullOrWhiteSpace(dto.Nombre))
                     return ApiResponse<object>.Error("400", "El nombre del plan es obligatorio");
 
-                if (dto.Precio <= 0)
-                    return ApiResponse<object>.Error("400", "El precio debe ser mayor a cero");
-
                 if (dto.DuracionDias <= 0)
-                    return ApiResponse<object>.Error("400", "La duración debe ser mayor a cero días");
+                    return ApiResponse<object>.Error("400", "La duración debe ser mayor a cero");
 
-                if (string.IsNullOrEmpty(dto.Tipo))
+                if (dto.Precio < 0)
+                    return ApiResponse<object>.Error("400", "El precio no puede ser negativo");
+
+                if (string.IsNullOrWhiteSpace(dto.Tipo))
                     return ApiResponse<object>.Error("400", "El tipo de plan es obligatorio");
 
                 var plan = new Plan
@@ -91,23 +91,33 @@ namespace AdLocalAPI.Services
                     Nombre = dto.Nombre,
                     Precio = dto.Precio,
                     DuracionDias = dto.DuracionDias,
-                    Tipo = dto.Tipo,
+                    Tipo = dto.Tipo.ToUpper(),
+
+                    MaxNegocios = dto.MaxNegocios,
+                    MaxProductos = dto.MaxProductos,
+                    MaxFotos = dto.MaxFotos,
+
+                    NivelVisibilidad = dto.NivelVisibilidad,
+                    PermiteCatalogo = dto.PermiteCatalogo,
+                    ColoresPersonalizados = dto.ColoresPersonalizados,
+                    TieneBadge = dto.TieneBadge,
+                    BadgeTexto = dto.BadgeTexto,
+                    TieneAnalytics = dto.TieneAnalytics,
+
                     Activo = true,
                     FechaCreacion = DateTime.UtcNow
                 };
 
                 var creado = await _repository.CreateAsync(plan);
 
-                return ApiResponse<object>.Success(
-                    creado,
-                    "Plan creado correctamente"
-                );
+                return ApiResponse<object>.Success(null, "Plan creado correctamente");
             }
             catch (Exception ex)
             {
                 return ApiResponse<object>.Error("500", ex.Message);
             }
         }
+
 
         public async Task<ApiResponse<object>> ActualizarPlan(int id, PlanCreateDto dto)
         {
@@ -121,20 +131,29 @@ namespace AdLocalAPI.Services
                 plan.Nombre = dto.Nombre;
                 plan.Precio = dto.Precio;
                 plan.DuracionDias = dto.DuracionDias;
-                plan.Tipo = dto.Tipo;
+                plan.Tipo = dto.Tipo.ToUpper();
+
+                plan.MaxNegocios = dto.MaxNegocios;
+                plan.MaxProductos = dto.MaxProductos;
+                plan.MaxFotos = dto.MaxFotos;
+
+                plan.NivelVisibilidad = dto.NivelVisibilidad;
+                plan.PermiteCatalogo = dto.PermiteCatalogo;
+                plan.ColoresPersonalizados = dto.ColoresPersonalizados;
+                plan.TieneBadge = dto.TieneBadge;
+                plan.BadgeTexto = dto.BadgeTexto;
+                plan.TieneAnalytics = dto.TieneAnalytics;
 
                 await _repository.UpdateAsync(plan);
 
-                return ApiResponse<object>.Success(
-                    plan,
-                    "Plan actualizado correctamente"
-                );
+                return ApiResponse<object>.Success(null, "Plan actualizado correctamente"); ;
             }
             catch (Exception ex)
             {
                 return ApiResponse<object>.Error("500", ex.Message);
             }
         }
+
 
         public async Task<ApiResponse<object>> EliminarPlan(int id)
         {

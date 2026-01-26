@@ -3,6 +3,7 @@ using System;
 using AdLocalAPI.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NetTopologySuite.Geometries;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AdLocalAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260124214908_UsuarioPuedeTenerVariosComercios")]
+    partial class UsuarioPuedeTenerVariosComercios
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -112,7 +115,7 @@ namespace AdLocalAPI.Migrations
                         .HasColumnType("text");
 
                     b.Property<Point>("Ubicacion")
-                        .HasColumnType("geometry(Point,4326)");
+                        .HasColumnType("geography (point, 4326)");
 
                     b.HasKey("Id");
 

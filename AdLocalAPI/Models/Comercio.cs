@@ -44,5 +44,6 @@ namespace AdLocalAPI.Models
         public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
         // 🔹 Relación con calificaciones
         public ICollection<CalificacionComentario> CalificacionesComentarios { get; set; } = new List<CalificacionComentario>();
+        public Usuario Usuario { get; set; }
     }
 }

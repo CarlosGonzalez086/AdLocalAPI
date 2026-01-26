@@ -2,100 +2,188 @@
 using AdLocalAPI.Helpers;
 using AdLocalAPI.Models;
 using AdLocalAPI.Repositories;
+using AdLocalAPI.Utils;
+using Stripe.Checkout;
+
 
 namespace AdLocalAPI.Services
 {
     public class SuscripcionService
     {
-        private readonly SuscripcionRepository _repository;
-        private readonly PlanRepository _planRepo;
         private readonly JwtContext _jwt;
-        private readonly StripeService _stripe;
+        private readonly UsuarioRepository _usuarioRepository;
+        private readonly SuscripcionRepository _suscripcionRepository;
+        private readonly PlanRepository _planRepository;
+        private readonly StripeServiceSub _stripe;
+
 
         public SuscripcionService(
-            SuscripcionRepository repository,
-            PlanRepository planRepo,
             JwtContext jwt,
-            StripeService stripe)
+            UsuarioRepository usuarioRepository,
+            SuscripcionRepository suscripcionRepository,
+            PlanRepository planRepository,
+            StripeServiceSub stripe)
         {
-            _repository = repository;
-            _planRepo = planRepo;
             _jwt = jwt;
+            _usuarioRepository = usuarioRepository;
+            _suscripcionRepository = suscripcionRepository;
+            _planRepository = planRepository;
             _stripe = stripe;
         }
 
-        public async Task<ApiResponse<object>> ContratarPlan(SuscripcionCreateDto dto)
+        public async Task<ApiResponse<string>> CrearCheckoutSession(CrearSuscripcionDto dto)
         {
             int usuarioId = _jwt.GetUserId();
 
-            var plan = await _planRepo.GetByIdAsync(dto.PlanId);
+            var usuario = await _usuarioRepository.GetByIdAsync(usuarioId);
+            if (usuario == null)
+                return ApiResponse<string>.Error("404", "Usuario no encontrado");
+
+            var plan = await _planRepository.GetByIdAsync(dto.PlanId);
             if (plan == null || !plan.Activo)
-                return ApiResponse<object>.Error("404", "Plan no disponible");
+                return ApiResponse<string>.Error("404", "Plan no válido");
 
-            var paymentIntent = await _stripe.CreatePaymentIntent(
-                plan,
-                usuarioId,
-                dto.StripePaymentMethodId
-            );
+            if (!StripePriceIds.Planes.TryGetValue(plan.Tipo.ToUpper(), out var priceId))
+                return ApiResponse<string>.Error("400", "PriceId no configurado");
 
-            return ApiResponse<object>.Success(
-                new
-                {
-                    paymentIntentId = paymentIntent.Id,
-                    status = paymentIntent.Status
-                },
-                "Pago procesado"
-            );
+            var options = new SessionCreateOptions
+            {
+                Mode = "subscription",
+                CustomerEmail = usuario.Email,
+                LineItems = new List<SessionLineItemOptions>
+        {
+            new SessionLineItemOptions
+            {
+                Price = priceId,
+                Quantity = 1
+            }
+        },
+                Metadata = new Dictionary<string, string>
+        {
+            { "usuarioId", usuarioId.ToString() },
+            { "planId", plan.Id.ToString() }
+        },
+                SuccessUrl = "https://tudominio.com/success",
+                CancelUrl = "https://tudominio.com/cancel"
+            };
+
+            var session = new SessionService().Create(options);
+
+            return ApiResponse<string>.Success(session.Url);
+        }
+        public async Task<ApiResponse<bool>> CancelarSuscripcion()
+        {
+            int usuarioId = _jwt.GetUserId();
+
+            var sub = await _suscripcionRepository.ObtenerActiva(usuarioId);
+            if (sub == null)
+                return ApiResponse<bool>.Error("404", "No tienes suscripción activa");
+
+            _stripe.CancelarSuscripcion(sub.StripeSubscriptionId);
+
+            sub.Activa = false;
+            sub.Estado = "canceled";
+            sub.FechaCancelacion = DateTime.UtcNow;
+
+            await _suscripcionRepository.ActualizarAsync(sub);
+
+            return ApiResponse<bool>.Success(true, "Suscripción cancelada");
+        }
+
+        public async Task<ApiResponse<Suscripcion>> ObtenerSuscripcionActiva()
+        {
+            int usuarioId = _jwt.GetUserId();
+
+            var sub = await _suscripcionRepository.ObtenerActiva(usuarioId);
+            if (sub == null)
+                return ApiResponse<Suscripcion>.Error("404", "No tienes suscripción");
+
+            return ApiResponse<Suscripcion>.Success(sub);
         }
 
 
-        public async Task<ApiResponse<object>> ObtenerMiSuscripcion()
+
+
+
+
+        public async Task<ApiResponse<SuscripcionInfoDto>> ObtenerMiSuscripcion()
         {
             int usuarioId = _jwt.GetUserId();
-            var suscripcion = await _repository.GetActivaByUsuario(usuarioId);
+
+            var suscripcion = await _suscripcionRepository.GetActivaByUsuario(usuarioId);
+
+            var planDto = await _planRepository.GetByIdAsync(suscripcion.PlanId);
 
             if (suscripcion == null)
-                return ApiResponse<object>.Error("404", "No tienes suscripción activa");
+                return ApiResponse<SuscripcionInfoDto>.Error("404", "No tienes suscripción activa");
 
-            return ApiResponse<object>.Success(
+            return ApiResponse<SuscripcionInfoDto>.Success(
                 new SuscripcionInfoDto
                 {
                     Id = suscripcion.Id,
-                    Plan = suscripcion.Plan.Nombre,
+
+                    Plan = new PlanInfoDto
+                    {
+                        Nombre = planDto.Nombre,
+                        Precio = planDto.Precio,
+                        DuracionDias = planDto.DuracionDias,
+                        Tipo = planDto.Tipo,
+                        MaxNegocios = planDto.MaxNegocios,
+                        MaxProductos = planDto.MaxProductos,
+                        MaxFotos = planDto.MaxFotos,
+                        NivelVisibilidad = planDto.NivelVisibilidad,
+                        PermiteCatalogo = planDto.PermiteCatalogo,
+                        ColoresPersonalizados = planDto.ColoresPersonalizados,
+                        TieneBadge = planDto.TieneBadge,
+                        BadgeTexto = planDto.BadgeTexto,
+                        TieneAnalytics = planDto.TieneAnalytics,
+
+                    },
+
                     FechaInicio = suscripcion.FechaInicio,
                     FechaFin = suscripcion.FechaFin,
                     Activa = suscripcion.Activa,
                     Estado = suscripcion.Estado,
                     Monto = suscripcion.Monto,
-                    Tipo = "",
-                    Moneda = suscripcion.Moneda,
+                    Moneda = suscripcion.Moneda
                 }
             );
         }
 
-        public async Task<ApiResponse<object>> CancelarMiSuscripcion()
+
+        public async Task<ApiResponse<Suscripcion>> CambiarPlan(CambiarPlanDto dto)
         {
             int usuarioId = _jwt.GetUserId();
-            var suscripcion = await _repository.GetActivaByUsuario(usuarioId);
 
-            if (suscripcion == null)
-                return ApiResponse<object>.Error("404", "No hay suscripción activa");
+            var sub = await _suscripcionRepository.ObtenerActiva(usuarioId);
+            if (sub == null)
+                return ApiResponse<Suscripcion>.Error("404", "No tienes suscripción activa");
 
-            suscripcion.AutoRenovacion = false;
-            suscripcion.Estado = "Cancelada";
+            var nuevoPlan = await _planRepository.GetByIdAsync(dto.PlanIdNuevo);
+            if (nuevoPlan == null || !nuevoPlan.Activo)
+                return ApiResponse<Suscripcion>.Error("404", "Plan no válido");
+            var nuevoPriceId = ObtenerStripePriceIdPorTipo(nuevoPlan.Tipo);
 
-            await _repository.UpdateAsync(suscripcion);
-
-            return ApiResponse<object>.Success(
-                null,
-                "La suscripción se cancelará al finalizar el periodo actual"
+            _stripe.CambiarPlan(
+                sub.StripeSubscriptionId,
+                nuevoPriceId
             );
-        }
-        public async Task<bool> TieneSuscripcionActiva(int usuarioId)
-        {
-            var sub = await _repository.GetByUsuarioId(usuarioId);
-            return sub != null && sub.FechaFin > DateTime.UtcNow;
-        }
 
+            // BD
+            sub.PlanId = nuevoPlan.Id;
+            sub.StripePriceId = nuevoPriceId;
+            sub.Monto = nuevoPlan.Precio;
+
+            await _suscripcionRepository.ActualizarAsync(sub);
+
+            return ApiResponse<Suscripcion>.Success(sub, "Plan actualizado");
+        }
+        private string ObtenerStripePriceIdPorTipo(string tipo)
+        {
+            if (!StripePriceIds.Planes.TryGetValue(tipo.ToUpper(), out var priceId))
+                throw new Exception($"No existe PriceId para el plan {tipo}");
+
+            return priceId;
+        }
     }
 }

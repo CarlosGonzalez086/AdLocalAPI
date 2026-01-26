@@ -27,7 +27,8 @@ namespace AdLocalAPI.Services
         public async Task<ApiResponse<ProductosServiciosDto>> CreateAsync(ProductosServiciosDto dto)
         {
             long idUser = _jwtContext.GetUserId();
-            long idComercio = (int)_jwtContext.GetComercioId();
+            int maxProductos = _jwtContext.GetMaxProductos();
+            long idComercio = dto.IdComercio == 0 ? _jwtContext.GetComercioId() : dto.IdComercio;
             // Validación aquí
             var validationResult = await _validator.ValidateAsync(dto);
 
@@ -53,6 +54,18 @@ namespace AdLocalAPI.Services
                         "Debes registrar un comercio o negocio antes de agregar un producto o servicio."
                     );
                 }
+
+                var list = await _repository.GetAllAsync(idComercio);
+
+                if (list.Count() == maxProductos )
+                {
+                    return ApiResponse<ProductosServiciosDto>.Error(
+                        "900",
+                        "Has alcanzado el límite de productos o servicios permitidos por tu plan."
+                    );
+                }
+
+
                 string? logoUrl = null;
                 if (!string.IsNullOrWhiteSpace(dto.ImagenBase64))
                 {
@@ -124,7 +137,7 @@ namespace AdLocalAPI.Services
         public async Task<ApiResponse<ProductosServiciosDto>> GetByIdAsync(long id)
         {
             long idUser = _jwtContext.GetUserId();
-            long idComercio = (int)_jwtContext.GetComercioId();
+            long idComercio = _jwtContext.GetComercioId();
             var entity = await _repository.GetByIdAsync(id,idComercio,idUser);
 
             if (entity == null)
@@ -147,7 +160,7 @@ namespace AdLocalAPI.Services
         public async Task<ApiResponse<bool>> UpdateAsync(long id, ProductosServiciosDto dto)
         {
             long idUser = _jwtContext.GetUserId();
-            long idComercio = (int)_jwtContext.GetComercioId();
+            long idComercio = dto.IdComercio == 0 ? _jwtContext.GetComercioId() : dto.IdComercio;
             var entity = await _repository.GetByIdAsync(id, idComercio, idUser);
 
             if (entity == null)
@@ -208,7 +221,7 @@ namespace AdLocalAPI.Services
         public async Task<ApiResponse<bool>> DeleteAsync(long id)
         {
             long idUser = _jwtContext.GetUserId();
-            long idComercio = (int)_jwtContext.GetComercioId();
+            long idComercio = _jwtContext.GetComercioId();
             var entity = await _repository.GetByIdAsync(id, idComercio, idUser);
 
             if (entity == null)
@@ -232,7 +245,7 @@ namespace AdLocalAPI.Services
         public async Task<ApiResponse<bool>> DesactivarAsync(long id)
         {
             long idUser = _jwtContext.GetUserId();
-            long idComercio = (int)_jwtContext.GetComercioId();
+            long idComercio = _jwtContext.GetComercioId();
             var entity = await _repository.GetByIdAsync(id, idComercio, idUser);
 
             if (entity == null)
@@ -247,10 +260,10 @@ namespace AdLocalAPI.Services
         }
 
         public async Task<ApiResponse<PagedResponse<ProductosServiciosDto>>> GetAllPagedAsync(
-            int page = 1, int pageSize = 10, string orderBy = "recent", string search = "")
+            int page = 1, int pageSize = 10, string orderBy = "recent", string search = "",long idComercio = 0)
         {
             long idUser = _jwtContext.GetUserId();
-            long idComercio = (int)_jwtContext.GetComercioId();
+            idComercio = idComercio == 0 ? _jwtContext.GetComercioId() : idComercio;
             return await _repository.GetAllPagedAsync(idUser,idComercio, page, pageSize, orderBy, search);
         }
         private static readonly Dictionary<string, string> TiposImagenPermitidos = new()

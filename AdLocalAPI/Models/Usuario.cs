@@ -4,7 +4,7 @@ namespace AdLocalAPI.Models
 {
     public class Usuario
     {
-        public int Id { get; set; }
+        public long Id { get; set; }
 
         [Required]
         public string Nombre { get; set; }
@@ -26,6 +26,6 @@ namespace AdLocalAPI.Models
         public string? StripeCustomerId { get; set; }
         public string? Token { get; set; }
         public string? Codigo { get; set; }
-        public Comercio? Comercio { get; set; }
+        public ICollection<Comercio> Comercios { get; set; } = new List<Comercio>();
     }
 }

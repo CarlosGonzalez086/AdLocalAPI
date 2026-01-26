@@ -1,8 +1,10 @@
 ﻿namespace AdLocalAPI.DTOs
 {
-    public class SuscripcionCreateDto
+    public class CrearSuscripcionDto
     {
         public int PlanId { get; set; }
-        public string StripePaymentMethodId { get; set; } = string.Empty;
+        public string StripePaymentMethodId { get; set; }
     }
+
+
 }

@@ -1,6 +1,6 @@
 ﻿namespace AdLocalAPI.DTOs
 {
-    public class PlanCreateDto
+    public class PlanInfoDto
     {
         public string Nombre { get; set; }
         public decimal Precio { get; set; }
@@ -18,5 +18,4 @@
         public string? BadgeTexto { get; set; }
         public bool TieneAnalytics { get; set; }
     }
-
 }

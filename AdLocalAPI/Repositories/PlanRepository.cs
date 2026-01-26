@@ -22,6 +22,9 @@ namespace AdLocalAPI.Repositories
         {
             var query = _context.Plans.AsQueryable();
 
+            query = query
+                    .Where(p => p.Activo == true);
+
 
             if (!string.IsNullOrWhiteSpace(search))
             {
@@ -59,7 +62,8 @@ namespace AdLocalAPI.Repositories
         {
             List<Models.Plan> plans = new List<Models.Plan>();
             var query = _context.Plans.AsQueryable();
-            query = query.Where(p => p.Activo == true);
+            query = query
+                .Where(p => p.Activo == true);
             try
             {
                 plans = await query.ToListAsync();
@@ -72,20 +76,13 @@ namespace AdLocalAPI.Repositories
             return plans;
         }
 
-        public async Task<Models.Plan> GetByIdAsync(int id) 
+        public async Task<Plan?> GetByIdAsync(int id)
         {
-            Models.Plan plan = new Models.Plan();
-            try 
-            {
-                plan = await _context.Plans.FindAsync(id);
-            }
-            catch (Exception ex) 
-            {
-                Console.WriteLine($"Could not find {ex.Message}");
-                return plan;
-            }
-            return plan;
+            return await _context.Plans
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == id);
         }
+
         public async Task<Models.Plan> CreateAsync(Models.Plan plan)
         {
             try
@@ -119,11 +116,11 @@ namespace AdLocalAPI.Repositories
             try
             {
                 var plan = await _context.Plans.FindAsync(id);
-                if (plan != null)
-                {
-                    _context.Plans.Remove(plan);
-                    await _context.SaveChangesAsync();
-                }
+                if (plan == null) return false;
+
+                plan.Activo = false;
+                _context.Plans.Update(plan);
+                await _context.SaveChangesAsync();
             }
             catch (Exception ex)
             {
@@ -132,5 +129,15 @@ namespace AdLocalAPI.Repositories
             }
             return true;
         }
+        public async Task<Plan> GetByTipoAsync(string tipo)
+        {
+            return await _context.Plans
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p =>
+                    p.Tipo == tipo &&
+                    p.Activo
+                );
+        }
+
     }
 }

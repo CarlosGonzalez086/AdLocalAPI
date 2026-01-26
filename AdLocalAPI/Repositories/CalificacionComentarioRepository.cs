@@ -28,7 +28,7 @@ namespace AdLocalAPI.Repositories
         {
             var query = _context.CalificacionComentario.AsQueryable();
 
-            query.Where( c => c.IdComercio == idComercio );
+            query = query.Where( c => c.IdComercio == idComercio );
 
             query = orderBy.ToLower() switch
             {
@@ -56,7 +56,7 @@ namespace AdLocalAPI.Repositories
         {
             var query = _context.CalificacionComentario.AsQueryable();
 
-            query.Where(c => c.IdComercio == idComercio);
+            query = query.Where(c => c.IdComercio == idComercio);
             return query;
         }
     }
