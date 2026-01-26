@@ -12,6 +12,6 @@ namespace AdLocalAPI.Interfaces.ProductosServicios
         Task<ApiResponse<bool>> DeleteAsync(long id);
         Task<ApiResponse<bool>> DesactivarAsync(long id);
         Task<ApiResponse<PagedResponse<ProductosServiciosDto>>> GetAllPagedAsync(
-           int page = 1, int pageSize = 10, string orderBy = "recent", string search = "");
+           int page = 1, int pageSize = 10, string orderBy = "recent", string search = "",long idComercio = 0);
     }
 }

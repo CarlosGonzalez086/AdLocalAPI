@@ -1,10 +1,12 @@
-﻿using AdLocalAPI.DTOs;
+﻿using AdLocalAPI.Data;
+using AdLocalAPI.DTOs;
 using AdLocalAPI.Helpers;
 using AdLocalAPI.Interfaces.Comercio;
 using AdLocalAPI.Interfaces.Location;
 using AdLocalAPI.Interfaces.ProductosServicios;
 using AdLocalAPI.Models;
 using AdLocalAPI.Repositories;
+using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
 using System.Linq;
 
@@ -19,11 +21,12 @@ namespace AdLocalAPI.Services
         private readonly IProductosServiciosRepository _productosServiciosRepository;
         private readonly ILocationRepository _locationRepository;
         private readonly CalificacionComentarioRepository _calificacionComentarioRepository;
+        private readonly AppDbContext _context;
 
         public ComercioService(ComercioRepository repository, JwtContext jwtContext, 
                                IRelComercioImagenRepositorio comercioImagenRepositorio, IHorarioComercioService horarioComercioService, 
                                IProductosServiciosRepository productosServiciosRepository, ILocationRepository locationRepository,
-                               CalificacionComentarioRepository calificacionComentarioRepository)
+                               CalificacionComentarioRepository calificacionComentarioRepository, AppDbContext context)
         {
             _repository = repository;
             _jwtContext = jwtContext;
@@ -32,6 +35,7 @@ namespace AdLocalAPI.Services
             _productosServiciosRepository = productosServiciosRepository;
             _locationRepository = locationRepository;
             _calificacionComentarioRepository = calificacionComentarioRepository;
+            _context = context;
         }
 
         public async Task<ApiResponse<object>> GetAllComercios(
@@ -59,7 +63,7 @@ namespace AdLocalAPI.Services
                 return ApiResponse<object>.Error("500", ex.Message);
             }
         }
-        public async Task<ApiResponse<ComercioMineDto>> GetComercioById(int id)
+        public async Task<ApiResponse<ComercioMineDto>> GetComercioById(long id)
         {
             try
             {
@@ -126,6 +130,33 @@ namespace AdLocalAPI.Services
                     municipio = await _locationRepository.GetMunicipalityByIdAsync(comercio.MunicipioId);
                 }
 
+                string badge = "";
+
+                var suscripcionActiva = await _context.Suscripcions
+                    .Where(s =>
+                        s.UsuarioId == comercio.IdUsuario &&
+                        s.Activa &&
+                        !s.Eliminada &&
+                        (s.Plan.Tipo == "PRO" || s.Plan.Tipo == "BUSINESS")
+                    )
+                    .Select(s => new
+                    {
+                        s.Plan.Tipo,
+                        s.Plan.NivelVisibilidad,
+                        s.Plan.TieneBadge,
+                        s.Plan.BadgeTexto
+                    })
+                    .FirstOrDefaultAsync();
+
+                if (suscripcionActiva != null && suscripcionActiva.TieneBadge)
+                {
+                    badge = !string.IsNullOrEmpty(suscripcionActiva.BadgeTexto)
+                        ? suscripcionActiva.BadgeTexto
+                        : suscripcionActiva.Tipo == "BUSINESS"
+                            ? "Premium"
+                            : "Recomendado";
+                }
+
 
                 var dto = new ComercioMineDto
                 {
@@ -148,7 +179,8 @@ namespace AdLocalAPI.Services
                     MunicipioNombre = municipio == null ? "" : municipio.MunicipioNombre,
                     EstadoId = estado == null ? 0 : estado.Id,
                     MunicipioId = municipio == null ? 0 : municipio.Id,
-                    Calificacion = calificacionPromedio
+                    Calificacion = calificacionPromedio,
+                    Badge = badge
 
                 };
 
@@ -262,17 +294,35 @@ namespace AdLocalAPI.Services
             try
             {
                 long idUser = _jwtContext.GetUserId();
-                var comercioExistente = await _repository.GetComercioByUser(idUser);
-
-                if (comercioExistente != null)
+                string planTipo = _jwtContext.GetPlanTipo();
+                if (planTipo != "PRO" && planTipo != "BUSINESS")
                 {
-                    return ApiResponse<object>.Error(
-                        "409",
-                        "Ya existe un comercio registrado asociado a este usuario"
-                    );
+                    var comercioExistente = await _repository.GetComercioByUser(idUser);
+
+                    if (comercioExistente != null)
+                    {
+                        return ApiResponse<object>.Error(
+                            "409",
+                            "Ya existe un comercio registrado asociado a este usuario"
+                        );
+                    }
                 }
+
+                if (planTipo == "PRO" || planTipo == "BUSINESS") 
+                {
+                    int maxNegocios = _jwtContext.GetMaxNegocios();
+                    List<Comercio> totalNegocios = await _repository.GetAllComerciosByIdUsuario(idUser);
+                    if (maxNegocios == totalNegocios.Count)
+                    {
+                        return ApiResponse<object>.Error(
+                            "409",
+                            "Has alcanzado el límite de comercios permitidos por tu plan."
+                        );
+                    }
+                }
+
                 if (string.IsNullOrWhiteSpace(dto.Nombre))
-                    return ApiResponse<object>.Error(
+                   return ApiResponse<object>.Error(
                         "400",
                         "El nombre del comercio es obligatorio"
                     );
@@ -291,10 +341,7 @@ namespace AdLocalAPI.Services
                     return ApiResponse<object>.Error(
                        "400",
                        "El municipio del comercio es obligatorrio"
-                   );
-                
-
-                long userId = _jwtContext.GetUserId();
+                   );               
 
                 string? logoUrl = null;
 
@@ -319,7 +366,7 @@ namespace AdLocalAPI.Services
 
                     logoUrl = await _repository.UploadToSupabaseAsync(
                         imageBytes,
-                        (int)userId,
+                        (int)idUser,
                         contentType
                     );
                 }
@@ -334,7 +381,7 @@ namespace AdLocalAPI.Services
                     LogoUrl = logoUrl,
                     Activo = true,
                     FechaCreacion = DateTime.UtcNow,
-                    IdUsuario = userId,
+                    IdUsuario = idUser,
                     ColorPrimario = dto.ColorPrimario,
                     ColorSecundario = dto.ColorSecundario,
                     Descripcion = dto.Descripcion,      
@@ -377,7 +424,7 @@ namespace AdLocalAPI.Services
                             byte[] imageBytes = Convert.FromBase64String(base64Clean);
 
                             var imagenUrl = await _comercioImagenRepositorio
-                                .UploadToSupabaseAsync(imageBytes, (int)userId, contentType);
+                                .UploadToSupabaseAsync(imageBytes, (int)idUser, contentType);
 
                             if (string.IsNullOrEmpty(imagenUrl))
                                 continue;
@@ -416,7 +463,7 @@ namespace AdLocalAPI.Services
         {
             try
             {
-                int idComercio = (int)_jwtContext.GetComercioId();
+                long idComercio = dto.Id == 0 ? _jwtContext.GetComercioId() : dto.Id;
                 var comercio = await _repository.GetByIdAsync(idComercio);
 
                 if (comercio == null)
@@ -609,7 +656,7 @@ namespace AdLocalAPI.Services
                 );
             }
         }
-        public async Task<ApiResponse<object>> DeleteComercio(int id)
+        public async Task<ApiResponse<object>> DeleteComercio(long id)
         {
             try
             {
@@ -684,6 +731,35 @@ namespace AdLocalAPI.Services
                 return ApiResponse<object>.Error("500", ex.Message);
             }
         }
+
+        public async Task<ApiResponse<PagedResponse<ComercioPublicDto>>> GetAllComerciosByUserPaged(
+            int page = 1,
+            int pageSize = 10
+        )
+        {
+            try
+            {
+                long idUser = _jwtContext.GetUserId();
+
+                return await _repository.GetAllComerciosByUserPaged(
+                    idUser,
+                    page,
+                    pageSize
+                );
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<PagedResponse<ComercioPublicDto>>.Error("500", ex.Message);
+            }
+        }
+        public async Task<ApiResponse<object>> GeTotalComerciosByIdUsuario()
+        {
+            long idUser = _jwtContext.GetUserId();
+            List<Comercio> totalNegocios = await _repository.GetAllComerciosByIdUsuario(idUser);
+            return ApiResponse<object>.Success(totalNegocios.Count,"Total de comercios");
+
+        }
+
 
 
 

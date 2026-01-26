@@ -29,15 +29,18 @@ namespace AdLocalAPI.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            modelBuilder.Entity<Usuario>()
-                .HasOne(u => u.Comercio)
-                .WithMany()
-                .HasForeignKey(u => u.ComercioId);
+            /* =========================
+               USUARIO
+            ========================== */
 
             modelBuilder.Entity<Usuario>()
                 .Property(u => u.StripeCustomerId)
-                .HasColumnName("stripecustomerid") 
+                .HasColumnName("stripecustomerid")
                 .HasMaxLength(100);
+
+            /* =========================
+               SUSCRIPCION / PLAN
+            ========================== */
 
             modelBuilder.Entity<Suscripcion>()
                 .HasOne(s => s.Usuario)
@@ -55,6 +58,10 @@ namespace AdLocalAPI.Data
                 .Property(p => p.FechaCreacion)
                 .HasDefaultValueSql("NOW()");
 
+            /* =========================
+               RELACIONES CON USUARIO
+            ========================== */
+
             modelBuilder.Entity<Evento>()
                 .HasOne(e => e.Usuario)
                 .WithMany()
@@ -70,13 +77,29 @@ namespace AdLocalAPI.Data
                 .WithMany()
                 .HasForeignKey(p => p.UsuarioId);
 
-            modelBuilder.Entity<Comercio>()
-                .HasIndex(c => c.IdUsuario)
-                .IsUnique();
+            /* =========================
+               COMERCIO (USUARIO 1 → N)
+            ========================== */
 
-            modelBuilder.Entity<Comercio>()
-                .Property(c => c.Ubicacion)
-                .HasColumnType("geography (point, 4326)");
+            modelBuilder.Entity<Comercio>(entity =>
+            {
+                entity.HasKey(c => c.Id);
+
+                entity.HasOne(c => c.Usuario)
+                      .WithMany(u => u.Comercios)
+                      .HasForeignKey(c => c.IdUsuario)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(c => c.IdUsuario);
+
+                entity.Property(c => c.Ubicacion)
+                      .HasColumnType("geometry(Point,4326)");
+                 
+            });
+
+            /* =========================
+               TARJETAS
+            ========================== */
 
             modelBuilder.Entity<Tarjeta>(entity =>
             {
@@ -107,29 +130,36 @@ namespace AdLocalAPI.Data
                       .IsRequired()
                       .HasMaxLength(20);
 
+                // BOOL limpio
                 entity.Property(e => e.Status)
-                      .HasMaxLength(20)
                       .HasDefaultValue(true);
 
                 entity.Property(e => e.CreatedAt)
                       .HasDefaultValueSql("NOW()");
             });
+
+            /* =========================
+               PRODUCTOS / SERVICIOS
+            ========================== */
+
             modelBuilder.Entity<ProductosServicios>(entity =>
             {
                 entity.HasIndex(e => e.IdComercio);
                 entity.HasIndex(e => e.IdUsuario);
                 entity.HasIndex(e => e.Activo);
                 entity.HasIndex(e => e.Eliminado);
+
                 entity.HasQueryFilter(e => !e.Eliminado);
+
                 entity.Property(e => e.FechaCreacion)
-                    .ValueGeneratedOnAdd()
-                    .HasDefaultValueSql("NOW()")
-                    .Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Ignore);
+                      .ValueGeneratedOnAdd()
+                      .HasDefaultValueSql("NOW()")
+                      .Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Ignore);
             });
-            modelBuilder.Entity<ProductosServicios>()
-                .Property(e => e.FechaCreacion)
-                .ValueGeneratedOnAdd()
-                .Metadata.SetAfterSaveBehavior(PropertySaveBehavior.Ignore);
+
+            /* =========================
+               IMÁGENES DE COMERCIO
+            ========================== */
 
             modelBuilder.Entity<RelComercioImagen>(entity =>
             {
@@ -152,8 +182,13 @@ namespace AdLocalAPI.Data
                 entity.Property(e => e.FechaActualizacion)
                       .HasColumnName("fecha_actualizacion");
             });
+
+            /* =========================
+               HORARIOS
+            ========================== */
+
             modelBuilder.Entity<HorarioComercio>()
-                .HasOne<Comercio>()              
+                .HasOne<Comercio>()
                 .WithMany()
                 .HasForeignKey(h => h.ComercioId)
                 .OnDelete(DeleteBehavior.Cascade);
@@ -162,47 +197,63 @@ namespace AdLocalAPI.Data
                 .HasIndex(h => new { h.ComercioId, h.Dia })
                 .IsUnique();
 
-            modelBuilder.Entity<Comercio>()
-                        .Property(c => c.Ubicacion)
-                        .HasColumnType("geometry(Point,4326)");
-            modelBuilder.Entity<EstadoMunicipio>()
-                        .HasOne(em => em.Estado)
-                        .WithMany(e => e.EstadosMunicipios)
-                        .HasForeignKey(em => em.EstadoId);
+            /* =========================
+               ESTADOS / MUNICIPIOS
+            ========================== */
 
             modelBuilder.Entity<EstadoMunicipio>()
-                        .HasOne(em => em.Municipio)
-                        .WithMany(m => m.EstadosMunicipios)
-                        .HasForeignKey(em => em.MunicipioId);
+                .HasOne(em => em.Estado)
+                .WithMany(e => e.EstadosMunicipios)
+                .HasForeignKey(em => em.EstadoId);
+
+            modelBuilder.Entity<EstadoMunicipio>()
+                .HasOne(em => em.Municipio)
+                .WithMany(m => m.EstadosMunicipios)
+                .HasForeignKey(em => em.MunicipioId);
 
             modelBuilder.Entity<Comercio>()
-                        .HasOne(c => c.Estado)
-                        .WithMany()
-                        .HasForeignKey(c => c.EstadoId)
-                        .OnDelete(DeleteBehavior.Restrict);
+                .HasOne(c => c.Estado)
+                .WithMany()
+                .HasForeignKey(c => c.EstadoId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Comercio>()
-                        .HasOne(c => c.Municipio)
-                        .WithMany()
-                        .HasForeignKey(c => c.MunicipioId)
-                        .OnDelete(DeleteBehavior.Restrict);
+                .HasOne(c => c.Municipio)
+                .WithMany()
+                .HasForeignKey(c => c.MunicipioId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            /* =========================
+               CALIFICACIONES
+            ========================== */
+
             modelBuilder.Entity<CalificacionComentario>(entity =>
             {
                 entity.HasKey(e => e.Id);
-                entity.Property(e => e.Comentario).HasMaxLength(250).IsRequired();
-                entity.Property(e => e.NombrePersona).HasMaxLength(100).IsRequired();
-                entity.Property(e => e.Calificacion).IsRequired();
+
+                entity.Property(e => e.Comentario)
+                      .HasMaxLength(250)
+                      .IsRequired();
+
+                entity.Property(e => e.NombrePersona)
+                      .HasMaxLength(100)
+                      .IsRequired();
+
+                entity.Property(e => e.Calificacion)
+                      .IsRequired();
+
                 entity.Property(e => e.FechaCreacion)
-                      .HasDefaultValueSql("NOW()") 
+                      .HasDefaultValueSql("NOW()")
                       .IsRequired();
             });
-            modelBuilder.Entity<Comercio>()
-             .HasMany(c => c.CalificacionesComentarios)
-             .WithOne(cc => cc.Comercio)
-             .HasForeignKey(cc => cc.IdComercio)
-             .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<Comercio>()
+                .HasMany(c => c.CalificacionesComentarios)
+                .WithOne(cc => cc.Comercio)
+                .HasForeignKey(cc => cc.IdComercio)
+                .OnDelete(DeleteBehavior.Cascade);
         }
+
 
     }
 }

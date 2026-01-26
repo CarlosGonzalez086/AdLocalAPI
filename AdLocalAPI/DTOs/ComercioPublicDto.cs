@@ -17,6 +17,7 @@
         public bool Activo { get; set; }
         public string EstadoNombre { get; set; } = "";
         public string MunicipioNombre { get; set; } = "";
+        public string Badge { get; set; } = "";
         public DateTime FechaCreacion { get; set; }
         // 🔹 Nuevo campo para promedio de calificaciones
         public double PromedioCalificacion { get; set; } = 0;

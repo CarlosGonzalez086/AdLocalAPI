@@ -20,8 +20,11 @@ namespace AdLocalAPI.Services
         private readonly ComercioRepository _comercioRepository;
         private readonly EmailService _emailService;
         private readonly IWebHostEnvironment _env;
+        private readonly SuscripcionRepository _suscripcionRepository;
+        private readonly PlanRepository _planRepo;
 
-        public UsuarioService(UsuarioRepository repository, IConfiguration config, JwtContext jwtContext,ComercioRepository comercioRepository, EmailService emailService, IWebHostEnvironment env)
+        public UsuarioService(UsuarioRepository repository, IConfiguration config, JwtContext jwtContext,ComercioRepository comercioRepository, EmailService emailService, IWebHostEnvironment env, SuscripcionRepository suscripcionRepository,
+            PlanRepository planRepo)
         {
             _repository = repository;
             _config = config;
@@ -29,6 +32,8 @@ namespace AdLocalAPI.Services
             _comercioRepository = comercioRepository;
             _emailService = emailService;
             _env = env;
+            _suscripcionRepository = suscripcionRepository;
+            _planRepo = planRepo;
 
         }
 
@@ -103,8 +108,34 @@ namespace AdLocalAPI.Services
 
             var creado = await _repository.CreateAsync(usuario);
 
+            var planFree = await _planRepo.GetByTipoAsync("FREE");
+
+            if (planFree == null)
+                return ApiResponse<object>.Error("500", "No existe un plan gratuito configurado");
+
+            await _suscripcionRepository.CrearAsync(new Suscripcion
+            {
+                UsuarioId = creado.Id,
+                PlanId = planFree.Id,
+
+                StripeCustomerId = null,
+                StripeSessionId = null,
+                StripeSubscriptionId = null,
+                StripePriceId = null,
+                Monto = 0,
+                Moneda = "MXN",
+                MetodoPago = "free",
+                FechaInicio = DateTime.UtcNow,
+                FechaFin = DateTime.MaxValue,
+                Activa = true,
+                Estado = "active",
+                AutoRenovacion = false,
+                Eliminada = false,
+                FechaCreacion = DateTime.UtcNow
+            });
+
             return ApiResponse<object>.Success(
-                new { creado.Id, creado.Nombre, creado.Email, creado.Rol },
+               null,
                 "Usuario creado correctamente"
             );
         }
@@ -263,29 +294,61 @@ namespace AdLocalAPI.Services
         }
         public async Task<string> GenerateJwtToken(Usuario usuario)
         {
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]));
+            var key = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(_config["Jwt:Key"])
+            );
+
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var claims = new List<Claim>
-            {
-                new Claim(JwtRegisteredClaimNames.Sub, usuario.Email),
-                new Claim("id", usuario.Id.ToString()),
-                new Claim("nombre", usuario.Nombre),
-                new Claim("rol", usuario.Rol)
-            };
+                                        {
+                                            new Claim(JwtRegisteredClaimNames.Sub, usuario.Email),
+                                            new Claim("id", usuario.Id.ToString()),
+                                            new Claim("nombre", usuario.Nombre),
+                                            new Claim("rol", usuario.Rol)
+                                        };
+
 
             if (usuario.Rol == "Comercio")
             {
-                Comercio comercio = await _comercioRepository.GetComercioByUser(usuario.Id);
-                if (comercio != null)
+                var comercio = await _comercioRepository.GetComercioByUser(usuario.Id);
+
+                claims.Add(new Claim(
+                    "comercioId",
+                    comercio?.Id.ToString() ?? "0"
+                ));
+
+                claims.Add(new Claim(
+                    "fotoUrl",
+                    usuario.FotoUrl ?? ""
+                ));
+                var suscripcion = await _suscripcionRepository
+                    .GetActivaByUsuarioAsync(usuario.Id);
+
+                if (suscripcion != null && suscripcion.Plan != null)
                 {
-                    claims.Add(new Claim("comercioId", comercio.Id.ToString()));
-                    claims.Add(new Claim("FotoUrl", usuario.FotoUrl == null ? "" : usuario.FotoUrl));
+                    var plan = suscripcion.Plan;
+
+                    claims.Add(new Claim("planId", plan.Id.ToString()));
+                    claims.Add(new Claim("planTipo", plan.Tipo));
+                    claims.Add(new Claim("nivelVisibilidad", plan.NivelVisibilidad.ToString()));
+                    claims.Add(new Claim("esatdo", suscripcion.Estado));
+                    claims.Add(new Claim("maxNegocios", plan.MaxNegocios.ToString()));
+                    claims.Add(new Claim("maxProductos", plan.MaxProductos.ToString()));
+                    claims.Add(new Claim("maxFotos", plan.MaxFotos.ToString()));
+
+                    claims.Add(new Claim("permiteCatalogo", plan.PermiteCatalogo.ToString()));
+                    claims.Add(new Claim("tieneAnalytics", plan.TieneAnalytics.ToString()));
+
+                    claims.Add(new Claim(
+                        "badge",
+                        plan.TieneBadge ? plan.BadgeTexto ?? "" : ""
+                    ));
                 }
-                else 
+                else
                 {
-                    claims.Add(new Claim("comercioId", usuario.ComercioId == null ? "0" : usuario.ComercioId.Value.ToString()));
-                    claims.Add(new Claim("FotoUrl", usuario.FotoUrl == null ? "" : usuario.FotoUrl));
+                    claims.Add(new Claim("planTipo", "FREE"));
+                    claims.Add(new Claim("nivelVisibilidad", "0"));
                 }
             }
 
@@ -299,6 +362,7 @@ namespace AdLocalAPI.Services
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
+
         public async Task<UpdateJwtResult> ActualizarJwtAsync(string email, bool updateJWT)
         {
             var usuario = await _repository.GetByCorreoAsync(email);

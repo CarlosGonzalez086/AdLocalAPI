@@ -32,13 +32,13 @@ namespace AdLocalAPI.Controllers
         }
         [Authorize]
         [HttpDelete("{id}")]
-        public async Task<IActionResult> Eliminar(int id)
+        public async Task<IActionResult> Eliminar(long id)
         {
             var response = await _service.DeleteComercio(id);
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
         [HttpGet("{id}")]
-        public async Task<IActionResult> GetById(int id)
+        public async Task<IActionResult> GetById(long id)
         {
             var response = await _service.GetComercioById(id);
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
@@ -48,6 +48,13 @@ namespace AdLocalAPI.Controllers
         public async Task<IActionResult> GetMine()
         {
             var response = await _service.GetComercioByUser();
+            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+        }
+        [Authorize]
+        [HttpGet("getTotalComerciosByIdUsuario")]
+        public async Task<IActionResult> GeTotalComerciosByIdUsuario()
+        {
+            var response = await _service.GeTotalComerciosByIdUsuario();
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
         [HttpGet]
@@ -72,6 +79,17 @@ namespace AdLocalAPI.Controllers
             var response = await _service.GetByFiltros(estadoId, municipioId, orden);
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
+        [Authorize]
+        [HttpGet("getAllComerciosByUser")]
+        public async Task<IActionResult> GetAllComerciosByUser(
+            int page = 1,
+            int pageSize = 10
+        )
+        {
+            var response = await _service.GetAllComerciosByUserPaged(page, pageSize);
+            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+        }
+
 
 
     }

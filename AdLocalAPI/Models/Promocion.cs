@@ -25,7 +25,7 @@ namespace AdLocalAPI.Models
         public DateTime FechaCreacion { get; set; }
 
         // 🔐 Dueño
-        public int UsuarioId { get; set; }
+        public long UsuarioId { get; set; }
         public Usuario Usuario { get; set; }
     }
 }

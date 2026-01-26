@@ -59,10 +59,11 @@ namespace AdLocalAPI.Controllers
             int page = 1,
             int pageSize = 10,
             string orderBy = "recent",
-            string search = ""
+            string search = "",
+            long idComercio = 0
         )
         {
-            var response = await _service.GetAllPagedAsync(page, pageSize, orderBy, search);
+            var response = await _service.GetAllPagedAsync(page, pageSize, orderBy, search, idComercio);
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
         [HttpGet("comercio/{idComercio}")]

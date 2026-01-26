@@ -7,16 +7,16 @@ namespace AdLocalAPI.Models
         public int Id { get; set; }
 
         // Relaciones
-        public int UsuarioId { get; set; }
+        public long UsuarioId { get; set; }
         public Usuario Usuario { get; set; }
 
         public int PlanId { get; set; }
         public Plan Plan { get; set; }
 
         // Stripe
-        public string StripeCustomerId { get; set; }
-        public string StripeSubscriptionId { get; set; }
-        public string StripePriceId { get; set; }
+        public string? StripeCustomerId { get; set; }
+        public string? StripeSubscriptionId { get; set; }
+        public string? StripePriceId { get; set; }
 
         // Pago
         public decimal Monto { get; set; }
@@ -37,6 +37,6 @@ namespace AdLocalAPI.Models
         public bool Eliminada { get; set; } = false;
 
         public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
-        public string StripeSessionId { get; set; }
+        public string? StripeSessionId { get; set; }
     }
 }

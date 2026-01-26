@@ -3,6 +3,7 @@ using System;
 using AdLocalAPI.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NetTopologySuite.Geometries;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AdLocalAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260121010828_MakeStripeSessionIdNullable")]
+    partial class MakeStripeSessionIdNullable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -118,7 +121,8 @@ namespace AdLocalAPI.Migrations
 
                     b.HasIndex("EstadoId");
 
-                    b.HasIndex("IdUsuario");
+                    b.HasIndex("IdUsuario")
+                        .IsUnique();
 
                     b.HasIndex("MunicipioId");
 
@@ -241,8 +245,8 @@ namespace AdLocalAPI.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
-                    b.Property<long>("UsuarioId")
-                        .HasColumnType("bigint");
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -488,8 +492,8 @@ namespace AdLocalAPI.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
-                    b.Property<long>("UsuarioId")
-                        .HasColumnType("bigint");
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -532,8 +536,8 @@ namespace AdLocalAPI.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
-                    b.Property<long>("UsuarioId")
-                        .HasColumnType("bigint");
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -634,8 +638,8 @@ namespace AdLocalAPI.Migrations
                     b.Property<string>("StripeSubscriptionId")
                         .HasColumnType("text");
 
-                    b.Property<long>("UsuarioId")
-                        .HasColumnType("bigint");
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -688,6 +692,7 @@ namespace AdLocalAPI.Migrations
 
                     b.Property<bool>("Status")
                         .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
                         .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
@@ -714,11 +719,11 @@ namespace AdLocalAPI.Migrations
 
             modelBuilder.Entity("AdLocalAPI.Models.Usuario", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
+                        .HasColumnType("integer");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<bool>("Activo")
                         .HasColumnType("boolean");
@@ -761,6 +766,8 @@ namespace AdLocalAPI.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ComercioId");
+
                     b.ToTable("Usuarios");
                 });
 
@@ -783,12 +790,6 @@ namespace AdLocalAPI.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("AdLocalAPI.Models.Usuario", "Usuario")
-                        .WithMany("Comercios")
-                        .HasForeignKey("IdUsuario")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("AdLocalAPI.Models.Municipio", "Municipio")
                         .WithMany()
                         .HasForeignKey("MunicipioId")
@@ -798,8 +799,6 @@ namespace AdLocalAPI.Migrations
                     b.Navigation("Estado");
 
                     b.Navigation("Municipio");
-
-                    b.Navigation("Usuario");
                 });
 
             modelBuilder.Entity("AdLocalAPI.Models.EstadoMunicipio", b =>
@@ -882,6 +881,15 @@ namespace AdLocalAPI.Migrations
                     b.Navigation("Usuario");
                 });
 
+            modelBuilder.Entity("AdLocalAPI.Models.Usuario", b =>
+                {
+                    b.HasOne("AdLocalAPI.Models.Comercio", "Comercio")
+                        .WithMany()
+                        .HasForeignKey("ComercioId");
+
+                    b.Navigation("Comercio");
+                });
+
             modelBuilder.Entity("AdLocalAPI.Models.Comercio", b =>
                 {
                     b.Navigation("CalificacionesComentarios");
@@ -895,11 +903,6 @@ namespace AdLocalAPI.Migrations
             modelBuilder.Entity("AdLocalAPI.Models.Municipio", b =>
                 {
                     b.Navigation("EstadosMunicipios");
-                });
-
-            modelBuilder.Entity("AdLocalAPI.Models.Usuario", b =>
-                {
-                    b.Navigation("Comercios");
                 });
 #pragma warning restore 612, 618
         }

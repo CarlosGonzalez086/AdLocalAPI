@@ -55,9 +55,13 @@ namespace AdLocalAPI.Repositories
 
             query = orderBy.ToLower() switch
             {
-                "name" => query.OrderBy(x => x.Nombre),
-                _ => query.OrderByDescending(x => x.Id)
+                "az" => query.OrderBy(x => x.Nombre),
+                "za" => query.OrderByDescending(x => x.Nombre),
+                "recent" => query.OrderByDescending(x => x.Id), 
+                "old" => query.OrderBy(x => x.Id),          
+                _ => query.OrderByDescending(x => x.Id) 
             };
+
 
             var totalItems = await query.CountAsync();
             var totalPages = (int)Math.Ceiling(totalItems / (double)pageSize);

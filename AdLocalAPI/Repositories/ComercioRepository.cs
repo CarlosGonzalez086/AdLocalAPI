@@ -3,6 +3,7 @@ using AdLocalAPI.DTOs;
 using AdLocalAPI.Models;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
+using Org.BouncyCastle.Crypto.Digests;
 using Supabase.Gotrue;
 
 
@@ -43,6 +44,31 @@ namespace AdLocalAPI.Repositories
 
             switch (tipo.ToLower())
             {
+                case "destacados":
+                    query = query
+                        .Where(c =>
+                            c.Activo &&
+                            _context.Suscripcions.Any(s =>
+                                s.UsuarioId == c.IdUsuario &&
+                                s.Activa &&
+                                !s.Eliminada &&
+                                (s.Plan.Tipo == "PRO" || s.Plan.Tipo == "BUSINESS")
+                            )
+                        )
+                        .OrderByDescending(c =>
+                            _context.Suscripcions
+                                .Where(s =>
+                                    s.UsuarioId == c.IdUsuario &&
+                                    s.Activa &&
+                                    !s.Eliminada &&
+                                    (s.Plan.Tipo == "PRO" || s.Plan.Tipo == "BUSINESS")
+                                )
+                                .Select(s => s.Plan.NivelVisibilidad)
+                                .FirstOrDefault()
+                        );
+                    break;
+
+
                 case "populares":
                     query = query
                         .OrderByDescending(c => c.CalificacionesComentarios.Any()
@@ -90,7 +116,15 @@ namespace AdLocalAPI.Repositories
                     ColorSecundario = c.ColorSecundario,
                     Activo = c.Activo,
                     FechaCreacion = c.FechaCreacion,
-
+                    Badge = _context.Suscripcions
+                            .Where(s =>
+                                s.UsuarioId == c.IdUsuario &&
+                                s.Activa &&
+                                !s.Eliminada &&
+                                s.Plan.TieneBadge
+                            )
+                            .Select(s => s.Plan.BadgeTexto)
+                            .FirstOrDefault() ?? "",
                     EstadoNombre = c.Estado!.EstadoNombre == null ? "" :c.Estado!.EstadoNombre,
                     MunicipioNombre = c.Municipio!.MunicipioNombre == null ? "" : c.Municipio!.MunicipioNombre,
                     PromedioCalificacion = c.CalificacionesComentarios.Any()
@@ -106,7 +140,7 @@ namespace AdLocalAPI.Repositories
 
 
 
-        public async Task<Comercio> GetByIdAsync(int id)
+        public async Task<Comercio> GetByIdAsync(long id)
         {
 
             try
@@ -156,7 +190,7 @@ namespace AdLocalAPI.Repositories
             await _context.SaveChangesAsync();
         }
 
-        public async Task DeleteAsync(int id)
+        public async Task DeleteAsync(long id)
         {
             var comercio = await _context.Comercios.FindAsync(id);
             if (comercio != null)
@@ -263,7 +297,78 @@ namespace AdLocalAPI.Repositories
 
             return result;
         }
+        public async Task<ApiResponse<PagedResponse<ComercioPublicDto>>> GetAllComerciosByUserPaged(
+            long idUser,
+            int page = 1,
+            int pageSize = 10
+        )
+        {
+            IQueryable<Comercio> query = _context.Comercios
+                .Where(c => c.Activo && c.IdUsuario == idUser)
+                .Include(c => c.Estado)
+                .Include(c => c.Municipio)
+                .Include(c => c.CalificacionesComentarios);
 
+            // Badge del usuario (una sola vez)
+            var badge = await _context.Suscripcions
+                .Where(s =>
+                    s.UsuarioId == idUser &&
+                    s.Activa &&
+                    !s.Eliminada &&
+                    s.Plan.TieneBadge
+                )
+                .Select(s => s.Plan.BadgeTexto)
+                .FirstOrDefaultAsync();
+
+            var totalItems = await query.CountAsync();
+            var totalPages = (int)Math.Ceiling(totalItems / (double)pageSize);
+
+            var items = await query
+                .OrderByDescending(c => c.FechaCreacion)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(c => new ComercioPublicDto
+                {
+                    Id = c.Id,
+                    Nombre = c.Nombre,
+                    Direccion = c.Direccion,
+                    Telefono = c.Telefono,
+                    Email = c.Email,
+                    LogoUrl = c.LogoUrl,
+                    Lat = c.Ubicacion!.Y,
+                    Lng = c.Ubicacion!.X,
+                    ColorPrimario = c.ColorPrimario,
+                    ColorSecundario = c.ColorSecundario,
+                    Activo = c.Activo,
+                    FechaCreacion = c.FechaCreacion,
+                    EstadoNombre = c.Estado!.EstadoNombre,
+                    MunicipioNombre = c.Municipio!.MunicipioNombre,
+                    Badge = badge,
+                    PromedioCalificacion = c.CalificacionesComentarios.Any()
+                        ? c.CalificacionesComentarios.Average(x => x.Calificacion)
+                        : 0
+                })
+                .ToListAsync();
+
+            var pagedResponse = new PagedResponse<ComercioPublicDto>
+            {
+                Page = page,
+                PageSize = pageSize,
+                TotalPages = totalPages,
+                TotalItems = totalItems,
+                Items = items
+            };
+
+            return ApiResponse<PagedResponse<ComercioPublicDto>>.Success(
+                pagedResponse,
+                "Listado de comercios obtenido correctamente"
+            );
+        }
+
+        public async Task<List<Comercio>> GetAllComerciosByIdUsuario(long idUser)
+        {
+            return await _context.Comercios.Where((e)=>e.IdUsuario == idUser && e.Activo == true).ToListAsync();
+        }
 
     }
 }

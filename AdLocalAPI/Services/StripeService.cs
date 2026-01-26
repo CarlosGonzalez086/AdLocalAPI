@@ -80,19 +80,20 @@ namespace AdLocalAPI.Services
             }
         }
 
-        public async Task<PaymentIntent> CreatePaymentIntent(
-    Models.Plan plan,
-    int usuarioId,
-    string paymentMethodId
-)
+        public async Task<PaymentIntent> CreatePaymentIntent(Models.Plan plan, int usuarioId, string paymentMethodId)
         {
             var usuario = await _usuarioRepository.GetByIdAsync(usuarioId);
             if (string.IsNullOrEmpty(usuario.StripeCustomerId))
             {
-                var customerId = await CreateCustomer(usuario.Email);
-                usuario.StripeCustomerId = customerId;
+                var customerService = new CustomerService();
+                var customer = await customerService.CreateAsync(new CustomerCreateOptions
+                {
+                    Email = usuario.Email
+                });
+                usuario.StripeCustomerId = customer.Id;
                 await _usuarioRepository.UpdateAsync(usuario);
             }
+
             var options = new PaymentIntentCreateOptions
             {
                 Amount = (long)(plan.Precio * 100),
@@ -102,10 +103,10 @@ namespace AdLocalAPI.Services
                 Confirm = true,
                 OffSession = true,
                 Metadata = new Dictionary<string, string>
-        {
-            { "usuarioId", usuarioId.ToString() },
-            { "planId", plan.Id.ToString() }
-        }
+            {
+                { "usuarioId", usuarioId.ToString() },
+                { "planId", plan.Id.ToString() }
+            }
             };
 
             var service = new PaymentIntentService();

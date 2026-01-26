@@ -12,5 +12,6 @@
         public string? ImagenBase64 { get; set; }
 
         public bool Activo { get; set; } = true;
+        public long IdComercio { get; set; } = 0;
     }
 }
