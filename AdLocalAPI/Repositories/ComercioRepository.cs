@@ -146,7 +146,6 @@ namespace AdLocalAPI.Repositories
             try
             {
                 return await _context.Comercios
-                    .AsNoTracking()
                     .FirstOrDefaultAsync(c =>
                         c.Id == id &&
                         c.Activo

@@ -82,6 +82,12 @@ namespace AdLocalAPI.Repositories
                 .AsNoTracking()
                 .FirstOrDefaultAsync(p => p.Id == id);
         }
+        public async Task<Plan?> GetByIdLongAsync(long id)
+        {
+            return await _context.Plans
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == id);
+        }
 
         public async Task<Models.Plan> CreateAsync(Models.Plan plan)
         {

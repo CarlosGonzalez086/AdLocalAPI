@@ -24,6 +24,8 @@ namespace AdLocalAPI.Data
         public DbSet<Municipio> Municipios { get; set; }
         public DbSet<EstadoMunicipio> EstadosMunicipios { get; set; }
         public DbSet<CalificacionComentario> CalificacionComentario { get; set; }
+        public DbSet<ComercioVisita> ComercioVisitas { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -252,6 +254,16 @@ namespace AdLocalAPI.Data
                 .WithOne(cc => cc.Comercio)
                 .HasForeignKey(cc => cc.IdComercio)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            /* =========================
+               VISITAS DEL COMERCIO
+            ========================== */
+
+            modelBuilder.Entity<ComercioVisita>()
+                .HasIndex(v => v.ComercioId);
+
+            modelBuilder.Entity<ComercioVisita>()
+                .HasIndex(v => v.FechaVisita);
         }
 
 

@@ -2,8 +2,10 @@
 using AdLocalAPI.Helpers;
 using AdLocalAPI.Interfaces.ProductosServicios;
 using AdLocalAPI.Models;
+using AdLocalAPI.Repositories;
 using FluentValidation;
 using Supabase.Gotrue;
+using System.Linq;
 
 namespace AdLocalAPI.Services
 {
@@ -11,16 +13,25 @@ namespace AdLocalAPI.Services
     {
         private readonly IProductosServiciosRepository _repository;
         private readonly JwtContext _jwtContext;
+        private readonly SuscripcionRepository _suscripcionRepository;
+        private readonly PlanRepository _planRepository;
+        private readonly UsuarioRepository _usuarioRepository;
         private readonly IValidator<ProductosServiciosDto> _validator; 
 
         public ProductosServiciosService(
             IProductosServiciosRepository repository,
             JwtContext jwtContext,
+            SuscripcionRepository suscripcionRepository,
+            PlanRepository planRepository,
+            UsuarioRepository usuarioRepository,
             IValidator<ProductosServiciosDto> validator)
         {
             _repository = repository;
             _jwtContext = jwtContext;
             _validator = validator;
+            _suscripcionRepository = suscripcionRepository;
+            _planRepository = planRepository;
+            _usuarioRepository = usuarioRepository;
         }
 
 
@@ -117,21 +128,32 @@ namespace AdLocalAPI.Services
 
         public async Task<ApiResponse<IEnumerable<ProductosServiciosDto>>> GetAllAsync(long idComercio)
         {
-            var list = await _repository.GetAllAsync(idComercio);
-            var result = list.Select(x => new ProductosServiciosDto
-            {
-                Id = x.Id,
-                Nombre = x.Nombre,
-                Descripcion = x.Descripcion,
-                Tipo = (int)x.Tipo,
-                Precio = x.Precio,
-                Stock = (int)x.Stock,
-                Activo = x.Activo,
-                ImagenBase64 = x.LogoUrl,
-            });
 
-            return ApiResponse<IEnumerable<ProductosServiciosDto>>
-                .Success(result, "Listado obtenido correctamente");
+            if (_jwtContext.PermiteCatalogo())
+            {
+                var list = await _repository.GetAllAsync(idComercio);
+                list = list.Take(_jwtContext.GetMaxProductos());
+
+                var result = list.Select(x => new ProductosServiciosDto
+                {
+                    Id = x.Id,
+                    Nombre = x.Nombre,
+                    Descripcion = x.Descripcion,
+                    Tipo = (int)x.Tipo,
+                    Precio = x.Precio,
+                    Stock = (int)x.Stock,
+                    Activo = x.Activo,
+                    ImagenBase64 = x.LogoUrl,
+                }).Where(c => c.Activo);
+
+                return ApiResponse<IEnumerable<ProductosServiciosDto>>
+                    .Success(result, "Listado obtenido correctamente");
+            }
+            else
+            {
+                return ApiResponse<IEnumerable<ProductosServiciosDto>>.Success([], "Listado obtenido correctamente");
+            }
+
         }
 
         public async Task<ApiResponse<ProductosServiciosDto>> GetByIdAsync(long id)
@@ -263,8 +285,9 @@ namespace AdLocalAPI.Services
             int page = 1, int pageSize = 10, string orderBy = "recent", string search = "",long idComercio = 0)
         {
             long idUser = _jwtContext.GetUserId();
+            int maxProductos = _jwtContext.GetMaxProductos();
             idComercio = idComercio == 0 ? _jwtContext.GetComercioId() : idComercio;
-            return await _repository.GetAllPagedAsync(idUser,idComercio, page, pageSize, orderBy, search);
+            return await _repository.GetAllPagedAsync(idUser,idComercio, page, pageSize, orderBy, search, maxProductos);
         }
         private static readonly Dictionary<string, string> TiposImagenPermitidos = new()
         {

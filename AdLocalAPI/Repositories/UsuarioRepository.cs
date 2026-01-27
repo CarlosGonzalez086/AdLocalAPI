@@ -87,6 +87,26 @@ namespace AdLocalAPI.Repositories
             }
         }
 
+        public async Task<Usuario> GetByIdComercioAsync(long id)
+        {
+            Usuario usuario = new Usuario();
+            try
+            {
+
+                usuario = await _context.Usuarios
+                    .FirstOrDefaultAsync(u => u.Comercios.Any(c => c.Id == id));
+
+            }
+            catch (Exception ex)
+            {
+                // Aquí puedes loguear el error si quieres
+                Console.WriteLine($"Error al obtener usuario por Id {id}: {ex.Message}");
+                // Opcionalmente podrías lanzar otra excepción o devolver null
+                return null;
+            }
+            return usuario;
+        }
+
         public async Task<Usuario?> GetByCodeAsync(string code)
         {
             try

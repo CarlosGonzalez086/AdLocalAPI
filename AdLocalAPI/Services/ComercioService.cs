@@ -22,10 +22,17 @@ namespace AdLocalAPI.Services
         private readonly ILocationRepository _locationRepository;
         private readonly CalificacionComentarioRepository _calificacionComentarioRepository;
         private readonly AppDbContext _context;
+        private readonly SuscripcionRepository _suscripcionRepository;
+        private readonly PlanRepository _planRepository;
+        private readonly UsuarioRepository _usuarioRepository;
 
         public ComercioService(ComercioRepository repository, JwtContext jwtContext, 
-                               IRelComercioImagenRepositorio comercioImagenRepositorio, IHorarioComercioService horarioComercioService, 
+                               IRelComercioImagenRepositorio comercioImagenRepositorio, IHorarioComercioService horarioComercioService,
+                                           SuscripcionRepository suscripcionRepository,
+            PlanRepository planRepository,
+            UsuarioRepository usuarioRepository,
                                IProductosServiciosRepository productosServiciosRepository, ILocationRepository locationRepository,
+
                                CalificacionComentarioRepository calificacionComentarioRepository, AppDbContext context)
         {
             _repository = repository;
@@ -36,6 +43,9 @@ namespace AdLocalAPI.Services
             _locationRepository = locationRepository;
             _calificacionComentarioRepository = calificacionComentarioRepository;
             _context = context;
+            _suscripcionRepository = suscripcionRepository;
+            _planRepository = planRepository;
+            _usuarioRepository = usuarioRepository;
         }
 
         public async Task<ApiResponse<object>> GetAllComercios(
@@ -69,10 +79,19 @@ namespace AdLocalAPI.Services
             {
                 var comercio = await _repository.GetByIdAsync(id);
 
+                var usuario = await _usuarioRepository.GetByIdComercioAsync(id);
+                var planActivo = await _suscripcionRepository.GetActivaByUsuarioAsync(usuario.Id);
+                long idPlan = planActivo.PlanId;
+                var plan = await _planRepository.GetByIdLongAsync(idPlan);
+
                 if (comercio == null)
                     return ApiResponse<ComercioMineDto>.Error("404", "Comercio no encontrado");
 
                 var listaImagenes = await _comercioImagenRepositorio.ObtenerPorComercio(comercio.Id);
+                int MaxFotos = plan.MaxFotos;
+                listaImagenes = listaImagenes
+                  .Take(MaxFotos)
+                  .ToList();
                 List<string> Imagenes = new List<string>();
                 if (listaImagenes.Count > 0)
                 {
@@ -101,14 +120,22 @@ namespace AdLocalAPI.Services
                     }
                 }
                 var listaProductos = await _productosServiciosRepository.GetAllAsync(id);
+                int MaxProductos = plan.MaxProductos;
                 List<ProductosServicios> productos = new List<ProductosServicios>();
-                if (listaProductos.Count() > 0)
+                if (plan.PermiteCatalogo) 
                 {
-                    foreach (var item in listaProductos)
+                    listaProductos = listaProductos.Take(MaxProductos);
+                    listaProductos = listaProductos.Where(c => c.Activo);
+
+                    if (listaProductos.Count() > 0)
                     {
-                        productos.Add(item);
+                        foreach (var item in listaProductos)
+                        {
+                            productos.Add(item);
+                        }
                     }
                 }
+
 
                 var listaCalificaciones =
                     await _calificacionComentarioRepository.GetCalificacionByComercioAsync(id);
