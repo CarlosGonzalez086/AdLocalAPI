@@ -16,7 +16,7 @@ namespace AdLocalAPI.Models
         public string PasswordHash { get; set; }
 
         [Required]
-        public string Rol { get; set; } // Admin o Cliente
+        public string Rol { get; set; }
 
         public bool Activo { get; set; } = true;
 

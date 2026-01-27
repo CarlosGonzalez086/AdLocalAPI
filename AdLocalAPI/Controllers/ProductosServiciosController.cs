@@ -66,6 +66,7 @@ namespace AdLocalAPI.Controllers
             var response = await _service.GetAllPagedAsync(page, pageSize, orderBy, search, idComercio);
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
+        [Authorize]
         [HttpGet("comercio/{idComercio}")]
         public async Task<IActionResult> GetAll(long idComercio)
         {

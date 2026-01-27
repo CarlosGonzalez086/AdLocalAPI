@@ -23,7 +23,8 @@ ENV AllowedHosts=*
 
 # Connection String (EF Core)
 ENV SUPABASE_DB_CONNECTION=Host=ep-empty-moon-adsd2mcc-pooler.c-2.us-east-1.aws.neon.tech;Port=5432;Database=neondb;Username=neondb_owner;Password=npg_vXt9sekfG3rY;SslMode=Require
-ENV STRIPE_WEBHOOK_SECRET=whsec_ec0866bc2a9d02c5523dc064af7b70733661fe48b829827e0dcdb86405021c14
+ENV STRIPE_WEBHOOK_SECRET=whsec_Z7LdP2xE4G8qc0NIqe25dqxJTAma13xs
+ENV SecretKey=sk_test_51Sgu6rLujiW19P6j9Yzp9BTfcJrkhS4wkhX7aC68eLf7hSCFZTOB9jsRfI3uht9i4hx8TJJRQY1VMdzG01lrZ6SQ00ypPDKvxL
 
 
 

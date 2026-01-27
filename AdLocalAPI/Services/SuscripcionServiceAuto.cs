@@ -31,6 +31,11 @@ namespace AdLocalAPI.Services
                 )
                 .ToListAsync();
 
+            if (vencidas.Count == 0)
+            {
+                return;
+            }
+
             foreach (var suscripcion in vencidas)
             {
 

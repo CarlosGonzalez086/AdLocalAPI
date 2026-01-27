@@ -155,11 +155,18 @@ builder.Services.Configure<EmailSettings>(
     builder.Configuration.GetSection("EmailSettings"));
 
 builder.Services.AddScoped<EmailService>();
+
 builder.Services.AddHostedService<SuscripcionBackgroundService>();
 builder.Services.AddScoped<SuscripcionServiceAuto>();
 
-builder.Services.AddScoped<SuscripcionAutoRenewBackgroundService>();
+builder.Services.AddHostedService<SuscripcionAutoRenewBackgroundService>();
 builder.Services.AddScoped<SuscripcionAutoRenewService>();
+
+builder.Services.AddHostedService<SuscripcionUsersBackgroundService>();
+builder.Services.AddScoped<SuscripcionUsersServiceAuto>();
+
+builder.Services.AddScoped<ComercioVisitaService>();
+builder.Services.AddScoped<ComercioVisitaRepository>();
 
 builder.Services.AddScoped<ISuscriptionService, SuscriptionService>();
 builder.Services.AddScoped<ISuscriptionRepository, SuscriptionRepository>();

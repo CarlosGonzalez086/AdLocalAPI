@@ -4,6 +4,7 @@ using AdLocalAPI.Interfaces.ProductosServicios;
 using AdLocalAPI.Models;
 using Microsoft.EntityFrameworkCore;
 using Supabase.Interfaces;
+using System.Linq;
 
 namespace AdLocalAPI.Repositories
 {
@@ -45,10 +46,12 @@ namespace AdLocalAPI.Repositories
             await _context.SaveChangesAsync();
         }
         public async Task<ApiResponse<PagedResponse<ProductosServiciosDto>>> GetAllPagedAsync(
-                   long idUser, long idComercio, int page = 1, int pageSize = 10, string orderBy = "recent", string search = "")
+                   long idUser, long idComercio, int page = 1, int pageSize = 10, string orderBy = "recent", string search = "",int maxProductos = 0)
         {
             var query = _context.ProductosServicios
                 .Where(x => x.IdComercio == idComercio && x.IdUsuario == idUser);
+
+            query = query.Take(maxProductos);
 
             if (!string.IsNullOrWhiteSpace(search))
                 query = query.Where(x => x.Nombre.Contains(search));
