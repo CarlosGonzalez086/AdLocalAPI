@@ -59,6 +59,8 @@ namespace AdLocalAPI.Services
                 {
                     suscripcion.Activa = false;
                     suscripcion.Estado = "finalizada";
+
+                    _context.Suscripcions.Update(suscripcion);
                 }
 
                 bool yaTieneFree = await _context.Suscripcions.AnyAsync(s =>

@@ -106,6 +106,29 @@ namespace AdLocalAPI.Repositories
             }
             return usuario;
         }
+        public async Task<Usuario> GetByIdComercioAndIdUserAsync(long idUser,long idComercio)
+        {
+            Usuario usuario = new Usuario();
+            try
+            {
+                usuario = await _context.Usuarios
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == idUser &&
+                        x.Rol == "Colaborador" &&
+                        x.ComercioId == idComercio
+                    );
+
+
+            }
+            catch (Exception ex)
+            {
+                // Aquí puedes loguear el error si quieres
+                Console.WriteLine($"Error al obtener usuario por Id {idUser}: {ex.Message}");
+                // Opcionalmente podrías lanzar otra excepción o devolver null
+                return null;
+            }
+            return usuario;
+        }
 
         public async Task<Usuario?> GetByCodeAsync(string code)
         {
@@ -210,6 +233,36 @@ namespace AdLocalAPI.Repositories
             user.FotoUrl = url;
             _context.Usuarios.Update(user);
             await _context.SaveChangesAsync();
+        }
+        public async Task DeleteColaboradorAsync(long idUser,long idComercio)
+        {
+            var usuario = await _context.Usuarios
+                    .FirstOrDefaultAsync(x =>
+                        x.Id == idUser &&
+                        x.Rol == "Colaborador" &&
+                        x.ComercioId == idComercio
+                    );
+            if (usuario != null)
+            {
+                _context.Usuarios.Remove(usuario);
+                await _context.SaveChangesAsync();
+            }
+        }
+        public async Task<Usuario?> GetByCodigoReferidoAsync(string codigo)
+        {
+            try
+            {
+                return await _context.Usuarios
+
+                                     .FirstOrDefaultAsync(u => u.CodigoReferido == codigo);
+            }
+            catch (Exception ex)
+            {
+                // Aquí puedes loguear el error si quieres
+                Console.WriteLine($"Error al obtener usuario por token {codigo}: {ex.Message}");
+                // Opcionalmente podrías lanzar otra excepción o devolver null
+                return null;
+            }
         }
 
     }

@@ -26,6 +26,8 @@ namespace AdLocalAPI.Models
         public string? StripeCustomerId { get; set; }
         public string? Token { get; set; }
         public string? Codigo { get; set; }
+        [MaxLength(50)]
+        public string? CodigoReferido { get; set; }
         public ICollection<Comercio> Comercios { get; set; } = new List<Comercio>();
     }
 }

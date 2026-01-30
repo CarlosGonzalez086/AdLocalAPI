@@ -37,7 +37,25 @@ namespace AdLocalAPI.Services
 
         public async Task<ApiResponse<ProductosServiciosDto>> CreateAsync(ProductosServiciosDto dto)
         {
-            long idUser = _jwtContext.GetUserId();
+            long userId = 0;
+            if (_jwtContext.GetUserRole() == "Colaborador")
+            {
+                var usuario = await _usuarioRepository.GetByIdComercioAsync(_jwtContext.GetComercioId());
+                userId = usuario.Id;
+                var planActivo = await _suscripcionRepository.GetActivaByUsuarioAsync(userId);
+                if (planActivo.Plan.Tipo == "BASIC" || planActivo.Plan.Tipo == "FREE")
+                {
+                    return ApiResponse<ProductosServiciosDto>.Error(
+                       "400",
+                       "El dueño del negocio necesita actualizar su suscripción para que puedas usar las funciones de colaborador."
+                   );
+
+                }
+            }
+            else
+            {
+                userId = _jwtContext.GetUserId();
+            }
             int maxProductos = _jwtContext.GetMaxProductos();
             long idComercio = dto.IdComercio == 0 ? _jwtContext.GetComercioId() : dto.IdComercio;
             // Validación aquí
@@ -99,14 +117,14 @@ namespace AdLocalAPI.Services
 
                     logoUrl = await _repository.UploadToSupabaseAsync(
                         imageBytes,
-                        (int)idUser,
+                        userId,
                         contentType
                     );
                 }
                 var entity = new ProductosServicios
                 {
                     IdComercio = idComercio,
-                    IdUsuario = idUser,
+                    IdUsuario = userId,
                     Nombre = dto.Nombre,
                     Descripcion = dto.Descripcion,
                     Tipo = (TipoProductoServicio)dto.Tipo,
@@ -158,9 +176,27 @@ namespace AdLocalAPI.Services
 
         public async Task<ApiResponse<ProductosServiciosDto>> GetByIdAsync(long id)
         {
-            long idUser = _jwtContext.GetUserId();
+            long userId = 0;
+            if (_jwtContext.GetUserRole() == "Colaborador")
+            {
+                var usuario = await _usuarioRepository.GetByIdComercioAsync(_jwtContext.GetComercioId());
+                userId = usuario.Id;
+                var planActivo = await _suscripcionRepository.GetActivaByUsuarioAsync(userId);
+                if (planActivo.Plan.Tipo == "BASIC" || planActivo.Plan.Tipo == "FREE")
+                {
+                    return ApiResponse<ProductosServiciosDto>.Error(
+                       "400",
+                       "El dueño del negocio necesita actualizar su suscripción para que puedas usar las funciones de colaborador."
+                   );
+
+                }
+            }
+            else
+            {
+                userId = _jwtContext.GetUserId();
+            }
             long idComercio = _jwtContext.GetComercioId();
-            var entity = await _repository.GetByIdAsync(id,idComercio,idUser);
+            var entity = await _repository.GetByIdAsync(id,idComercio, userId);
 
             if (entity == null)
                 return ApiResponse<ProductosServiciosDto>.Error("404", "Producto/Servicio no encontrado");
@@ -181,9 +217,27 @@ namespace AdLocalAPI.Services
 
         public async Task<ApiResponse<bool>> UpdateAsync(long id, ProductosServiciosDto dto)
         {
-            long idUser = _jwtContext.GetUserId();
+            long userId = 0;
+            if (_jwtContext.GetUserRole() == "Colaborador")
+            {
+                var usuario = await _usuarioRepository.GetByIdComercioAsync(_jwtContext.GetComercioId());
+                userId = usuario.Id;
+                var planActivo = await _suscripcionRepository.GetActivaByUsuarioAsync(userId);
+                if (planActivo.Plan.Tipo == "BASIC" || planActivo.Plan.Tipo == "FREE")
+                {
+                    return ApiResponse<bool>.Error(
+                       "400",
+                       "El dueño del negocio necesita actualizar su suscripción para que puedas usar las funciones de colaborador."
+                   );
+
+                }
+            }
+            else
+            {
+                userId = _jwtContext.GetUserId();
+            }
             long idComercio = dto.IdComercio == 0 ? _jwtContext.GetComercioId() : dto.IdComercio;
-            var entity = await _repository.GetByIdAsync(id, idComercio, idUser);
+            var entity = await _repository.GetByIdAsync(id, idComercio, userId);
 
             if (entity == null)
                 return ApiResponse<bool>.Error("404", "Producto/Servicio no encontrado");
@@ -223,7 +277,7 @@ namespace AdLocalAPI.Services
 
                 entity.LogoUrl = await _repository.UploadToSupabaseAsync(
                     imageBytes,
-                    (int)idUser,
+                    userId,
                     contentType
                 );
             }
@@ -240,11 +294,29 @@ namespace AdLocalAPI.Services
             return ApiResponse<bool>.Success(true, "Actualizado correctamente");
         }
 
-        public async Task<ApiResponse<bool>> DeleteAsync(long id)
+        public async Task<ApiResponse<bool>> DeleteAsync(long id,long idComercio)
         {
-            long idUser = _jwtContext.GetUserId();
-            long idComercio = _jwtContext.GetComercioId();
-            var entity = await _repository.GetByIdAsync(id, idComercio, idUser);
+            long userId = 0;
+            if (_jwtContext.GetUserRole() == "Colaborador")
+            {
+                var usuario = await _usuarioRepository.GetByIdComercioAsync(_jwtContext.GetComercioId());
+                userId = usuario.Id;
+                var planActivo = await _suscripcionRepository.GetActivaByUsuarioAsync(userId);
+                if (planActivo.Plan.Tipo == "BASIC" || planActivo.Plan.Tipo == "FREE")
+                {
+                    return ApiResponse<bool>.Error(
+                       "400",
+                       "El dueño del negocio necesita actualizar su suscripción para que puedas usar las funciones de colaborador."
+                   );
+
+                }
+            }
+            else
+            {
+                userId = _jwtContext.GetUserId();
+            }
+            idComercio = idComercio == 0 ? _jwtContext.GetComercioId() : idComercio;
+            var entity = await _repository.GetByIdAsync(id, idComercio, userId);
 
             if (entity == null)
                 return ApiResponse<bool>.Error("404", "Producto/Servicio no encontrado");
@@ -264,11 +336,29 @@ namespace AdLocalAPI.Services
             return ApiResponse<bool>.Success(true, "Eliminado correctamente");
         }
 
-        public async Task<ApiResponse<bool>> DesactivarAsync(long id)
+        public async Task<ApiResponse<bool>> DesactivarAsync(long id,long idComercio)
         {
-            long idUser = _jwtContext.GetUserId();
-            long idComercio = _jwtContext.GetComercioId();
-            var entity = await _repository.GetByIdAsync(id, idComercio, idUser);
+            long userId = 0;
+            if (_jwtContext.GetUserRole() == "Colaborador")
+            {
+                var usuario = await _usuarioRepository.GetByIdComercioAsync(_jwtContext.GetComercioId());
+                userId = usuario.Id;
+                var planActivo = await _suscripcionRepository.GetActivaByUsuarioAsync(userId);
+                if (planActivo.Plan.Tipo == "BASIC" || planActivo.Plan.Tipo == "FREE")
+                {
+                    return ApiResponse<bool>.Error(
+                       "400",
+                       "El dueño del negocio necesita actualizar su suscripción para que puedas usar las funciones de colaborador."
+                   );
+
+                }
+            }
+            else
+            {
+                userId = _jwtContext.GetUserId();
+            }
+            idComercio = idComercio == 0 ? _jwtContext.GetComercioId() : idComercio;
+            var entity = await _repository.GetByIdAsync(id, idComercio, userId);
 
             if (entity == null)
                 return ApiResponse<bool>.Error("404", "Producto/Servicio no encontrado");
@@ -284,10 +374,19 @@ namespace AdLocalAPI.Services
         public async Task<ApiResponse<PagedResponse<ProductosServiciosDto>>> GetAllPagedAsync(
             int page = 1, int pageSize = 10, string orderBy = "recent", string search = "",long idComercio = 0)
         {
-            long idUser = _jwtContext.GetUserId();
+            long userId = 0;
+            if (_jwtContext.GetUserRole() == "Colaborador")
+            {
+                var usuario = await _usuarioRepository.GetByIdComercioAsync(_jwtContext.GetComercioId());
+                userId = usuario.Id;
+            }
+            else
+            {
+                userId = _jwtContext.GetUserId();
+            }
             int maxProductos = _jwtContext.GetMaxProductos();
             idComercio = idComercio == 0 ? _jwtContext.GetComercioId() : idComercio;
-            return await _repository.GetAllPagedAsync(idUser,idComercio, page, pageSize, orderBy, search, maxProductos);
+            return await _repository.GetAllPagedAsync(userId, idComercio, page, pageSize, orderBy, search, maxProductos);
         }
         private static readonly Dictionary<string, string> TiposImagenPermitidos = new()
         {

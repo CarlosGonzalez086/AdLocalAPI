@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AdLocalAPI.Controllers
 {
-    [Authorize] 
+ 
     [ApiController]
     [Route("api/[controller]")]
     public class PlanesController : ControllerBase
@@ -15,31 +15,35 @@ namespace AdLocalAPI.Controllers
         {
             _service = service;
         }
-
+        [Authorize]
         [HttpPost]
         public async Task<IActionResult> Crear([FromBody] PlanCreateDto dto)
         {
             var response = await _service.CrearPlan(dto);
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
+        [Authorize]
         [HttpPut("{id}")]
         public async Task<IActionResult> Actualizar(int id, [FromBody] PlanCreateDto dto)
         {
             var response = await _service.ActualizarPlan(id,dto);
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
+        [Authorize]
         [HttpDelete("{id}")]
         public async Task<IActionResult> Eliminar(int id)
         {
             var response = await _service.EliminarPlan(id);
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
+        [Authorize]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
             var response = await _service.GetPlanById(id);
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
+        [Authorize]
         [HttpGet]
         public async Task<IActionResult> GetAll(
             int page = 1,

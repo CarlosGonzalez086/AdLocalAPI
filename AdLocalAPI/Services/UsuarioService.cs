@@ -4,6 +4,7 @@ using AdLocalAPI.Models;
 using AdLocalAPI.Repositories;
 using AdLocalAPI.Utils;
 using Microsoft.IdentityModel.Tokens;
+using Stripe;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -22,9 +23,10 @@ namespace AdLocalAPI.Services
         private readonly IWebHostEnvironment _env;
         private readonly SuscripcionRepository _suscripcionRepository;
         private readonly PlanRepository _planRepo;
+        private readonly UsoCodigoReferidoRepository _usoCodigoReferidoRepository;
 
         public UsuarioService(UsuarioRepository repository, IConfiguration config, JwtContext jwtContext,ComercioRepository comercioRepository, EmailService emailService, IWebHostEnvironment env, SuscripcionRepository suscripcionRepository,
-            PlanRepository planRepo)
+            PlanRepository planRepo, UsoCodigoReferidoRepository usoCodigoReferidoRepository)
         {
             _repository = repository;
             _config = config;
@@ -34,7 +36,7 @@ namespace AdLocalAPI.Services
             _env = env;
             _suscripcionRepository = suscripcionRepository;
             _planRepo = planRepo;
-
+            _usoCodigoReferidoRepository = usoCodigoReferidoRepository;
         }
 
         public async Task<ApiResponse<object>> GetAllUsuarios(int page,
@@ -95,6 +97,26 @@ namespace AdLocalAPI.Services
 
             if (existente)
                 return ApiResponse<object>.Error("400", "El correo ya está registrado");
+            string codigoRef = string.Empty;
+            const int MAX_INTENTOS = 5;
+
+            for (int i = 0; i < MAX_INTENTOS; i++)
+            {
+                codigoRef = CodigoReferidoGenerator.Generar();
+
+                var existe = await _repository.GetByCodigoReferidoAsync(codigoRef);
+                if (existe == null)
+                    break;
+            }
+
+            if (string.IsNullOrEmpty(codigoRef))
+            {
+                return ApiResponse<object>.Error(
+                    "500",
+                    "No se pudo generar un código de referido único"
+                );
+            }
+
 
             var usuario = new Usuario
             {
@@ -102,11 +124,18 @@ namespace AdLocalAPI.Services
                 Email = dto.Email,
                 Rol = "Comercio",
                 ComercioId = dto.ComercioId,
+                CodigoReferido = codigoRef,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
                 FechaCreacion = DateTime.UtcNow
             };
 
             var creado = await _repository.CreateAsync(usuario);
+
+            if (!string.IsNullOrEmpty(dto.CodigoReferenciado))
+            {
+                var usuarioReferido = await _repository.GetByCodigoReferidoAsync(dto.CodigoReferenciado);
+                await _usoCodigoReferidoRepository.InsertarAsync(usuarioReferido.Id,creado.Id,dto.CodigoReferenciado);
+            }
 
             var planFree = await _planRepo.GetByTipoAsync("FREE");
 
@@ -245,7 +274,31 @@ namespace AdLocalAPI.Services
         }
         public async Task<ApiResponse<object>> Login(string email, string password)
         {
+
             var usuario = await _repository.GetByCorreoAsync(email);
+
+            if (usuario.Rol == "Colaborador")
+            {
+                var usuarioManager = await _repository.GetByIdComercioAsync((long)usuario.ComercioId);
+                var planActivo = await _suscripcionRepository.GetActivaByUsuarioAsync(usuarioManager.Id);
+
+                if (planActivo == null || planActivo.Plan == null)
+                {
+                    return ApiResponse<object>.Error(
+                        "403",
+                        "El comercio no cuenta con una suscripción activa para registrar colaboradores."
+                    );
+                }
+
+                if (planActivo.FechaFin <= DateTime.UtcNow)
+                {
+                    return ApiResponse<object>.Error(
+                        "403",
+                        "El comercio que te dio de alta debe renovar su suscripción para agregar colaboradores."
+                    );
+                }
+            }
+
 
             if (usuario == null)
                 return ApiResponse<object>.Error("401", "Credenciales inválidas");
@@ -271,6 +324,18 @@ namespace AdLocalAPI.Services
                 };
             }
             else if (usuario.Rol == "Comercio")
+            {
+                respuesta = new
+                {
+                    usuario.Id,
+                    usuario.Nombre,
+                    usuario.Email,
+                    usuario.Rol,
+                    usuario.ComercioId,
+                    Token = token
+                };
+            }
+            else if (usuario.Rol == "Colaborador")
             {
                 respuesta = new
                 {
@@ -322,6 +387,10 @@ namespace AdLocalAPI.Services
                     "fotoUrl",
                     usuario.FotoUrl ?? ""
                 ));
+                claims.Add(new Claim(
+                    "codigoReferido",
+                    usuario.CodigoReferido ?? ""
+                ));
                 var suscripcion = await _suscripcionRepository
                     .GetActivaByUsuarioAsync(usuario.Id);
 
@@ -349,6 +418,38 @@ namespace AdLocalAPI.Services
                 {
                     claims.Add(new Claim("planTipo", "FREE"));
                     claims.Add(new Claim("nivelVisibilidad", "0"));
+                }
+            }
+            else if (usuario.Rol == "Colaborador")
+            {
+                var comercio = await _comercioRepository.GetByIdAsync((long)usuario.ComercioId);
+                claims.Add(new Claim(
+                    "comercioId",
+                    comercio?.Id.ToString() ?? "0"
+                ));
+
+                claims.Add(new Claim(
+                    "fotoUrl",
+                    usuario.FotoUrl ?? ""
+                ));
+
+                var usuarioManager = await _repository.GetByIdComercioAsync((long)usuario.ComercioId);
+                var planActivo = await _suscripcionRepository.GetActivaByUsuarioAsync(usuarioManager.Id);
+                if (planActivo != null && planActivo.Plan != null)
+                {
+                    var plan = planActivo.Plan;
+
+                    claims.Add(new Claim("planId", plan.Id.ToString()));
+                    claims.Add(new Claim("planTipo", plan.Tipo));
+                    claims.Add(new Claim("nivelVisibilidad", plan.NivelVisibilidad.ToString()));
+                    claims.Add(new Claim("esatdo", planActivo.Estado));
+                    claims.Add(new Claim("maxProductos", plan.MaxProductos.ToString()));
+                    claims.Add(new Claim("maxFotos", plan.MaxFotos.ToString()));
+                    claims.Add(new Claim("permiteCatalogo", plan.PermiteCatalogo.ToString()));
+                    claims.Add(new Claim(
+                        "badge",
+                        plan.TieneBadge ? plan.BadgeTexto ?? "" : ""
+                    ));
                 }
             }
 

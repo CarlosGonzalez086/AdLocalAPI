@@ -6,6 +6,7 @@ using AdLocalAPI.Interfaces.Location;
 using AdLocalAPI.Interfaces.ProductosServicios;
 using AdLocalAPI.Models;
 using AdLocalAPI.Repositories;
+using AdLocalAPI.Utils;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
 using System.Linq;
@@ -25,6 +26,8 @@ namespace AdLocalAPI.Services
         private readonly SuscripcionRepository _suscripcionRepository;
         private readonly PlanRepository _planRepository;
         private readonly UsuarioRepository _usuarioRepository;
+        private readonly IWebHostEnvironment _env;
+        private readonly EmailService _emailService;
 
         public ComercioService(ComercioRepository repository, JwtContext jwtContext, 
                                IRelComercioImagenRepositorio comercioImagenRepositorio, IHorarioComercioService horarioComercioService,
@@ -33,7 +36,7 @@ namespace AdLocalAPI.Services
             UsuarioRepository usuarioRepository,
                                IProductosServiciosRepository productosServiciosRepository, ILocationRepository locationRepository,
 
-                               CalificacionComentarioRepository calificacionComentarioRepository, AppDbContext context)
+                               CalificacionComentarioRepository calificacionComentarioRepository, AppDbContext context, IWebHostEnvironment env, EmailService emailService)
         {
             _repository = repository;
             _jwtContext = jwtContext;
@@ -46,13 +49,15 @@ namespace AdLocalAPI.Services
             _suscripcionRepository = suscripcionRepository;
             _planRepository = planRepository;
             _usuarioRepository = usuarioRepository;
+            _env = env;
+            _emailService = emailService;
         }
 
         public async Task<ApiResponse<object>> GetAllComercios(
             string tipo,
-            double? lat,
-            double? lng,
-            string? municipio
+            double lat,
+            double lng,
+            string municipio
         )
         {
             try
@@ -225,8 +230,25 @@ namespace AdLocalAPI.Services
         {
             try
             {
+
                 long idUser = _jwtContext.GetUserId();
-                var comercio = await _repository.GetComercioByUser(idUser);
+                Comercio comercio;
+
+                var rol = _jwtContext.GetUserRole();
+
+                if (rol == "Colaborador")
+                {
+                    var comercioId = _jwtContext.GetComercioId();
+
+
+                    comercio = await _repository.GetByIdAsync(comercioId);
+                }
+                else
+                {
+                    comercio = await _repository.GetComercioByUser(idUser);
+                }
+
+
 
                 if (comercio == null)
                     return ApiResponse<ComercioMineDto>.Error("404", "Comercio no encontrado");
@@ -314,8 +336,6 @@ namespace AdLocalAPI.Services
                 return ApiResponse<ComercioMineDto>.Error("500", ex.Message);
             }
         }
-
-
         public async Task<ApiResponse<object>> CreateComercio(ComercioCreateDto dto)
         {
             try
@@ -519,8 +539,28 @@ namespace AdLocalAPI.Services
                        "400",
                        "El municipio del comercio es obligatorrio"
                    );
+                long userId = 0;
+                if (_jwtContext.GetUserRole() == "Colaborador")
+                {
+                    var usuario = await _usuarioRepository.GetByIdComercioAsync(_jwtContext.GetComercioId());                    
+                    userId = usuario.Id;
+                    var planActivo = await _suscripcionRepository.GetActivaByUsuarioAsync(userId);
+                    
+                    if (planActivo.Plan.Tipo == "BASIC" || planActivo.Plan.Tipo == "FREE")
+                    {
+                        return ApiResponse<object>.Error(
+                           "400",
+                           "El dueño del negocio necesita actualizar su suscripción para que puedas usar las funciones de colaborador."
+                       );
 
-                long userId = _jwtContext.GetUserId();
+                    }
+                }
+                else 
+                {
+                    userId = _jwtContext.GetUserId();
+                }
+                    
+
 
                 if (comercio.IdUsuario != userId)
                     return ApiResponse<object>.Error(
@@ -758,7 +798,6 @@ namespace AdLocalAPI.Services
                 return ApiResponse<object>.Error("500", ex.Message);
             }
         }
-
         public async Task<ApiResponse<PagedResponse<ComercioPublicDto>>> GetAllComerciosByUserPaged(
             int page = 1,
             int pageSize = 10
@@ -785,6 +824,116 @@ namespace AdLocalAPI.Services
             List<Comercio> totalNegocios = await _repository.GetAllComerciosByIdUsuario(idUser);
             return ApiResponse<object>.Success(totalNegocios.Count,"Total de comercios");
 
+        }
+        public async Task<ApiResponse<object>> guardarColaborador(ColaborarDto dto) 
+        {
+            long idUser = _jwtContext.GetUserId();
+            var plan = await _planRepository.GetByTipoAsync(_jwtContext.GetPlanTipo());
+            if (plan.IsMultiUsuario)
+            {
+                if (string.IsNullOrWhiteSpace(dto.Nombre))
+                    return ApiResponse<object>.Error(
+                        "400",
+                        "El nombre del colaborador es obligatorio"
+                    );
+                if (string.IsNullOrWhiteSpace(dto.Correo))
+                    return ApiResponse<object>.Error(
+                        "400",
+                        "El correo del colaborador es obligatorio"
+                    );
+                if (dto.IdComercio == 0)
+                    return ApiResponse<object>.Error(
+                        "400",
+                        "El comercio es obligatorio"
+                    );
+                bool existente = await _usuarioRepository.ExistePorCorreoAsync(dto.Correo);
+
+                if (existente)
+                    return ApiResponse<object>.Error("400", "El correo ya está registrado");
+
+                string codigo = ServicesGenerals.GenerarCodigoAlfanumerico(6);
+                string token = Guid.NewGuid().ToString();
+                var userColaborador = new Usuario
+                {
+                    Nombre = dto.Nombre,
+                    Email = dto.Correo,
+                    ComercioId = dto.IdComercio,
+                    Activo = true,
+                    FechaCreacion = DateTime.UtcNow,
+                    Codigo = codigo,
+                    Token = token,
+                    Rol = "Colaborador",
+                    PasswordHash = "",
+                };
+
+                await _usuarioRepository.CreateAsync(userColaborador);
+                bool esProduccion = _env.IsProduction();
+                var link = UrlHelper.GenerarLinkNuevoColaborador(token, esProduccion);
+
+                var html = TemplatesEmail.PlantillaCorreoBienvenidaColaborador(dto.Nombre,dto.Correo,codigo, link);
+
+                await _emailService.EnviarCorreoAsync(
+                    dto.Correo,
+                    "¡Bienvenido a AdLocal! Crea tu contraseña",
+                    html
+                );
+                return ApiResponse<object>.Success(
+   null,
+    "Colaborador creado correctamente"
+);
+
+
+            }
+            return ApiResponse<object>.Error("900", "No tienes permiso para agregar colaborasodree");
+
+        }
+        public async Task<ApiResponse<PagedResponse<UsuarioInfoDto>>> getAllColaboradores(long idComercio, int page = 1, int pageSize = 10)
+        {
+            try
+            {
+                return await _repository.getAllColaboradores(
+                    idComercio,
+                    page,
+                    pageSize
+                );
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<PagedResponse<UsuarioInfoDto>>.Error("500", ex.Message);
+            }
+        }
+        public async Task<ApiResponse<bool>> toggleAccesoColaborador(int idColaborador, long idComercio)
+        {
+            try
+            {
+                long idUser = _jwtContext.GetUserId();
+                var user = await _usuarioRepository.GetByIdComercioAndIdUserAsync(idColaborador, idComercio);
+                user.Activo = !user.Activo;
+                await _usuarioRepository.UpdateAsync(user);
+                return ApiResponse<bool>.Success(true, user.Activo ? "Activado correctamente" : "Desactivado correctamente");
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<bool>.Error("500", ex.Message);
+            }
+        }
+        public async Task<ApiResponse<bool>> eliminarColaborador(int idColaborador, long idComercio)
+        {
+            try
+            {
+                long idUser = _jwtContext.GetUserId();
+                var user = await _usuarioRepository.GetByIdComercioAndIdUserAsync(idColaborador, idComercio);
+                if (!string.IsNullOrEmpty(user.FotoUrl))
+                {
+                    await _usuarioRepository.DeleteFromSupabaseByUrlAsync(user.FotoUrl);
+                }
+                await _usuarioRepository.DeleteColaboradorAsync(idColaborador,idComercio);
+                return ApiResponse<bool>.Success(true, user.Activo ? "Activado correctamente" : "Desactivado correctamente");
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<bool>.Error("500", ex.Message);
+            }
         }
 
 

@@ -11,7 +11,7 @@ namespace AdLocalAPI.Interfaces.ProductosServicios
         Task<IEnumerable<Models.ProductosServicios>> GetAllAsync(long idComercio);
         Task<ApiResponse<PagedResponse<ProductosServiciosDto>>> GetAllPagedAsync(
    long idUser, long idComercio, int page = 1, int pageSize = 10, string orderBy = "recent", string search = "",int maxProductos = 0);
-        Task<string> UploadToSupabaseAsync(byte[] imageBytes,int userId,string contentType = "image/png");
+        Task<string> UploadToSupabaseAsync(byte[] imageBytes,long userId,string contentType = "image/png");
         Task<bool> DeleteFromSupabaseByUrlAsync(string publicUrl);
     }
 }

@@ -33,17 +33,17 @@ namespace AdLocalAPI.Controllers
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
         [Authorize]
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> Eliminar(long id)
+        [HttpDelete("{id}/idComercio/{idComercio}")]
+        public async Task<IActionResult> Eliminar(long id,long idComercio = 0)
         {
-            var response = await _service.DeleteAsync(id);
+            var response = await _service.DeleteAsync(id, idComercio);
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
-
-        [HttpPut("desactivar/{id}")]
-        public async Task<IActionResult> Desactivar(long id)
+        [Authorize]
+        [HttpPut("desactivar/{id}/idComercio/{idComercio}")]
+        public async Task<IActionResult> Desactivar(long id,long idComercio = 0)
         {
-            var response = await _service.DesactivarAsync(id);
+            var response = await _service.DesactivarAsync(id, idComercio);
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
         [Authorize]

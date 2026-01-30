@@ -168,6 +168,8 @@ builder.Services.AddScoped<SuscripcionUsersServiceAuto>();
 builder.Services.AddScoped<ComercioVisitaService>();
 builder.Services.AddScoped<ComercioVisitaRepository>();
 
+builder.Services.AddScoped<UsoCodigoReferidoRepository>();
+
 builder.Services.AddScoped<ISuscriptionService, SuscriptionService>();
 builder.Services.AddScoped<ISuscriptionRepository, SuscriptionRepository>();
 
@@ -205,7 +207,8 @@ builder.Services.AddCors(options =>
             "http://localhost:3000",
             "http://localhost:3001",
             "https://ad-local-gamma.vercel.app",
-            "https://ad-local-web.vercel.app"
+            "https://ad-local-web.vercel.app",
+            "https://www.adlocal.store"
         )
         .AllowAnyHeader()
         .AllowAnyMethod()
