@@ -21,4 +21,10 @@ namespace AdLocalAPI.DTOs
         public int MunicipioId { get; set; } = 0;
         public ICollection<HorarioComercio> Horarios { get; set; } = new List<HorarioComercio>();
     }
+    public class ColaborarDto
+    {
+        public long IdComercio { get; set; } = 0;
+        public string Nombre { get; set; } = "";
+        public string Correo { get; set; } = "";
+    }
 }

@@ -98,7 +98,7 @@ namespace AdLocalAPI.Repositories
         }
         public async Task<string> UploadToSupabaseAsync(
             byte[] imageBytes,
-            int userId,
+            long userId,
             string contentType = "image/png")
         {
             try

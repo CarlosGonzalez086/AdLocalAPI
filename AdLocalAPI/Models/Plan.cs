@@ -31,7 +31,7 @@ namespace AdLocalAPI.Models
         public bool TieneBadge { get; set; }
         public string? BadgeTexto { get; set; }
         public bool TieneAnalytics { get; set; }
-
+        public bool IsMultiUsuario { get; set; } = false;
         public bool Activo { get; set; } = true;
         public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
     }

@@ -103,7 +103,7 @@ namespace AdLocalAPI.Services
                     TieneBadge = dto.TieneBadge,
                     BadgeTexto = dto.BadgeTexto,
                     TieneAnalytics = dto.TieneAnalytics,
-
+                    IsMultiUsuario = dto.IsMultiUsuario,
                     Activo = true,
                     FechaCreacion = DateTime.UtcNow
                 };
@@ -136,7 +136,7 @@ namespace AdLocalAPI.Services
                 plan.MaxNegocios = dto.MaxNegocios;
                 plan.MaxProductos = dto.MaxProductos;
                 plan.MaxFotos = dto.MaxFotos;
-
+                plan.IsMultiUsuario = dto.IsMultiUsuario;
                 plan.NivelVisibilidad = dto.NivelVisibilidad;
                 plan.PermiteCatalogo = dto.PermiteCatalogo;
                 plan.ColoresPersonalizados = dto.ColoresPersonalizados;

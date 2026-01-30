@@ -25,6 +25,10 @@ namespace AdLocalAPI.Data
         public DbSet<EstadoMunicipio> EstadosMunicipios { get; set; }
         public DbSet<CalificacionComentario> CalificacionComentario { get; set; }
         public DbSet<ComercioVisita> ComercioVisitas { get; set; }
+        public DbSet<UsoCodigoReferido> UsoCodigoReferido { get; set; }
+        public ICollection<UsoCodigoReferido> CodigosReferidosUsados { get; set; }
+        public ICollection<UsoCodigoReferido> CodigosReferidosGenerados { get; set; }
+
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -264,6 +268,25 @@ namespace AdLocalAPI.Data
 
             modelBuilder.Entity<ComercioVisita>()
                 .HasIndex(v => v.FechaVisita);
+
+            modelBuilder.Entity<UsoCodigoReferido>(entity =>
+            {
+                // Un usuario solo puede usar un código una vez
+                entity.HasIndex(e => e.UsuarioReferidoId)
+                      .IsUnique();
+
+                // Evitar que se auto-refiera
+                entity.HasCheckConstraint(
+                    "CK_NoAutoReferido",
+                    "\"UsuarioReferidorId\" <> \"UsuarioReferidoId\""
+                );
+
+                entity.Property(e => e.CodigoReferido)
+                      .HasMaxLength(50)
+                      .IsRequired();
+            });
+
+
         }
 
 

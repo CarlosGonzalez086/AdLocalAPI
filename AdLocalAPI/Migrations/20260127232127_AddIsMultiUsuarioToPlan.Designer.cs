@@ -3,6 +3,7 @@ using System;
 using AdLocalAPI.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NetTopologySuite.Geometries;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AdLocalAPI.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260127232127_AddIsMultiUsuarioToPlan")]
+    partial class AddIsMultiUsuarioToPlan
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -741,39 +744,6 @@ namespace AdLocalAPI.Migrations
                     b.ToTable("tarjetas", (string)null);
                 });
 
-            modelBuilder.Entity("AdLocalAPI.Models.UsoCodigoReferido", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("CodigoReferido")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<DateTime>("FechaUso")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<long>("UsuarioReferidoId")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("UsuarioReferidorId")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UsuarioReferidoId")
-                        .IsUnique();
-
-                    b.ToTable("UsosCodigoReferido", t =>
-                        {
-                            t.HasCheckConstraint("CK_NoAutoReferido", "\"UsuarioReferidorId\" <> \"UsuarioReferidoId\"");
-                        });
-                });
-
             modelBuilder.Entity("AdLocalAPI.Models.Usuario", b =>
                 {
                     b.Property<long>("Id")
@@ -787,10 +757,6 @@ namespace AdLocalAPI.Migrations
 
                     b.Property<string>("Codigo")
                         .HasColumnType("text");
-
-                    b.Property<string>("CodigoReferido")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
 
                     b.Property<long?>("ComercioId")
                         .HasColumnType("bigint");

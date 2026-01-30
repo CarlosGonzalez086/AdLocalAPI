@@ -137,6 +137,7 @@ namespace AdLocalAPI.Services
                         TieneBadge = planDto.TieneBadge,
                         BadgeTexto = planDto.BadgeTexto,
                         TieneAnalytics = planDto.TieneAnalytics,
+                        IsMultiUsuario = planDto.IsMultiUsuario,
 
                     },
 

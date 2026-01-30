@@ -17,5 +17,6 @@
         public bool TieneBadge { get; set; }
         public string? BadgeTexto { get; set; }
         public bool TieneAnalytics { get; set; }
+        public bool IsMultiUsuario { get; set; }
     }
 }

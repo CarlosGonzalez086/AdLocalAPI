@@ -9,8 +9,8 @@ namespace AdLocalAPI.Interfaces.ProductosServicios
         Task<ApiResponse<IEnumerable<ProductosServiciosDto>>> GetAllAsync(long idComercio);
         Task<ApiResponse<ProductosServiciosDto>> GetByIdAsync(long id);
         Task<ApiResponse<bool>> UpdateAsync(long id, ProductosServiciosDto dto);
-        Task<ApiResponse<bool>> DeleteAsync(long id);
-        Task<ApiResponse<bool>> DesactivarAsync(long id);
+        Task<ApiResponse<bool>> DeleteAsync(long id,long idComercio);
+        Task<ApiResponse<bool>> DesactivarAsync(long id, long idComercio = 0);
         Task<ApiResponse<PagedResponse<ProductosServiciosDto>>> GetAllPagedAsync(
            int page = 1, int pageSize = 10, string orderBy = "recent", string search = "",long idComercio = 0);
     }
