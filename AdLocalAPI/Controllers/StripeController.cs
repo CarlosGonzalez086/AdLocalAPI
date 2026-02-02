@@ -24,7 +24,10 @@ namespace AdLocalAPI.Controllers
         {
             long userId = _jwtContext.GetUserId();
             var user = await _usuarioRepository.GetByIdAsync(userId);
-
+            Console.WriteLine("Stripe key loaded: " +
+    (StripeConfiguration.ApiKey?.StartsWith("sk_live") == true
+        ? "LIVE"
+        : "TEST"));
             if (string.IsNullOrEmpty(user.StripeCustomerId))
             {
                 var customerId = await _stripe.CreateCustomer(user.Email);
