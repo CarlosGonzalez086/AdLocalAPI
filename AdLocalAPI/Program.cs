@@ -56,8 +56,8 @@ var connectionString = Environment
     ?.Trim()
     ?? throw new Exception("❌ SUPABASE_DB_CONNECTION no está definida");
 
-Stripe.StripeConfiguration.ApiKey = "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";
-//    builder.Configuration["Stripe:SecretKey"];
+Stripe.StripeConfiguration.ApiKey = 
+   builder.Configuration["Stripe:SecretKey"];
 
 //var connectionString = "User Id=postgres.uzgnfwbztoizcctyfdiv;Password=q8dZ1szsEYIOzKrM;Server=aws-1-us-east-2.pooler.supabase.com;Port=6543;Database=postgres;SSL Mode=Require;Trust Server Certificate=true";
 
