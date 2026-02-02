@@ -8,7 +8,7 @@ namespace AdLocalAPI.Services
     {
         public StripeService(StripeSettings settings)
         {
-            StripeConfiguration.ApiKey = settings.SecretKey;
+            StripeConfiguration.ApiKey = settings.SecretKey;            
         }
 
         // =========================

@@ -3,9 +3,11 @@
     public class StripeSettings
     {
         public string SecretKey { get; private set; }
-        public void Inicializar(string secretKey)
+        public string WebhookSecret { get; private set; }
+        public void Inicializar(string secretKey, string webhookSecret)
         {
             SecretKey = secretKey;
+            WebhookSecret = webhookSecret;
         }
     }
 }
