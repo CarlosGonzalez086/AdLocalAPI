@@ -145,5 +145,18 @@ namespace AdLocalAPI.Services
                 }
             );
         }
+        public async Task<string> CrearSetupIntent(string stripeCustomerId)
+        {
+            var service = new SetupIntentService();
+
+            var setupIntent = await service.CreateAsync(new SetupIntentCreateOptions
+            {
+                Customer = stripeCustomerId,
+                PaymentMethodTypes = new List<string> { "card" }
+            });
+
+            return setupIntent.ClientSecret;
+        }
+
     }
 }

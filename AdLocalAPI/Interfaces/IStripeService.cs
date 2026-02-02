@@ -18,5 +18,6 @@ namespace AdLocalAPI.Interfaces
         );
         Task CancelSubscription(string subscriptionId, bool atPeriodEnd = true);
         Task ChangePlan(string subscriptionId, string subscriptionItemId, string newPriceId);
+        Task<string> CrearSetupIntent(string stripeCustomerId);
     }
 }
