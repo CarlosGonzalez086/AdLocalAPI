@@ -27,7 +27,7 @@ public class SuscriptionRepository : ISuscriptionRepository
     public async Task<List<Suscripcion>> GetByUsuarioAsync(int usuarioId)
     {
         return await _context.Suscripcions.Include(s => s.Plan)
-            .Where(s => s.UsuarioId == usuarioId && !s.Eliminada)
+            .Where(s => s.UsuarioId == usuarioId && !s.IsDeleted)
             .ToListAsync();
     }
 

@@ -3,6 +3,7 @@
     public class PlanCreateDto
     {
         public string Nombre { get; set; }
+        public string StripePriceId { get; set; }
         public decimal Precio { get; set; }
         public int DuracionDias { get; set; }
         public string Tipo { get; set; }

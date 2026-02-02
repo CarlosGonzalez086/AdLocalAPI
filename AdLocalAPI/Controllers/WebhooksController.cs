@@ -1,7 +1,7 @@
 ﻿using AdLocalAPI.Models;
 using AdLocalAPI.Repositories;
-using AdLocalAPI.Utils;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json.Linq;
 using Stripe;
 using Stripe.Checkout;
 
@@ -11,22 +11,25 @@ public class WebhooksController : ControllerBase
 {
     private readonly SuscripcionRepository _suscripcionRepo;
     private readonly PlanRepository _planRepo;
+    private readonly UsuarioRepository _usuarioRepository;
     private readonly string _webhookSecret;
 
     public WebhooksController(
         IConfiguration config,
         SuscripcionRepository suscripcionRepo,
+        UsuarioRepository usuarioRepository,
         PlanRepository planRepo)
     {
         _suscripcionRepo = suscripcionRepo;
+        _usuarioRepository = usuarioRepository;
         _planRepo = planRepo;
         _webhookSecret = config["Stripe:WebhookSecret"];
     }
 
     [HttpPost("stripe")]
-    public async Task<IActionResult> StripeWebhook()
+    public async Task<IActionResult> Handle()
     {
-        var json = await new StreamReader(HttpContext.Request.Body).ReadToEndAsync();
+        var json = await new StreamReader(Request.Body).ReadToEndAsync();
         Event stripeEvent;
 
         try
@@ -44,123 +47,254 @@ public class WebhooksController : ControllerBase
 
         switch (stripeEvent.Type)
         {
-            case EventTypes.ChargeSucceeded:
-                var charge = stripeEvent.Data.Object as Charge; 
-                if (charge != null) 
-                { 
-                    await ProcesarCharge(charge); 
-                }
-                break;
-            case EventTypes.CheckoutSessionCompleted:
-                var session1 = stripeEvent.Data.Object as Session;
-                if (session1 != null)
-                {
-                    await ProcesarCheckoutSession(session1);
-                }
+            case "checkout.session.completed":
+                await OnCheckoutCompleted(
+                    (Session)stripeEvent.Data.Object
+                );
                 break;
 
-            case EventTypes.CustomerSubscriptionDeleted:
-                await ProcesarCancelacion((Subscription)stripeEvent.Data.Object);
+            case "invoice.payment_succeeded":
+                await OnPaymentSucceeded(
+                    (Invoice)stripeEvent.Data.Object
+                );
+                break;
+
+            case "invoice.payment_failed":
+                await OnPaymentFailed(
+                    (Invoice)stripeEvent.Data.Object
+                );
+                break;
+
+            case "customer.subscription.updated":
+                await OnSubscriptionUpdated(
+                    (Subscription)stripeEvent.Data.Object
+                );
+                break;
+
+            case "customer.subscription.deleted":
+                await OnSubscriptionDeleted(
+                    (Subscription)stripeEvent.Data.Object
+                );
                 break;
         }
 
         return Ok();
     }
-    private async Task ProcesarCheckoutSession(Session session)
+    private async Task OnCheckoutCompleted(Session session)
     {
+        if (session.Mode != "subscription" || session.Metadata == null)
+            return;
 
-        if (session.Metadata == null) return;
-
-        if (!session.Metadata.TryGetValue("usuarioId", out var usuarioIdStr)) return;
-        if (!session.Metadata.TryGetValue("planId", out var planIdStr)) return;
-
-        if (!int.TryParse(usuarioIdStr, out int usuarioId)) return;
-        if (!int.TryParse(planIdStr, out int planId)) return;
-
+        var usuarioId = long.Parse(session.Metadata["usuarioId"]);
+        var planId = int.Parse(session.Metadata["planId"]);
+        var days = int.Parse(session.Metadata["days"]); // 30
 
         if (await _suscripcionRepo.ExistePorSessionAsync(session.Id))
             return;
 
+        var stripeSub = await new SubscriptionService()
+            .GetAsync(session.SubscriptionId);
 
-        var plan = await _planRepo.GetByIdAsync(planId);
-        if (plan == null) return;
-
-
-        var activa = await _suscripcionRepo.GetActivaByUsuarioAsync(usuarioId);
-        if (activa != null)
+        var existSub = await _suscripcionRepo.GetActivaByUsuarioAsync(usuarioId);
+        if (existSub != null)
         {
-            activa.Activa = false;
-            activa.Estado = "canceled";
-            activa.AutoRenovacion = false;
-            activa.FechaFin = DateTime.UtcNow;
-            await _suscripcionRepo.ActualizarAsync(activa);
+            existSub.Status = "canceled";
+            existSub.IsActive = false;
+            existSub.CanceledAt = DateTime.UtcNow;
+            existSub.UpdatedAt = DateTime.UtcNow;
+            await _suscripcionRepo.ActualizarAsync(existSub);
         }
 
+
+        DateTime periodStart = DateTime.UtcNow;
+        DateTime periodEnd;
+
+        if (stripeSub.CancelAt == DateTime.Now.AddMonths(1))
+        {
+            periodEnd = stripeSub.CancelAt.Value;
+        }
+        else
+        {
+            periodEnd = periodStart.AddDays(days);
+        }
 
         await _suscripcionRepo.CrearAsync(new Suscripcion
         {
             UsuarioId = usuarioId,
             PlanId = planId,
 
-            StripeCustomerId = session.CustomerId,
-            StripeSubscriptionId = session.Id,
+            StripeCustomerId = stripeSub.CustomerId,
+            StripeSubscriptionId = stripeSub.Id,
+            StripePriceId = stripeSub.Items.Data[0].Price.Id,
+            StripeCheckoutSessionId = session.Id,
 
-            Monto = (decimal)(session.AmountTotal / 100m),
-            Moneda = session.Currency.ToUpper(),
-            MetodoPago = "stripe",
+            Status = "active",
+            CurrentPeriodStart = periodStart,
+            CurrentPeriodEnd = periodEnd,
 
-            FechaInicio = DateTime.UtcNow,
-            FechaFin = DateTime.UtcNow.AddDays(plan.DuracionDias),
-
-            Activa = true,
-            Estado = "active",
-            AutoRenovacion = false
+            AutoRenew = stripeSub.CancelAt == null,
+            IsActive = true
         });
     }
-    private async Task ProcesarCancelacion(Subscription subscription)
+    private async Task OnPaymentSucceeded(Invoice invoice)
     {
-        var sub = await _suscripcionRepo.ObtenerPorStripeId(subscription.Id);
-        if (sub == null) return;
+        var line = invoice.Lines.Data.FirstOrDefault();
+        if (line == null)
+            return;
 
-        sub.Activa = false;
-        sub.Estado = "canceled";
-        sub.FechaFin = DateTime.UtcNow;
+        var user = await _usuarioRepository.GetByStripeId(invoice.CustomerId);
+        if (user == null)
+            return;
+
+        var json = JObject.Parse(line.RawJObject.ToString());
+
+        string subscriptionId = json["parent"]?["subscription_item_details"]?["subscription"]?.ToString();
+        if (string.IsNullOrEmpty(subscriptionId))
+            return;
+
+        var stripeSub = await new SubscriptionService()
+            .GetAsync(subscriptionId);
+
+        var sub = await _suscripcionRepo.ObtenerPorStripeId(subscriptionId);
+
+        var existSub = await _suscripcionRepo.GetActivaByUsuarioAsync(user.Id);
+        if (existSub != null && (sub == null || existSub.Id != sub.Id))
+        {
+            existSub.Status = "canceled";
+            existSub.IsActive = false;
+            existSub.CanceledAt = DateTime.UtcNow;
+            existSub.UpdatedAt = DateTime.UtcNow;
+            await _suscripcionRepo.ActualizarAsync(existSub);
+        }
+
+        DateTime periodStart = DateTime.UtcNow;
+        DateTime periodEnd;
+
+        if (stripeSub.CancelAt == DateTime.UtcNow.AddMonths(1))
+        {
+            periodEnd = stripeSub.CancelAt.Value;
+        }
+        else
+        {
+            periodEnd = periodStart.AddMonths(1);
+        }
+
+        if (sub == null)
+        {
+            string priceId = json["pricing"]?["price_details"]?["price"]?.ToString();
+            var plan = await _planRepo.GetByStripePriceIdAsync(priceId);
+            if (plan == null)
+                return;
+
+            sub = new Suscripcion
+            {
+                UsuarioId = user.Id,
+                PlanId = plan.Id,
+
+                StripeCustomerId = invoice.CustomerId,
+                StripeSubscriptionId = subscriptionId,
+                StripePriceId = priceId,
+
+                Status = "active",
+                CurrentPeriodStart = periodStart,
+                CurrentPeriodEnd = periodEnd,
+
+                AutoRenew = stripeSub.CancelAt == null,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _suscripcionRepo.CrearAsync(sub);
+            return;
+        }
+
+        sub.CurrentPeriodStart = periodStart;
+        sub.CurrentPeriodEnd = periodEnd;
+        sub.Status = "active";
+        sub.IsActive = true;
+        sub.UpdatedAt = DateTime.UtcNow;
 
         await _suscripcionRepo.ActualizarAsync(sub);
     }
-    private async Task ProcesarCharge(Charge charge)
+    private async Task OnPaymentFailed(Invoice invoice)
     {
-        if (!charge.Metadata.TryGetValue("usuarioId", out var usuarioIdStr)) return;
-        if (!charge.Metadata.TryGetValue("planId", out var planIdStr)) return;
-        if (!charge.Metadata.TryGetValue("autoRenew", out var autoRenew)) return;
-        if (!int.TryParse(usuarioIdStr, out int usuarioId)) return;
-        if (!int.TryParse(planIdStr, out int planId)) return;
-        if (await _suscripcionRepo.ExistePorSessionAsync(charge.Id)) return;
-        var plan = await _planRepo.GetByIdAsync(planId);
-        if (plan == null) return;
-        var activa = await _suscripcionRepo.GetActivaByUsuarioAsync(usuarioId);
-        if (activa != null)
+        var line = invoice.Lines.Data.FirstOrDefault();
+        if (line == null || string.IsNullOrEmpty(line.SubscriptionId))
+            return;
+
+        var sub = await _suscripcionRepo
+            .ObtenerPorStripeId(line.SubscriptionId);
+
+        if (sub == null)
+            return;
+
+        sub.Status = "past_due";
+        sub.IsActive = false;
+        sub.UpdatedAt = DateTime.UtcNow;
+
+        await _suscripcionRepo.ActualizarAsync(sub);
+    }
+    private async Task OnSubscriptionUpdated(Subscription stripeSub)
+    {
+        var sub = await _suscripcionRepo
+            .ObtenerPorStripeId(stripeSub.Id);
+
+        if (sub == null)
+            return;
+
+        if (stripeSub.CancelAtPeriodEnd)
         {
-            activa.Activa = false;
-            activa.Estado = "canceled";
-            activa.AutoRenovacion = false;
-            activa.FechaFin = DateTime.UtcNow;
-            await _suscripcionRepo.ActualizarAsync(activa);
+            sub.Status = "canceling";
+            sub.IsActive = true;
+            sub.AutoRenew = false;
+            sub.CanceledAt = sub.CurrentPeriodEnd;
+            sub.UpdatedAt = DateTime.UtcNow;
+            await _suscripcionRepo.ActualizarAsync(sub);
+            return;
         }
+        else
+        {
+            sub.Status = stripeSub.Status;
+            sub.IsActive = stripeSub.Status == "active";
+            sub.AutoRenew = true;
+            sub.CanceledAt = null;
+        }
+
+        if (stripeSub.Items?.Data?.Any() == true)
+        {
+            sub.StripePriceId = stripeSub.Items.Data[0].Price.Id;
+        }
+
+        await _suscripcionRepo.ActualizarAsync(sub);
+    }
+    private async Task OnSubscriptionDeleted(Subscription stripeSub)
+    {
+        var sub = await _suscripcionRepo
+            .ObtenerPorStripeId(stripeSub.Id);
+
+        if (sub == null)
+            return;
+
+        sub.Status = "canceled";
+        sub.IsActive = false;
+        sub.CanceledAt = DateTime.UtcNow;
+        sub.UpdatedAt = DateTime.UtcNow;
+        await _suscripcionRepo.ActualizarAsync(sub);
+
+        var planFree = await _planRepo.GetByTipoAsync("FREE");
+        if (planFree == null)
+            return;
+
         await _suscripcionRepo.CrearAsync(new Suscripcion
         {
-            UsuarioId = usuarioId,
-            PlanId = planId,
-            StripeCustomerId = charge.CustomerId,
-            StripeSubscriptionId = charge.Id,
-            Monto = charge.Amount / 100m,
-            Moneda = charge.Currency.ToUpper(),
-            MetodoPago = "stripe",
-            FechaInicio = DateTime.UtcNow,
-            FechaFin = DateTime.UtcNow.AddDays(plan.DuracionDias),
-            Activa = true,
-            Estado = "active",
-            AutoRenovacion = autoRenew == "si" ? true : false
+            UsuarioId = sub.UsuarioId,
+            PlanId = planFree.Id,
+            CurrentPeriodStart = DateTime.UtcNow,
+            CurrentPeriodEnd = DateTime.MaxValue,
+            Status = "active",
+            IsActive = true,
+            AutoRenew = false,
+            CreatedAt = DateTime.UtcNow
         });
     }
-}
+}

@@ -5,39 +5,40 @@ using Microsoft.AspNetCore.Mvc;
 
 [Authorize]
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/checkout")]
 public class CheckoutController : ControllerBase
 {
-    private readonly ISuscriptionService _service;
+    private readonly ISuscriptionServiceV1 _service;
 
-    public CheckoutController(ISuscriptionService service)
+    public CheckoutController(ISuscriptionServiceV1 service)
     {
         _service = service;
     }
 
-    [HttpPost("crearSesion")]
-    public async Task<IActionResult> CrearSesion([FromBody] CheckoutRequestDto dto)
+    // Tarjeta ya guardada
+    [HttpPost("suscribirse")]
+    public async Task<IActionResult> Suscribirse([FromBody] CheckoutRequestDto dto)
     {
-        if (dto.Metodo == "guardada")
-        {
-            if (dto.StripePaymentMethodId == "") return BadRequest(ApiResponse<string>.Error("400", "Se requiere TarjetaId"));
+        if (string.IsNullOrEmpty(dto.StripePaymentMethodId))
+            return BadRequest(ApiResponse<string>.Error("400", "Tarjeta requerida"));
 
-            var result = await _service.ContratarConTarjetaGuardada(dto.PlanId, dto.StripePaymentMethodId,dto.autoRenew);
-            return result.Codigo == "200" ? Ok(result) : BadRequest(result);
-        }
-        else if (dto.Metodo == "nueva")
-        {
-            var result = await _service.CrearSesionStripe(dto.PlanId);
-            return result.Codigo == "200" ? Ok(result) : BadRequest(result);
-        }
-        else if (dto.Metodo == "transferencia")
-        {
-            var result = await _service.GenerarReferenciaTransferencia(dto.PlanId,dto.banco);
-            return result.Codigo == "200" ? Ok(result) : BadRequest(result);
-        }
+        var result = await _service.SuscribirseConTarjeta(
+            dto.PlanId,
+            dto.StripePaymentMethodId,
+            dto.autoRenew
+        );
 
-        return BadRequest(ApiResponse<string>.Error("400", "Método de pago inválido"));
+        return result.Codigo == "200" ? Ok(result) : BadRequest(result);
     }
+
+    // Tarjeta nueva (Checkout)
+    [HttpPost("checkout")]
+    public async Task<IActionResult> CrearCheckout([FromBody] CheckoutRequestDto dto)
+    {
+        var result = await _service.CrearCheckoutSuscripcion(dto.PlanId);
+        return result.Codigo == "200" ? Ok(result) : BadRequest(result);
+    }
+
     [HttpPost("cancelar")]
     public async Task<IActionResult> Cancelar()
     {

@@ -49,7 +49,7 @@ namespace AdLocalAPI.Services
                 if (dto.IsDefault)
                 {
                     await _repository.RemoveDefaults(idUser);
-                    await _stripe.SetDefault(user.StripeCustomerId, pm.Id);
+                    await _stripe.SetDefaultPaymentMethod(user.StripeCustomerId, pm.Id);
                 }
 
                 var tarjeta = new Tarjeta
@@ -104,7 +104,7 @@ namespace AdLocalAPI.Services
                 }
 
 
-                await _stripe.SetDefault(user.StripeCustomerId, tarjeta.StripePaymentMethodId);
+                await _stripe.SetDefaultPaymentMethod(user.StripeCustomerId, tarjeta.StripePaymentMethodId);
 
     
                 tarjeta.IsDefault = true;
@@ -135,7 +135,7 @@ namespace AdLocalAPI.Services
                 tarjeta.IsDefault = false;
 
                 await _stripe.Detach(tarjeta.StripePaymentMethodId);
-                await _repository.Save();
+                await _repository.Update(tarjeta);
 
                 return ApiResponse<object>.Success(null, "Tarjeta eliminada correctamente");
             }

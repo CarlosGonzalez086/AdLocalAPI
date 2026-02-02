@@ -85,6 +85,8 @@ namespace AdLocalAPI.Services
 
                 if (string.IsNullOrWhiteSpace(dto.Tipo))
                     return ApiResponse<object>.Error("400", "El tipo de plan es obligatorio");
+                if (string.IsNullOrWhiteSpace(dto.StripePriceId))
+                    return ApiResponse<object>.Error("400", "El tipo de plan es obligatorio");
 
                 var plan = new Plan
                 {
@@ -92,7 +94,7 @@ namespace AdLocalAPI.Services
                     Precio = dto.Precio,
                     DuracionDias = dto.DuracionDias,
                     Tipo = dto.Tipo.ToUpper(),
-
+                    StripePriceId = dto.StripePriceId,
                     MaxNegocios = dto.MaxNegocios,
                     MaxProductos = dto.MaxProductos,
                     MaxFotos = dto.MaxFotos,
@@ -132,7 +134,7 @@ namespace AdLocalAPI.Services
                 plan.Precio = dto.Precio;
                 plan.DuracionDias = dto.DuracionDias;
                 plan.Tipo = dto.Tipo.ToUpper();
-
+                plan.StripePriceId = dto.StripePriceId;
                 plan.MaxNegocios = dto.MaxNegocios;
                 plan.MaxProductos = dto.MaxProductos;
                 plan.MaxFotos = dto.MaxFotos;

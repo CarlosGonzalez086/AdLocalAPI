@@ -148,19 +148,16 @@ namespace AdLocalAPI.Services
                 PlanId = planFree.Id,
 
                 StripeCustomerId = null,
-                StripeSessionId = null,
+                StripeCheckoutSessionId = null,
                 StripeSubscriptionId = null,
                 StripePriceId = null,
-                Monto = 0,
-                Moneda = "MXN",
-                MetodoPago = "free",
-                FechaInicio = DateTime.UtcNow,
-                FechaFin = DateTime.MaxValue,
-                Activa = true,
-                Estado = "active",
-                AutoRenovacion = false,
-                Eliminada = false,
-                FechaCreacion = DateTime.UtcNow
+                CurrentPeriodStart = DateTime.UtcNow,
+                CurrentPeriodEnd = DateTime.MaxValue,
+                IsActive = true,
+                Status = "active",
+                AutoRenew = false,
+                IsDeleted = false,
+                CreatedAt = DateTime.UtcNow
             });
 
             return ApiResponse<object>.Success(
@@ -290,7 +287,7 @@ namespace AdLocalAPI.Services
                     );
                 }
 
-                if (planActivo.FechaFin <= DateTime.UtcNow)
+                if (planActivo.CurrentPeriodEnd <= DateTime.UtcNow)
                 {
                     return ApiResponse<object>.Error(
                         "403",
@@ -401,7 +398,7 @@ namespace AdLocalAPI.Services
                     claims.Add(new Claim("planId", plan.Id.ToString()));
                     claims.Add(new Claim("planTipo", plan.Tipo));
                     claims.Add(new Claim("nivelVisibilidad", plan.NivelVisibilidad.ToString()));
-                    claims.Add(new Claim("esatdo", suscripcion.Estado));
+                    claims.Add(new Claim("esatdo", suscripcion.Status));
                     claims.Add(new Claim("maxNegocios", plan.MaxNegocios.ToString()));
                     claims.Add(new Claim("maxProductos", plan.MaxProductos.ToString()));
                     claims.Add(new Claim("maxFotos", plan.MaxFotos.ToString()));
@@ -442,7 +439,7 @@ namespace AdLocalAPI.Services
                     claims.Add(new Claim("planId", plan.Id.ToString()));
                     claims.Add(new Claim("planTipo", plan.Tipo));
                     claims.Add(new Claim("nivelVisibilidad", plan.NivelVisibilidad.ToString()));
-                    claims.Add(new Claim("esatdo", planActivo.Estado));
+                    claims.Add(new Claim("esatdo", planActivo.Status));
                     claims.Add(new Claim("maxProductos", plan.MaxProductos.ToString()));
                     claims.Add(new Claim("maxFotos", plan.MaxFotos.ToString()));
                     claims.Add(new Claim("permiteCatalogo", plan.PermiteCatalogo.ToString()));

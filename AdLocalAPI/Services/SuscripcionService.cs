@@ -81,9 +81,9 @@ namespace AdLocalAPI.Services
 
             _stripe.CancelarSuscripcion(sub.StripeSubscriptionId);
 
-            sub.Activa = false;
-            sub.Estado = "canceled";
-            sub.FechaCancelacion = DateTime.UtcNow;
+            sub.IsActive = false;
+            sub.Status = "canceled";
+            sub.CanceledAt = DateTime.UtcNow;
 
             await _suscripcionRepository.ActualizarAsync(sub);
 
@@ -141,16 +141,15 @@ namespace AdLocalAPI.Services
 
                     },
 
-                    FechaInicio = suscripcion.FechaInicio,
-                    FechaFin = suscripcion.FechaFin,
-                    Activa = suscripcion.Activa,
-                    Estado = suscripcion.Estado,
-                    Monto = suscripcion.Monto,
-                    Moneda = suscripcion.Moneda
+                    FechaInicio = (DateTime)suscripcion.CurrentPeriodStart,
+                    FechaFin = (DateTime)suscripcion.CurrentPeriodEnd,
+                    Activa = suscripcion.IsActive,
+                    Estado = suscripcion.Status,
+                    Monto = suscripcion.Plan.Precio,
+                    Moneda = "MXN"
                 }
             );
         }
-
 
         public async Task<ApiResponse<Suscripcion>> CambiarPlan(CambiarPlanDto dto)
         {
@@ -173,7 +172,6 @@ namespace AdLocalAPI.Services
             // BD
             sub.PlanId = nuevoPlan.Id;
             sub.StripePriceId = nuevoPriceId;
-            sub.Monto = nuevoPlan.Precio;
 
             await _suscripcionRepository.ActualizarAsync(sub);
 

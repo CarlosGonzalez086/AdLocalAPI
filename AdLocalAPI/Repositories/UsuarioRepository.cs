@@ -264,6 +264,20 @@ namespace AdLocalAPI.Repositories
                 return null;
             }
         }
+        public async Task<Usuario?> GetByStripeId(string CustomerId)
+        {
+            try
+            {
+                return await _context.Usuarios.FirstOrDefaultAsync(u => u.StripeCustomerId == CustomerId);
+            }
+            catch (Exception ex)
+            {
+                // Aquí puedes loguear el error si quieres
+                Console.WriteLine($"Error al obtener usuario por token {CustomerId}: {ex.Message}");
+                // Opcionalmente podrías lanzar otra excepción o devolver null
+                return null;
+            }
+        }
 
     }
 }

@@ -22,5 +22,8 @@
         public DateTime FechaCreacion { get; set; }
         public double PromedioCalificacion { get; set; } = 0;
         public double? DistanciaKm { get; set; }
+
+        public string? PlanTipo { get; set; }     
+        public bool SuscripcionVigente { get; set; } 
     }
 }

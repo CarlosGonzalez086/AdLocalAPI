@@ -167,8 +167,8 @@ namespace AdLocalAPI.Services
                 var suscripcionActiva = await _context.Suscripcions
                     .Where(s =>
                         s.UsuarioId == comercio.IdUsuario &&
-                        s.Activa &&
-                        !s.Eliminada &&
+                        s.IsActive &&
+                        !s.IsDeleted &&
                         (s.Plan.Tipo == "PRO" || s.Plan.Tipo == "BUSINESS")
                     )
                     .Select(s => new

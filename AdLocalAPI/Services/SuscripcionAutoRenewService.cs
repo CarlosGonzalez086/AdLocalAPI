@@ -1,85 +1,87 @@
-﻿using AdLocalAPI.Data;
-using AdLocalAPI.Models;
-using Microsoft.EntityFrameworkCore;
-using Stripe;
+﻿//using AdLocalAPI.Models;
+//using AdLocalAPI.Repositories;
+//using Stripe;
 
-namespace AdLocalAPI.Services
-{
-    public class SuscripcionAutoRenewService
-    {
-            private readonly AppDbContext _context;
-            private readonly IConfiguration _config;
+//namespace AdLocalAPI.Services
+//{
+//    public class SuscripcionAutoRenewService
+//    {
+//        private readonly SuscripcionRepository _suscripcionRepo;
+//        private readonly TarjetaRepository _tarjetaRepository;
+//        private readonly IConfiguration _config;
 
-            public SuscripcionAutoRenewService(
-                AppDbContext context,
-                IConfiguration config)
-            {
-                _context = context;
-                _config = config;
-            }
-            public async Task ProcesarAutoRenovaciones()
-            {
-                StripeConfiguration.ApiKey = _config["Stripe:SecretKey"];
-                var hoy = DateTime.UtcNow;
+//        public SuscripcionAutoRenewService(
+//            SuscripcionRepository suscripcionRepo,
+//            TarjetaRepository tarjetaRepository,
+//            IConfiguration config)
+//        {
+//            _suscripcionRepo = suscripcionRepo;
+//            _tarjetaRepository = tarjetaRepository;
+//            _config = config;
+//        }
+//        public async Task ProcesarAutoRenovacionesAsync()
+//        {
+//            StripeConfiguration.ApiKey = _config["Stripe:SecretKey"];
+//            var hoy = DateTime.UtcNow;
 
-                var suscripciones = await _context.Suscripcions
-                    .Include(s => s.Usuario)
-                    .Include(s => s.Plan)
-                    .Where(s =>
-                        s.Activa &&
-                        s.AutoRenovacion &&
-                        s.FechaFin <= hoy &&
-                        s.Usuario.StripeCustomerId != null &&
-                        s.StripeCustomerId != null
-                    )
-                    .ToListAsync();
+//            var suscripciones = await _suscripcionRepo
+//                .ObtenerParaAutoRenovacionAsync(hoy);
+//            foreach (var suscripcion in suscripciones)
+//            {
+//                var cardUser = await _tarjetaRepository.GetByUser(suscripcion.UsuarioId);
+//                var pagoExitoso = await CobrarRenovacionAsync(suscripcion,cardUser.);
 
-                foreach (var suscripcion in suscripciones)
-                {
-                    var pagoExitoso = await CobrarRenovacion(suscripcion);
+//                if (!pagoExitoso)
+//                    continue;
 
-                    if (!pagoExitoso)
-                        continue;
+//                ActualizarPeriodoSuscripcion(suscripcion, hoy);
 
-                    suscripcion.FechaInicio = hoy;
-                    suscripcion.FechaFin = hoy.AddMonths(1);
-                    suscripcion.Estado = "activa";
-                    suscripcion.Activa = true;
-                }
+//                await _suscripcionRepo.ActualizarAsync(suscripcion);
+//            }
+//        }
 
-                await _context.SaveChangesAsync();
-            }
-        private async Task<bool> CobrarRenovacion(Suscripcion suscripcion)
-        {
-            try
-            {
-                var paymentService = new PaymentIntentService();
+//        private static void ActualizarPeriodoSuscripcion(
+//            Suscripcion suscripcion,
+//            DateTime fechaBase)
+//        {
+//            suscripcion.FechaInicio = fechaBase;
+//            suscripcion.FechaFin = fechaBase.AddMonths(1);
+//            suscripcion.Estado = "activa";
+//            suscripcion.Activa = true;
+//        }
 
-                var intent = await paymentService.CreateAsync(
-                    new PaymentIntentCreateOptions
-                    {
-                        Amount = (long)(suscripcion.Plan.Precio * 100),
-                        Currency = "mxn",
-                        Customer = suscripcion.Usuario.StripeCustomerId,
-                        PaymentMethod = "stripe",
-                        OffSession = true,
-                        Confirm = true,
-                        PaymentMethodTypes = new List<string> { "card" },
-                        Metadata = new Dictionary<string, string>
-                        {
-                            { "usuarioId", suscripcion.UsuarioId.ToString() },
-                            { "planId", suscripcion.PlanId.ToString() },
-                            { "plan_nombre", suscripcion.Plan.Nombre },
-                            { "autoRenew", suscripcion.AutoRenovacion ? "si" : "no" },
-                        },
-                    });
+//        private async Task<bool> CobrarRenovacionAsync(Suscripcion suscripcion)
+//        {
+//            try
+//            {
+//                var paymentService = new PaymentIntentService();
 
-                return intent.Status == "succeeded";
-            }
-            catch (StripeException)
-            {
-                return false;
-            }
-        }
-    }
-}
+//                var intent = await paymentService.CreateAsync(
+//                    new PaymentIntentCreateOptions
+//                    {
+//                        Amount = (long)(suscripcion.Plan.Precio * 100),
+//                        Currency = "mxn",
+//                        Customer = suscripcion.Usuario.StripeCustomerId,
+//                        OffSession = true,
+//                        Confirm = true,
+//                        PaymentMethodTypes = new List<string> { "card" },
+//                        PaymentMethod = suscripcion.,
+//                        Metadata = new Dictionary<string, string>
+//                        {
+//                            { "usuarioId", suscripcion.UsuarioId.ToString() },
+//                            { "planId", suscripcion.PlanId.ToString() },
+//                            { "planNombre", suscripcion.Plan.Nombre },
+//                            { "autoRenew", suscripcion.AutoRenovacion ? "si" : "no" }
+//                        }
+//                    });
+
+//                return intent.Status == "succeeded";
+//            }
+//            catch (StripeException)
+//            {
+//                return false;
+//            }
+//        }
+
+//    }
+//}
