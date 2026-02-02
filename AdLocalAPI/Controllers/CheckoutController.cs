@@ -15,7 +15,7 @@ public class CheckoutController : ControllerBase
         _service = service;
     }
 
-    // Tarjeta ya guardada
+
     [HttpPost("suscribirse")]
     public async Task<IActionResult> Suscribirse([FromBody] CheckoutRequestDto dto)
     {
@@ -31,7 +31,7 @@ public class CheckoutController : ControllerBase
         return result.Codigo == "200" ? Ok(result) : BadRequest(result);
     }
 
-    // Tarjeta nueva (Checkout)
+
     [HttpPost("checkout")]
     public async Task<IActionResult> CrearCheckout([FromBody] CheckoutRequestDto dto)
     {

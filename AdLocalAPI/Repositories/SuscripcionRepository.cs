@@ -13,7 +13,7 @@ namespace AdLocalAPI.Repositories
             _context = context;
         }
 
-        // 🔹 Crear suscripción
+
 
         public async Task CrearAsync(Suscripcion suscripcion)
         {
@@ -22,14 +22,14 @@ namespace AdLocalAPI.Repositories
         }
 
 
-        // 🔹 Actualizar suscripción
+
         public async Task ActualizarAsync(Suscripcion suscripcion)
         {
             _context.Suscripcions.Update(suscripcion);
             await _context.SaveChangesAsync();
         }
 
-        // 🔹 Obtener suscripción activa por usuario
+
         public async Task<Suscripcion?> GetActivaByUsuario(int usuarioId)
         {
             return await _context.Suscripcions
@@ -94,13 +94,11 @@ namespace AdLocalAPI.Repositories
                     s.UsuarioId == usuarioId &&
                     !s.IsDeleted &&
                     (
-                        // Activa normal
                         (
                             s.Status == "active" &&
                             s.CurrentPeriodEnd >= DateTime.UtcNow
                         )
                         ||
-                        // Cancelada pero vigente
                         (
                             s.Status == "canceling" &&
                             s.CurrentPeriodEnd >= DateTime.UtcNow

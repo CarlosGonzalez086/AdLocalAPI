@@ -40,7 +40,7 @@ namespace AdLocalAPI.Repositories
                     s.IsActive &&
                     !s.IsDeleted &&
                     s.CurrentPeriodEnd > hoy &&
-                    (s.Plan.Tipo == "PRO" || s.Plan.Tipo == "BUSINESS")
+                    (s.Plan.Tipo == "BASIC" || s.Plan.Tipo == "PRO" || s.Plan.Tipo == "BUSINESS")
                 )
                 .Select(s => new
                 {

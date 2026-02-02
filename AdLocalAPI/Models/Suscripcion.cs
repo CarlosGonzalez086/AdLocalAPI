@@ -19,7 +19,7 @@ namespace AdLocalAPI.Models
         public Plan Plan { get; set; } = null!;
 
         // =========================
-        // Stripe (FUENTE DE VERDAD)
+        // Stripe 
         // =========================
         [Required]
         public string StripeCustomerId { get; set; } = null!;
@@ -42,7 +42,7 @@ namespace AdLocalAPI.Models
 
         // =========================
         // Periodos (Stripe)
-        // 👉 se llenan SOLO desde invoice.payment_succeeded
+        // Se llenan SOLO desde invoice.payment_succeeded
         // =========================
         public DateTime? CurrentPeriodStart { get; set; }
         public DateTime? CurrentPeriodEnd { get; set; }

@@ -30,9 +30,7 @@ public class SuscriptionService : ISuscriptionServiceV1
         StripeConfiguration.ApiKey = _config["Stripe:SecretKey"];
     }
 
-    // =========================
     // SUSCRIPCIÓN CON TARJETA
-    // =========================
     public async Task<ApiResponse<string>> SuscribirseConTarjeta(
         int planId,
         string paymentMethodId,bool autoRenew)
@@ -47,7 +45,6 @@ public class SuscriptionService : ISuscriptionServiceV1
         if (usuario == null)
             return ApiResponse<string>.Error("404", "Usuario no encontrado");
 
-        // 1️⃣ Customer
         if (string.IsNullOrEmpty(usuario.StripeCustomerId))
         {
             var customer = await new CustomerService().CreateAsync(
@@ -61,7 +58,7 @@ public class SuscriptionService : ISuscriptionServiceV1
             await _usuarioRepo.UpdateAsync(usuario);
         }
 
-        // 2️⃣ Attach tarjeta
+
         await new PaymentMethodService().AttachAsync(
             paymentMethodId,
             new PaymentMethodAttachOptions
@@ -69,7 +66,7 @@ public class SuscriptionService : ISuscriptionServiceV1
                 Customer = usuario.StripeCustomerId
             });
 
-        // 3️⃣ Default tarjeta
+
         await new CustomerService().UpdateAsync(
             usuario.StripeCustomerId,
             new CustomerUpdateOptions
@@ -80,7 +77,7 @@ public class SuscriptionService : ISuscriptionServiceV1
                 }
             });
 
-        // 4️⃣ Crear SUSCRIPCIÓN REAL
+
         var options = new SubscriptionCreateOptions
         {
             Customer = usuario.StripeCustomerId,
@@ -115,9 +112,7 @@ public class SuscriptionService : ISuscriptionServiceV1
         );
     }
 
-    // =========================
     // CHECKOUT (TARJETA NUEVA)
-    // =========================
     public async Task<ApiResponse<string>> CrearCheckoutSuscripcion(int planId)
     {
         var plan = await _context.Plans
@@ -180,9 +175,7 @@ public class SuscriptionService : ISuscriptionServiceV1
         return ApiResponse<string>.Success(session.Url!, "Checkout creado");
     }
 
-    // =========================
     // CANCELAR PLAN
-    // =========================
     public async Task<ApiResponse<string>> CancelarPlan()
     {
         var usuarioId = _jwt.GetUserId();

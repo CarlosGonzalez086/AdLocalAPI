@@ -55,7 +55,6 @@ namespace AdLocalAPI.Services
             }
             int maxProductos = _jwtContext.GetMaxProductos();
             long idComercio = dto.IdComercio == 0 ? _jwtContext.GetComercioId() : dto.IdComercio;
-            // Validación aquí
             var validationResult = await _validator.ValidateAsync(dto);
 
             if (!validationResult.IsValid)

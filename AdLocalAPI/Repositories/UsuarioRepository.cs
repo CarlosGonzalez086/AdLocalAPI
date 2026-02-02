@@ -99,9 +99,7 @@ namespace AdLocalAPI.Repositories
             }
             catch (Exception ex)
             {
-                // Aquí puedes loguear el error si quieres
                 Console.WriteLine($"Error al obtener usuario por Id {id}: {ex.Message}");
-                // Opcionalmente podrías lanzar otra excepción o devolver null
                 return null;
             }
             return usuario;
@@ -122,9 +120,7 @@ namespace AdLocalAPI.Repositories
             }
             catch (Exception ex)
             {
-                // Aquí puedes loguear el error si quieres
                 Console.WriteLine($"Error al obtener usuario por Id {idUser}: {ex.Message}");
-                // Opcionalmente podrías lanzar otra excepción o devolver null
                 return null;
             }
             return usuario;
@@ -139,9 +135,7 @@ namespace AdLocalAPI.Repositories
             }
             catch (Exception ex)
             {
-                // Aquí puedes loguear el error si quieres
                 Console.WriteLine($"Error al obtener usuario por code {code}: {ex.Message}");
-                // Opcionalmente podrías lanzar otra excepción o devolver null
                 return null;
             }
         }
@@ -155,9 +149,7 @@ namespace AdLocalAPI.Repositories
             }
             catch (Exception ex)
             {
-                // Aquí puedes loguear el error si quieres
                 Console.WriteLine($"Error al obtener usuario por token {token}: {ex.Message}");
-                // Opcionalmente podrías lanzar otra excepción o devolver null
                 return null;
             }
         }
@@ -258,9 +250,7 @@ namespace AdLocalAPI.Repositories
             }
             catch (Exception ex)
             {
-                // Aquí puedes loguear el error si quieres
                 Console.WriteLine($"Error al obtener usuario por token {codigo}: {ex.Message}");
-                // Opcionalmente podrías lanzar otra excepción o devolver null
                 return null;
             }
         }
@@ -272,9 +262,7 @@ namespace AdLocalAPI.Repositories
             }
             catch (Exception ex)
             {
-                // Aquí puedes loguear el error si quieres
                 Console.WriteLine($"Error al obtener usuario por token {CustomerId}: {ex.Message}");
-                // Opcionalmente podrías lanzar otra excepción o devolver null
                 return null;
             }
         }

@@ -73,13 +73,13 @@ namespace AdLocalAPI.Services
             string paymentMethodId
         )
         {
-            // 1️⃣ Asociar tarjeta al customer
+
             await AttachToCustomer(paymentMethodId, customerId);
 
-            // 2️⃣ Marcar tarjeta como default
+
             await SetDefaultPaymentMethod(customerId, paymentMethodId);
 
-            // 3️⃣ Crear suscripción REAL
+
             var subscription = await new SubscriptionService().CreateAsync(
                 new SubscriptionCreateOptions
                 {
