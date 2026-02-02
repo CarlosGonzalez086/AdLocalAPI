@@ -38,6 +38,7 @@ namespace AdLocalAPI.Controllers
                 Customer = user.StripeCustomerId,
                 PaymentMethodTypes = new List<string> { "card" }
             });
+            Console.WriteLine(setupIntent);
 
             return Ok(new { clientSecret = setupIntent.ClientSecret });
         }
