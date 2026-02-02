@@ -14,7 +14,6 @@ namespace AdLocalAPI.Services
         private readonly IProductosServiciosRepository _repository;
         private readonly JwtContext _jwtContext;
         private readonly SuscripcionRepository _suscripcionRepository;
-        private readonly PlanRepository _planRepository;
         private readonly UsuarioRepository _usuarioRepository;
         private readonly IValidator<ProductosServiciosDto> _validator; 
 
@@ -22,7 +21,6 @@ namespace AdLocalAPI.Services
             IProductosServiciosRepository repository,
             JwtContext jwtContext,
             SuscripcionRepository suscripcionRepository,
-            PlanRepository planRepository,
             UsuarioRepository usuarioRepository,
             IValidator<ProductosServiciosDto> validator)
         {
@@ -30,7 +28,6 @@ namespace AdLocalAPI.Services
             _jwtContext = jwtContext;
             _validator = validator;
             _suscripcionRepository = suscripcionRepository;
-            _planRepository = planRepository;
             _usuarioRepository = usuarioRepository;
         }
 
@@ -58,7 +55,6 @@ namespace AdLocalAPI.Services
             }
             int maxProductos = _jwtContext.GetMaxProductos();
             long idComercio = dto.IdComercio == 0 ? _jwtContext.GetComercioId() : dto.IdComercio;
-            // Validación aquí
             var validationResult = await _validator.ValidateAsync(dto);
 
             if (!validationResult.IsValid)

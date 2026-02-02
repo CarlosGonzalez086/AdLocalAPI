@@ -1,119 +1,149 @@
 ﻿using AdLocalAPI.Interfaces;
-using AdLocalAPI.Models;
-using AdLocalAPI.Repositories;
 using AdLocalAPI.Utils;
 using Stripe;
-using Stripe.Checkout;
-using Supabase.Gotrue;
 
 namespace AdLocalAPI.Services
 {
     public class StripeService : IStripeService
     {
-
-        private readonly StripeSettings _stripeSettings;
-        private readonly UsuarioRepository _usuarioRepository;
-
-        public StripeService(StripeSettings stripeSettings, UsuarioRepository usuarioRepository)
+        public StripeService(StripeSettings settings)
         {
-            _stripeSettings = stripeSettings;
-            _usuarioRepository = usuarioRepository;
-
-            StripeConfiguration.ApiKey = _stripeSettings.SecretKey;
+            StripeConfiguration.ApiKey = settings.SecretKey;            
         }
 
-        public async Task<PaymentMethod> GetPaymentMethod(string id)
-        {
-            var service = new PaymentMethodService();
-            return await service.GetAsync(id);
-        }
-
-        public async Task AttachToCustomer(string pmId, string customerId)
-        {
-            var service = new PaymentMethodService();
-            await service.AttachAsync(pmId, new PaymentMethodAttachOptions
-            {
-                Customer = customerId
-            });
-        }
-
-        public async Task Detach(string pmId)
-        {
-            var service = new PaymentMethodService();
-            await service.DetachAsync(pmId);
-        }
-
-        public async Task SetDefault(string customerId, string pmId)
+        // =========================
+        // CUSTOMER
+        // =========================
+        public async Task<string> CreateCustomer(string email)
         {
             var service = new CustomerService();
-            await service.UpdateAsync(customerId, new CustomerUpdateOptions
+
+            var customer = await service.CreateAsync(new CustomerCreateOptions
             {
-                InvoiceSettings = new CustomerInvoiceSettingsOptions
-                {
-                    DefaultPaymentMethod = pmId
-                }
+                Email = email
             });
+
+            return customer.Id;
         }
 
-        public async Task<string?> CreateCustomer(string email)
+        // =========================
+        // PAYMENT METHODS
+        // =========================
+        public async Task<PaymentMethod> GetPaymentMethod(string paymentMethodId)
         {
-            try
-            {
-                var service = new CustomerService();
-
-                var customer = await service.CreateAsync(new CustomerCreateOptions
-                {
-                    Email = email
-                });
-
-                return customer.Id;
-            }
-            catch (StripeException ex)
-            {
-                Console.WriteLine($"Error al crear el cliente en Stripe: {ex.Message}");
-                return null; 
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error inesperado al crear el cliente: {ex.Message}");
-                return null;
-            }
+            return await new PaymentMethodService().GetAsync(paymentMethodId);
         }
 
-        public async Task<PaymentIntent> CreatePaymentIntent(Models.Plan plan, int usuarioId, string paymentMethodId)
+        public async Task AttachToCustomer(string paymentMethodId, string customerId)
         {
-            var usuario = await _usuarioRepository.GetByIdAsync(usuarioId);
-            if (string.IsNullOrEmpty(usuario.StripeCustomerId))
-            {
-                var customerService = new CustomerService();
-                var customer = await customerService.CreateAsync(new CustomerCreateOptions
+            await new PaymentMethodService().AttachAsync(
+                paymentMethodId,
+                new PaymentMethodAttachOptions
                 {
-                    Email = usuario.Email
-                });
-                usuario.StripeCustomerId = customer.Id;
-                await _usuarioRepository.UpdateAsync(usuario);
-            }
-
-            var options = new PaymentIntentCreateOptions
-            {
-                Amount = (long)(plan.Precio * 100),
-                Currency = "mxn",
-                Customer = usuario.StripeCustomerId,
-                PaymentMethod = paymentMethodId,
-                Confirm = true,
-                OffSession = true,
-                Metadata = new Dictionary<string, string>
-            {
-                { "usuarioId", usuarioId.ToString() },
-                { "planId", plan.Id.ToString() }
-            }
-            };
-
-            var service = new PaymentIntentService();
-            return await service.CreateAsync(options);
+                    Customer = customerId
+                }
+            );
         }
 
+        public async Task Detach(string paymentMethodId)
+        {
+            await new PaymentMethodService().DetachAsync(paymentMethodId);
+        }
+
+        public async Task SetDefaultPaymentMethod(string customerId, string paymentMethodId)
+        {
+            await new CustomerService().UpdateAsync(
+                customerId,
+                new CustomerUpdateOptions
+                {
+                    InvoiceSettings = new CustomerInvoiceSettingsOptions
+                    {
+                        DefaultPaymentMethod = paymentMethodId
+                    }
+                }
+            );
+        }
+
+        // =========================
+        // SUBSCRIPTIONS
+        // =========================
+        public async Task<Subscription> CreateSubscription(
+            string customerId,
+            string priceId,
+            string paymentMethodId
+        )
+        {
+
+            await AttachToCustomer(paymentMethodId, customerId);
 
 
+            await SetDefaultPaymentMethod(customerId, paymentMethodId);
+
+
+            var subscription = await new SubscriptionService().CreateAsync(
+                new SubscriptionCreateOptions
+                {
+                    Customer = customerId,
+                    Items = new()
+                    {
+                        new SubscriptionItemOptions
+                        {
+                            Price = priceId
+                        }
+                    },
+                    DefaultPaymentMethod = paymentMethodId,
+                    PaymentSettings = new SubscriptionPaymentSettingsOptions
+                    {
+                        SaveDefaultPaymentMethod = "on_subscription"
+                    },
+                    Expand = new List<string> { "latest_invoice.payment_intent" }
+                }
+            );
+
+            return subscription;
+        }
+
+        public async Task CancelSubscription(string subscriptionId, bool atPeriodEnd = true)
+        {
+            var service = new SubscriptionService();
+
+            if (atPeriodEnd)
+            {
+                await service.UpdateAsync(
+                    subscriptionId,
+                    new SubscriptionUpdateOptions
+                    {
+                        CancelAtPeriodEnd = true
+                    }
+                );
+            }
+            else
+            {
+                await service.CancelAsync(subscriptionId);
+            }
+        }
+
+        public async Task ChangePlan(
+            string subscriptionId,
+            string subscriptionItemId,
+            string newPriceId
+        )
+        {
+            await new SubscriptionService().UpdateAsync(
+                subscriptionId,
+                new SubscriptionUpdateOptions
+                {
+                    Items = new()
+                    {
+                        new SubscriptionItemOptions
+                        {
+                            Id = subscriptionItemId,
+                            Price = newPriceId
+                        }
+                    },
+                    ProrationBehavior = "create_prorations"
+                }
+            );
+        }
     }
 }

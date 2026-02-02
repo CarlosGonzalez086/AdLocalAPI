@@ -13,7 +13,7 @@ namespace AdLocalAPI.Repositories
             _context = context;
         }
 
-        // 🔹 Crear suscripción
+
 
         public async Task CrearAsync(Suscripcion suscripcion)
         {
@@ -22,14 +22,14 @@ namespace AdLocalAPI.Repositories
         }
 
 
-        // 🔹 Actualizar suscripción
+
         public async Task ActualizarAsync(Suscripcion suscripcion)
         {
             _context.Suscripcions.Update(suscripcion);
             await _context.SaveChangesAsync();
         }
 
-        // 🔹 Obtener suscripción activa por usuario
+
         public async Task<Suscripcion?> GetActivaByUsuario(int usuarioId)
         {
             return await _context.Suscripcions
@@ -37,9 +37,9 @@ namespace AdLocalAPI.Repositories
                 .Include(s => s.Usuario)
                 .FirstOrDefaultAsync(s =>
                     s.UsuarioId == usuarioId &&
-                    s.Activa &&
-                    s.Estado == "active" &&
-                    s.FechaFin >= DateTime.UtcNow
+                    s.IsActive &&
+                    (s.Status == "active" || s.Status == "canceling") &&
+                    s.CurrentPeriodEnd >= DateTime.UtcNow
                 );
         }
         public async Task<Suscripcion?> ObtenerActiva(int usuarioId)
@@ -48,9 +48,9 @@ namespace AdLocalAPI.Repositories
                 .Include(s => s.Plan)
                 .Where(s =>
                     s.UsuarioId == usuarioId &&
-                    s.Activa &&
-                    !s.Eliminada)
-                .OrderByDescending(s => s.FechaInicio)
+                    s.IsActive &&
+                    !s.IsDeleted)
+                .OrderByDescending(s => s.CurrentPeriodEnd)
                 .FirstOrDefaultAsync();
         }
         public async Task<Suscripcion?> ObtenerPorStripeId(string stripeSubscriptionId)
@@ -60,7 +60,7 @@ namespace AdLocalAPI.Repositories
                 .Include(s => s.Plan)
                 .FirstOrDefaultAsync(s =>
                     s.StripeSubscriptionId == stripeSubscriptionId &&
-                    !s.Eliminada);
+                    !s.IsDeleted);
         }
         public async Task<List<Suscripcion>> ObtenerHistorial(int usuarioId)
         {
@@ -68,8 +68,8 @@ namespace AdLocalAPI.Repositories
                 .Include(s => s.Plan)
                 .Where(s =>
                     s.UsuarioId == usuarioId &&
-                    !s.Eliminada)
-                .OrderByDescending(s => s.FechaInicio)
+                    !s.IsDeleted)
+                .OrderByDescending(s => s.CurrentPeriodEnd)
                 .ToListAsync();
         }
         public async Task EliminarAsync(int suscripcionId)
@@ -77,14 +77,14 @@ namespace AdLocalAPI.Repositories
             var sub = await _context.Suscripcions.FindAsync(suscripcionId);
             if (sub == null) return;
 
-            sub.Eliminada = true;
+            sub.IsDeleted = true;
             await _context.SaveChangesAsync();
         }
 
         public async Task<bool> ExistePorSessionAsync(string sessionId)
         {
             return await _context.Suscripcions
-                .AnyAsync(x => x.StripeSessionId == sessionId);
+                .AnyAsync(x => x.StripeCheckoutSessionId == sessionId);
         }
         public async Task<Suscripcion?> GetActivaByUsuarioAsync(long usuarioId)
         {
@@ -92,15 +92,37 @@ namespace AdLocalAPI.Repositories
                 .Include(s => s.Plan)
                 .Where(s =>
                     s.UsuarioId == usuarioId &&
-                    s.Activa &&
-                    !s.Eliminada &&
-                    s.Estado == "active" &&
-                    s.FechaInicio <= DateTime.UtcNow &&
-                    s.FechaFin >= DateTime.UtcNow
+                    !s.IsDeleted &&
+                    (
+                        (
+                            s.Status == "active" &&
+                            s.CurrentPeriodEnd >= DateTime.UtcNow
+                        )
+                        ||
+                        (
+                            s.Status == "canceling" &&
+                            s.CurrentPeriodEnd >= DateTime.UtcNow
+                        )
+                    )
                 )
-                .OrderByDescending(s => s.FechaInicio)
+                .OrderByDescending(s => s.CurrentPeriodEnd)
                 .FirstOrDefaultAsync();
+
         }
+        public async Task<List<Suscripcion>> ObtenerParaAutoRenovacionAsync(DateTime fecha)
+        {
+            return await _context.Suscripcions
+                .Include(s => s.Usuario)
+                .Include(s => s.Plan)
+                .Where(s =>
+                    s.IsActive &&
+                    s.AutoRenew &&
+                    s.CurrentPeriodEnd <= fecha &&
+                    s.Usuario.StripeCustomerId != null
+                )
+                .ToListAsync();
+        }
+
 
     }
 }

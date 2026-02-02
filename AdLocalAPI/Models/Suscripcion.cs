@@ -4,39 +4,62 @@ namespace AdLocalAPI.Models
 {
     public class Suscripcion
     {
+        [Key]
         public int Id { get; set; }
 
+        // =========================
         // Relaciones
+        // =========================
+        [Required]
         public long UsuarioId { get; set; }
-        public Usuario Usuario { get; set; }
+        public Usuario Usuario { get; set; } = null!;
 
+        [Required]
         public int PlanId { get; set; }
-        public Plan Plan { get; set; }
+        public Plan Plan { get; set; } = null!;
 
-        // Stripe
-        public string? StripeCustomerId { get; set; }
-        public string? StripeSubscriptionId { get; set; }
-        public string? StripePriceId { get; set; }
+        // =========================
+        // Stripe 
+        // =========================
+        [Required]
+        public string StripeCustomerId { get; set; } = null!;
 
-        // Pago
-        public decimal Monto { get; set; }
-        public string Moneda { get; set; } = "MXN";
-        public string MetodoPago { get; set; } = "stripe";
+        [Required]
+        public string StripeSubscriptionId { get; set; } = null!;
 
-        // Fechas
-        public DateTime FechaInicio { get; set; }
-        public DateTime FechaFin { get; set; }
-        public DateTime? FechaCancelacion { get; set; }
+        [Required]
+        public string StripePriceId { get; set; } = null!;
 
-        // Estado
-        public bool Activa { get; set; }
-        public string Estado { get; set; } // active, canceled, past_due
+        public string? StripeCheckoutSessionId { get; set; }
 
+        // =========================
+        // Estado Stripe
+        // active | past_due | unpaid | canceled | incomplete
+        // =========================
+        [Required]
+        [MaxLength(50)]
+        public string Status { get; set; } = "active";
+
+        // =========================
+        // Periodos (Stripe)
+        // Se llenan SOLO desde invoice.payment_succeeded
+        // =========================
+        public DateTime? CurrentPeriodStart { get; set; }
+        public DateTime? CurrentPeriodEnd { get; set; }
+
+        public DateTime? CanceledAt { get; set; }
+
+        // =========================
         // Control
-        public bool AutoRenovacion { get; set; } = true;
-        public bool Eliminada { get; set; } = false;
+        // =========================
+        public bool AutoRenew { get; set; } = true;
 
-        public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
-        public string? StripeSessionId { get; set; }
+        public bool IsActive { get; set; } = true;
+
+        public bool IsDeleted { get; set; } = false;
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        public DateTime? UpdatedAt { get; set; }
     }
 }

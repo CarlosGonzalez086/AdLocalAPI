@@ -119,9 +119,6 @@ namespace AdLocalAPI.Repositories
             }
             catch (Exception ex)
             {
-                // aquí puedes usar ILogger si lo tienes
-                // _logger.LogError(ex, "Error al subir imagen a Supabase");
-
                 throw new Exception("Error al subir la imagen a Supabase.", ex);
             }
         }

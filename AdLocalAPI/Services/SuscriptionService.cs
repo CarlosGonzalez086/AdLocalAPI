@@ -6,188 +6,137 @@ using Microsoft.EntityFrameworkCore;
 using Stripe;
 using Stripe.Checkout;
 
-public interface ISuscriptionService
+public class SuscriptionService : ISuscriptionServiceV1
 {
-    Task<ApiResponse<string>> ContratarConTarjetaGuardada(int planId, string StripePaymentMethodId, bool autoRenew);
-    Task<ApiResponse<string>> CrearSesionStripe(int planId);
-    Task<ApiResponse<string>> GenerarReferenciaTransferencia(int planId,string banco);
-
-    Task<AdLocalAPI.Models.Plan> ObtenerPlan(int planId);
-    Task<ApiResponse<string>> CancelarPlan();
-}
-
-public class SuscriptionService : ISuscriptionService
-{
-    private readonly ISuscriptionRepository _repo;
     private readonly AppDbContext _context;
     private readonly IConfiguration _config;
-    private readonly UsuarioRepository _usuarioRepository;
-    private readonly JwtContext _jwtContext;
+    private readonly UsuarioRepository _usuarioRepo;
+    private readonly JwtContext _jwt;
     private readonly IWebHostEnvironment _env;
 
-    public SuscriptionService(ISuscriptionRepository repo, AppDbContext context, IConfiguration config,JwtContext jwtContext, UsuarioRepository usuarioRepository,IWebHostEnvironment env)
+    public SuscriptionService(
+        AppDbContext context,
+        IConfiguration config,
+        JwtContext jwt,
+        UsuarioRepository usuarioRepo,
+        IWebHostEnvironment env)
     {
-        _repo = repo;
         _context = context;
         _config = config;
-        _jwtContext = jwtContext;
-        _usuarioRepository = usuarioRepository;
+        _jwt = jwt;
+        _usuarioRepo = usuarioRepo;
         _env = env;
-    }
-
-    public async Task<AdLocalAPI.Models.Plan?> ObtenerPlan(int planId)
-    {
-        return await _context.Plans.FirstOrDefaultAsync(p => p.Id == planId && p.Activo);
-    }
-
-    public async Task<ApiResponse<string>> ContratarConTarjetaGuardada(int planId, string StripePaymentMethodId, bool autoRenew)
-    {
-        var plan = await ObtenerPlan(planId);
-        if (plan == null) return ApiResponse<string>.Error("404", "Plan no encontrado");
 
         StripeConfiguration.ApiKey = _config["Stripe:SecretKey"];
-
-        try
-        {
-            int usuarioId = _jwtContext.GetUserId();
-
-            var usuario = await _usuarioRepository.GetByIdAsync(usuarioId);
-            if (usuario == null)
-                return ApiResponse<string>.Error("404", "Usuario no encontrado");
-
-            // Crear PaymentIntent
-            var paymentService = new PaymentIntentService();
-            var paymentIntent = await paymentService.CreateAsync(new PaymentIntentCreateOptions
-            {
-                Amount = (long)(plan.Precio * 100),
-                Currency = "mxn",
-                Customer = usuario.StripeCustomerId,
-                PaymentMethod = StripePaymentMethodId,
-                Metadata = new Dictionary<string, string>
-                {
-                    { "usuarioId", usuarioId.ToString() },
-                    { "planId", plan.Id.ToString() },
-                    { "plan_nombre", plan.Nombre },
-                    { "autoRenew", autoRenew ? "si" : "no" },
-                },
-
-                OffSession = true,
-                Confirm = true,
-                PaymentMethodTypes = new List<string> { "card" },                
-            });
-
-            return ApiResponse<string>.Success(paymentIntent.Id, "Pago exitoso con tarjeta guardada");
-        }
-        catch (StripeException ex)
-        {
-            return ApiResponse<string>.Error("400", ex.Message);
-        }
     }
 
-    public async Task<ApiResponse<string>> CrearSesionStripe(int planId)
-    {
-
-        var plan = await ObtenerPlan(planId);
-        if (plan == null) return ApiResponse<string>.Error("404", "Plan no encontrado");
-        int usuarioId = _jwtContext.GetUserId();
-
-        StripeConfiguration.ApiKey = _config["Stripe:SecretKey"];
-
-        var usuario = await _usuarioRepository.GetByIdAsync(usuarioId);
-        if (usuario == null)
-            return ApiResponse<string>.Error("404", "Usuario no encontrado");
-
-        if (string.IsNullOrEmpty(usuario.StripeCustomerId))
-        {
-            var customerService = new Stripe.CustomerService();
-            var customer = await customerService.CreateAsync(new Stripe.CustomerCreateOptions
-            {
-                Email = usuario.Email
-            });
-
-            usuario.StripeCustomerId = customer.Id;
-            await _usuarioRepository.UpdateAsync(usuario);
-        }
-
-        string SuccessUrl = _env.IsProduction() ? "https://ad-local-gamma.vercel.app/app/checkout/success" : "http://localhost:5173/app/checkout/success";
-        string CancelUrl = _env.IsProduction() ? "https://ad-local-gamma.vercel.app/app/checkout/cancel" : "http://localhost:5173/app/checkout/cancel";
-
-        var options = new SessionCreateOptions
-        {
-            Locale = "es", // 👈 fuerza español
-            PaymentMethodTypes = new List<string> { "card" },
-            Mode = "payment",
-            Customer = usuario.StripeCustomerId,
-            Metadata = new Dictionary<string, string>
-            {
-                { "usuarioId", usuarioId.ToString() },
-                { "planId", plan.Id.ToString() },
-                { "plan_nombre", plan.Nombre }
-            },
-            LineItems = new List<SessionLineItemOptions>
-            {
-                new SessionLineItemOptions
-                {
-                    PriceData = new SessionLineItemPriceDataOptions
-                    {
-                        UnitAmount = (long)(plan.Precio * 100),
-                        Currency = "mxn",
-                        ProductData = new SessionLineItemPriceDataProductDataOptions
-                        {
-                            Name = plan.Nombre
-                        }
-                    },
-                    Quantity = 1
-                }
-            },
-            SuccessUrl = SuccessUrl,
-            CancelUrl = CancelUrl,
-        };
-
-        var service = new SessionService();
-        var session = await service.CreateAsync(options);
-
-        return ApiResponse<string>.Success(session.Url!, "Sesión creada");
-    }
-
-    public async Task<ApiResponse<string>> GenerarReferenciaTransferencia(
+    // SUSCRIPCIÓN CON TARJETA
+    public async Task<ApiResponse<string>> SuscribirseConTarjeta(
         int planId,
-        string banco // "spei" | "oxxo"
-    )
+        string paymentMethodId,bool autoRenew)
     {
-        int usuarioId = _jwtContext.GetUserId();
+        var plan = await _context.Plans
+            .FirstOrDefaultAsync(p => p.Id == planId && p.Activo);
 
-        // 🔹 Obtener plan
-        var plan = await ObtenerPlan(planId);
         if (plan == null)
             return ApiResponse<string>.Error("404", "Plan no encontrado");
 
-        // 🔹 Obtener usuario
-        var usuario = await _usuarioRepository.GetByIdAsync(usuarioId);
+        var usuario = await _usuarioRepo.GetByIdAsync(_jwt.GetUserId());
         if (usuario == null)
             return ApiResponse<string>.Error("404", "Usuario no encontrado");
 
-        // 🔹 Validar método
-        if (banco != "spei" && banco != "oxxo")
-            return ApiResponse<string>.Error("400", "Método de pago no válido");
-
-        StripeConfiguration.ApiKey = _config["Stripe:SecretKey"];
-
-        // 🔹 Crear customer en Stripe si no existe
         if (string.IsNullOrEmpty(usuario.StripeCustomerId))
         {
-            var customerService = new CustomerService();
-            var customer = await customerService.CreateAsync(new CustomerCreateOptions
-            {
-                Email = usuario.Email,
-                Name = usuario.Nombre
-            });
+            var customer = await new CustomerService().CreateAsync(
+                new CustomerCreateOptions
+                {
+                    Email = usuario.Email,
+                    Name = usuario.Nombre
+                });
 
             usuario.StripeCustomerId = customer.Id;
-            await _usuarioRepository.UpdateAsync(usuario);
+            await _usuarioRepo.UpdateAsync(usuario);
         }
 
-        // 🔹 URLs
+
+        await new PaymentMethodService().AttachAsync(
+            paymentMethodId,
+            new PaymentMethodAttachOptions
+            {
+                Customer = usuario.StripeCustomerId
+            });
+
+
+        await new CustomerService().UpdateAsync(
+            usuario.StripeCustomerId,
+            new CustomerUpdateOptions
+            {
+                InvoiceSettings = new CustomerInvoiceSettingsOptions
+                {
+                    DefaultPaymentMethod = paymentMethodId
+                }
+            });
+
+
+        var options = new SubscriptionCreateOptions
+        {
+            Customer = usuario.StripeCustomerId,
+            Items = new()
+            {
+                new SubscriptionItemOptions
+                {
+                    Price = plan.StripePriceId
+                }
+            },
+            DefaultPaymentMethod = paymentMethodId,
+            PaymentSettings = new SubscriptionPaymentSettingsOptions
+            {
+                SaveDefaultPaymentMethod = "on_subscription"
+            },
+            ProrationBehavior = "none"
+        };
+
+        if (!autoRenew)
+        {
+
+            options.CancelAt = DateTime.UtcNow.AddDays(30);
+        }
+
+        var subscription = await new SubscriptionService().CreateAsync(options);
+
+
+
+        return ApiResponse<string>.Success(
+            subscription.Id,
+            "Suscripción creada correctamente"
+        );
+    }
+
+    // CHECKOUT (TARJETA NUEVA)
+    public async Task<ApiResponse<string>> CrearCheckoutSuscripcion(int planId)
+    {
+        var plan = await _context.Plans
+            .FirstOrDefaultAsync(p => p.Id == planId && p.Activo);
+
+        if (plan == null)
+            return ApiResponse<string>.Error("404", "Plan no encontrado");
+
+        var usuario = await _usuarioRepo.GetByIdAsync(_jwt.GetUserId());
+        if (usuario == null)
+            return ApiResponse<string>.Error("404", "Usuario no encontrado");
+
+        if (string.IsNullOrEmpty(usuario.StripeCustomerId))
+        {
+            var customer = await new CustomerService().CreateAsync(
+                new CustomerCreateOptions
+                {
+                    Email = usuario.Email
+                });
+
+            usuario.StripeCustomerId = customer.Id;
+            await _usuarioRepo.UpdateAsync(usuario);
+        }
+
         string successUrl = _env.IsProduction()
             ? "https://ad-local-gamma.vercel.app/app/checkout/success"
             : "http://localhost:5173/app/checkout/success";
@@ -196,105 +145,58 @@ public class SuscriptionService : ISuscriptionService
             ? "https://ad-local-gamma.vercel.app/app/checkout/cancel"
             : "http://localhost:5173/app/checkout/cancel";
 
-        // 🔹 Base de Checkout Session
-        var options = new SessionCreateOptions
-        {
-            Locale = "es", 
-            Mode = "payment",
-            Customer = usuario.StripeCustomerId,
-            SuccessUrl = successUrl,
-            CancelUrl = cancelUrl,
-            LineItems = new List<SessionLineItemOptions>
-        {
+        var session = await new SessionService().CreateAsync(
+            new SessionCreateOptions
+            {
+                Mode = "subscription",
+                Customer = usuario.StripeCustomerId,
+                PaymentMethodTypes = new() { "card" },
+                LineItems = new()
+                {
             new SessionLineItemOptions
             {
-                Quantity = 1,
-                PriceData = new SessionLineItemPriceDataOptions
-                {
-                    Currency = "mxn",
-                    UnitAmount = (long)(plan.Precio * 100),
-                    ProductData = new SessionLineItemPriceDataProductDataOptions
-                    {
-                        Name = plan.Nombre
-                    }
-                }
+                Price = plan.StripePriceId,
+                Quantity = 1
             }
-        },
-            Metadata = new Dictionary<string, string>
-        {
-            { "usuarioId", usuarioId.ToString() },
-            { "planId", planId.ToString() },
-            { "metodo", banco }
-        }
-        };
-
-        // ============================
-        // 🏦 SPEI (Transferencia)
-        // ============================
-        if (banco == "spei")
-        {
-            options.PaymentMethodTypes = new List<string>
-        {
-            "customer_balance"
-        };
-
-            options.PaymentMethodOptions = new SessionPaymentMethodOptionsOptions
-            {
-                CustomerBalance = new SessionPaymentMethodOptionsCustomerBalanceOptions
+                },
+                SuccessUrl = successUrl,
+                CancelUrl = cancelUrl,
+                Metadata = new()
                 {
-                    FundingType = "bank_transfer",
-                    BankTransfer = new SessionPaymentMethodOptionsCustomerBalanceBankTransferOptions
-                    {
-                        Type = "mx_bank_transfer"
-                    }
+                { "usuarioId", usuario.Id.ToString() },
+                { "planId", plan.Id.ToString() },
+                { "autoRenew", "false" }, 
+                { "days", "30" }         
                 }
-            };
-        }
+            });
 
-        // ============================
-        // 🧾 OXXO
-        // ============================
-        if (banco == "oxxo")
-        {
-            options.PaymentMethodTypes = new List<string>
-        {
-            "oxxo"
-        };
-        }
 
-        // 🔹 Crear sesión
-        var service = new SessionService();
-        var session = await service.CreateAsync(options);
 
-        return ApiResponse<string>.Success(
-            "ok",
-            session.Url // 👉 URL de Stripe Checkout
-        );
+        return ApiResponse<string>.Success(session.Url!, "Checkout creado");
     }
 
-
+    // CANCELAR PLAN
     public async Task<ApiResponse<string>> CancelarPlan()
     {
-        int usuarioId = _jwtContext.GetUserId();
+        var usuarioId = _jwt.GetUserId();
 
         var suscripcion = await _context.Suscripcions
-            .Where(s => s.UsuarioId == usuarioId && s.Activa)
-            .OrderByDescending(s => s.FechaFin)
+            .Where(s => s.UsuarioId == usuarioId && s.IsActive)
             .FirstOrDefaultAsync();
 
         if (suscripcion == null)
-            return ApiResponse<string>.Error("404", "No tienes una suscripción activa");
+            return ApiResponse<string>.Error("404", "No hay suscripción activa");
 
-        suscripcion.Estado = "cancelada";
-        suscripcion.Activa = false;
-        suscripcion.AutoRenovacion = false;
-        suscripcion.FechaCancelacion = DateTime.UtcNow;
-
-        await _repo.UpdateAsync(suscripcion);
+        await new SubscriptionService().UpdateAsync(
+            suscripcion.StripeSubscriptionId,
+            new SubscriptionUpdateOptions
+            {
+                CancelAtPeriodEnd = true
+            });
 
         return ApiResponse<string>.Success(
             "ok",
-            $"Tu plan seguirá activo hasta {suscripcion.FechaFin:dd/MM/yyyy}"
+            "La suscripción se cancelará al final del período"
         );
     }
 }

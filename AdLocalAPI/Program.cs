@@ -45,13 +45,6 @@ if (string.IsNullOrWhiteSpace(webhookSecret))
     throw new Exception("Stripe Webhook Secret no configurado");
 }
 
-// Stripe
-//var stripeSecret = Environment.GetEnvironmentVariable("STRIPE__SecretKey");
-//if (!string.IsNullOrEmpty(stripeSecret))
-//{
-//    StripeConfiguration.ApiKey = stripeSecret;
-//}
-
 var supabaseUrl = Environment.GetEnvironmentVariable("SUPABASE__URL")
     ?? "https://uzgnfwbztoizcctyfdiv.supabase.co";
 
@@ -97,7 +90,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         connectionString,
         npgsql =>
         {
-            npgsql.UseNetTopologySuite(); // ✅ se queda
+            npgsql.UseNetTopologySuite();
             npgsql.CommandTimeout(30);
             npgsql.ExecutionStrategy(deps =>
                 new NonRetryingExecutionStrategy(deps)
@@ -136,7 +129,6 @@ builder.Services.AddScoped<SuscripcionRepository>();
 builder.Services.AddScoped<SuscripcionService>();
 
 builder.Services.AddScoped<StripeService>();
-builder.Services.AddScoped<StripeServiceSub>();
 
 builder.Services.AddScoped<IConfiguracionService, ConfiguracionService>();
 builder.Services.AddScoped<IConfiguracionRepository, ConfiguracionRepository>();
@@ -152,25 +144,16 @@ builder.Services.AddScoped<CalificacionComentarioRepository>();
 builder.Services.AddScoped<CalificacionComentarioService>();
 
 builder.Services.Configure<EmailSettings>(
-    builder.Configuration.GetSection("EmailSettings"));
+builder.Configuration.GetSection("EmailSettings"));
 
 builder.Services.AddScoped<EmailService>();
-
-builder.Services.AddHostedService<SuscripcionBackgroundService>();
-builder.Services.AddScoped<SuscripcionServiceAuto>();
-
-builder.Services.AddHostedService<SuscripcionAutoRenewBackgroundService>();
-builder.Services.AddScoped<SuscripcionAutoRenewService>();
-
-builder.Services.AddHostedService<SuscripcionUsersBackgroundService>();
-builder.Services.AddScoped<SuscripcionUsersServiceAuto>();
 
 builder.Services.AddScoped<ComercioVisitaService>();
 builder.Services.AddScoped<ComercioVisitaRepository>();
 
 builder.Services.AddScoped<UsoCodigoReferidoRepository>();
 
-builder.Services.AddScoped<ISuscriptionService, SuscriptionService>();
+builder.Services.AddScoped<ISuscriptionServiceV1, SuscriptionService>();
 builder.Services.AddScoped<ISuscriptionRepository, SuscriptionRepository>();
 
 
@@ -224,8 +207,6 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-
-//Asignacion de la variable singleton
 
 using (var scope = app.Services.CreateScope())
 {

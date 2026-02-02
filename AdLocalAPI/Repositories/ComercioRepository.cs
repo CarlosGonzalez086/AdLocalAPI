@@ -37,15 +37,15 @@ namespace AdLocalAPI.Repositories
 
             var suscripcionesVigentes = _context.Suscripcions
                 .Where(s =>
-                    s.Activa &&
-                    !s.Eliminada &&
-                    s.FechaFin > hoy &&
-                    (s.Plan.Tipo == "PRO" || s.Plan.Tipo == "BUSINESS")
+                    s.IsActive &&
+                    !s.IsDeleted &&
+                    s.CurrentPeriodEnd > hoy &&
+                    (s.Plan.Tipo == "BASIC" || s.Plan.Tipo == "PRO" || s.Plan.Tipo == "BUSINESS")
                 )
                 .Select(s => new
                 {
                     s.UsuarioId,
-                    s.FechaFin,
+                    s.CurrentPeriodEnd,
                     s.Plan.MaxNegocios,
                     s.Plan.BadgeTexto,
                     s.Plan.NivelVisibilidad,
@@ -54,7 +54,7 @@ namespace AdLocalAPI.Repositories
                 .AsEnumerable()
                 .GroupBy(s => s.UsuarioId)
                 .Select(g => g
-                    .OrderByDescending(x => x.FechaFin)
+                    .OrderByDescending(x => x.CurrentPeriodEnd)
                     .First()
                 )
                 .ToList();
@@ -127,7 +127,7 @@ namespace AdLocalAPI.Repositories
             }
 
 
-            var lista =  query
+            var lista = query
                 .Select(x => new ComercioPublicDto
                 {
                     Id = x.Comercio.Id,
@@ -139,33 +139,68 @@ namespace AdLocalAPI.Repositories
                     Lat = x.Comercio.Ubicacion!.Y,
                     Lng = x.Comercio.Ubicacion!.X,
                     ColorPrimario = x.Comercio.ColorPrimario,
-                    ColorSecundario = x.Comercio.ColorSecundario,                    
+                    ColorSecundario = x.Comercio.ColorSecundario,
+
                     Badge = x.Suscripcion != null
                         ? x.Suscripcion.BadgeTexto ?? ""
                         : "",
 
+                    PlanTipo = x.Suscripcion?.Tipo,
+                    SuscripcionVigente = x.Suscripcion != null,
+
                     EstadoNombre = x.Comercio.Estado.EstadoNombre ?? "",
                     MunicipioNombre = x.Comercio.Municipio.MunicipioNombre ?? "",
-                    PromedioCalificacion = x.Comercio.CalificacionesComentarios.Any()
-                                            ? x.Comercio.CalificacionesComentarios.Sum(cc => cc.Calificacion)
-                                              / (double)x.Comercio.CalificacionesComentarios.Count()
-                                            : 0,
-                    DistanciaKm = tipo == "cercanos"
-            ? Math.Round(
-                x.Comercio.Ubicacion.Distance(userLocation) * 111.32,
-                2
-              )
-            : null,
 
+                    PromedioCalificacion = x.Comercio.CalificacionesComentarios.Any()
+                        ? x.Comercio.CalificacionesComentarios.Sum(cc => cc.Calificacion)
+                          / (double)x.Comercio.CalificacionesComentarios.Count()
+                        : 0,
+
+                    DistanciaKm = tipo == "cercanos"
+                        ? Math.Round(
+                            x.Comercio.Ubicacion.Distance(userLocation) * 111.32,
+                            2
+                          )
+                        : null,
+
+                    FechaCreacion = x.Comercio.FechaCreacion,
                     IdUsuario = x.Comercio.IdUsuario
-                }).ToList();       
+                })
+                .ToList();
+
 
             return lista
                 .GroupBy(c => c.IdUsuario)
                 .SelectMany(g =>
                 {
-                    var max = g.Any(x => x.Badge != "") ? 3 : 1;
-                    return g.OrderBy(c => c.FechaCreacion).Take(max);
+                    var tieneSuscripcion = g.Any(x => x.SuscripcionVigente);
+
+                    int max = 1;
+
+                    if (tieneSuscripcion)
+                    {
+                        var tipoPlan = g.First(x => x.SuscripcionVigente).PlanTipo;
+
+                        max = tipoPlan switch
+                        {
+                            "BUSINESS" => 3,
+                            "PRO" => 2,
+                            _ => 1
+                        };
+                    }
+
+                    IEnumerable<ComercioPublicDto> ordenado = tipo switch
+                    {
+                        "recientes" => g.OrderByDescending(c => c.FechaCreacion),
+                        "cercanos" => g.OrderBy(c => c.DistanciaKm),
+                        _ => g.OrderBy(c => c.FechaCreacion)
+                    };
+
+
+                    if (!tieneSuscripcion)
+                        ordenado = g.OrderBy(c => c.FechaCreacion);
+
+                    return ordenado.Take(max);
                 })
                 .Select(c =>
                 {
@@ -173,6 +208,7 @@ namespace AdLocalAPI.Repositories
                     return c;
                 })
                 .ToList();
+
 
         }
 
@@ -348,8 +384,8 @@ namespace AdLocalAPI.Repositories
             var badge = await _context.Suscripcions
                 .Where(s =>
                     s.UsuarioId == idUser &&
-                    s.Activa &&
-                    !s.Eliminada &&
+                    s.IsActive &&
+                    !s.IsDeleted &&
                     s.Plan.TieneBadge
                 )
                 .Select(s => s.Plan.BadgeTexto)

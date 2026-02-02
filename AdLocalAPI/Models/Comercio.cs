@@ -26,14 +26,14 @@ namespace AdLocalAPI.Models
         [MaxLength(7)]
         public string? ColorSecundario { get; set; }
 
-        // 🔹 NUEVOS CAMPOS
+
         [Required]
         public int EstadoId { get; set; }
 
         [Required]
         public int MunicipioId { get; set; }
 
-        // 🔹 Navegación
+
         [ForeignKey(nameof(EstadoId))]
         public Estado Estado { get; set; }
 
@@ -42,7 +42,7 @@ namespace AdLocalAPI.Models
 
         public bool Activo { get; set; } = true;
         public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
-        // 🔹 Relación con calificaciones
+
         public ICollection<CalificacionComentario> CalificacionesComentarios { get; set; } = new List<CalificacionComentario>();
         public Usuario Usuario { get; set; }
     }

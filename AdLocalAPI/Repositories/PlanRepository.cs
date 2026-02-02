@@ -145,5 +145,15 @@ namespace AdLocalAPI.Repositories
                 );
         }
 
+        public async Task<Plan> GetByStripePriceIdAsync(string priceId)
+        {
+            return await _context.Plans
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p =>
+                    p.StripePriceId == priceId &&
+                    p.Activo
+                );
+        }
+
     }
 }

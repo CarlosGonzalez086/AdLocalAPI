@@ -21,11 +21,11 @@ namespace AdLocalAPI.Repositories
             long usuarioReferidoId,
             string codigoReferido)
         {
-            // No permitir auto-referido
+        
             if (usuarioReferidorId == usuarioReferidoId)
                 return false;
 
-            // El usuario referido no puede usar código 2 veces
+
             bool yaUsoCodigo = await _context.UsoCodigoReferido
                 .AnyAsync(x => x.UsuarioReferidoId == usuarioReferidoId);
 

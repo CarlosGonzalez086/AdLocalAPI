@@ -8,6 +8,9 @@ namespace AdLocalAPI.Models
 
         [Required]
         public string Nombre { get; set; } // Free, Básico, Pro, Business
+        [Required]
+        [MaxLength(100)]
+        public string StripePriceId { get; set; } = null!;
 
         [Required]
         public decimal Precio { get; set; } // 0 para Free
