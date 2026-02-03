@@ -1,14 +1,13 @@
 ﻿using AdLocalAPI.Interfaces;
-using AdLocalAPI.Utils;
 using Stripe;
 
 namespace AdLocalAPI.Services
 {
     public class StripeService : IStripeService
     {
-        public StripeService(StripeSettings settings)
+        // ❌ NO constructor con keys
+        public StripeService()
         {
-            StripeConfiguration.ApiKey = settings.SecretKey;            
         }
 
         // =========================
@@ -73,12 +72,8 @@ namespace AdLocalAPI.Services
             string paymentMethodId
         )
         {
-
             await AttachToCustomer(paymentMethodId, customerId);
-
-
             await SetDefaultPaymentMethod(customerId, paymentMethodId);
-
 
             var subscription = await new SubscriptionService().CreateAsync(
                 new SubscriptionCreateOptions
@@ -96,7 +91,10 @@ namespace AdLocalAPI.Services
                     {
                         SaveDefaultPaymentMethod = "on_subscription"
                     },
-                    Expand = new List<string> { "latest_invoice.payment_intent" }
+                    Expand = new List<string>
+                    {
+                        "latest_invoice.payment_intent"
+                    }
                 }
             );
 
@@ -145,18 +143,23 @@ namespace AdLocalAPI.Services
                 }
             );
         }
+
+        // =========================
+        // SETUP INTENT
+        // =========================
         public async Task<string> CrearSetupIntent(string stripeCustomerId)
         {
             var service = new SetupIntentService();
 
-            var setupIntent = await service.CreateAsync(new SetupIntentCreateOptions
-            {
-                Customer = stripeCustomerId,
-                PaymentMethodTypes = new List<string> { "card" }
-            });
+            var setupIntent = await service.CreateAsync(
+                new SetupIntentCreateOptions
+                {
+                    Customer = stripeCustomerId,
+                    PaymentMethodTypes = new List<string> { "card" }
+                }
+            );
 
             return setupIntent.ClientSecret;
         }
-
     }
 }

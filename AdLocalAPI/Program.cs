@@ -143,6 +143,8 @@ builder.Services.AddScoped<ILocationService, LocationService>();
 builder.Services.AddScoped<CalificacionComentarioRepository>();
 builder.Services.AddScoped<CalificacionComentarioService>();
 
+builder.Services.AddSingleton<StripeConfigProvider>();
+
 builder.Services.Configure<EmailSettings>(
 builder.Configuration.GetSection("EmailSettings"));
 
@@ -219,6 +221,24 @@ using (var scope = app.Services.CreateScope())
         .FirstOrDefaultAsync();
 
     stripeSettings.Inicializar(secretKey ?? "sk_test_default_value");
+}
+
+using (var scope = app.Services.CreateScope())
+{
+    var repo = scope.ServiceProvider
+        .GetRequiredService<IConfiguracionRepository>();
+
+    var provider = scope.ServiceProvider
+        .GetRequiredService<StripeConfigProvider>();
+
+    var configs = await repo.ObtenerTodosAsync();
+
+    provider.Load(configs);
+
+    Stripe.StripeConfiguration.ApiKey = provider.SecretKey;
+
+    Console.WriteLine("Stripe loaded from DB: " +
+        (provider.SecretKey.StartsWith("sk_live") ? "LIVE" : "TEST"));
 }
 
 app.UseForwardedHeaders(new ForwardedHeadersOptions

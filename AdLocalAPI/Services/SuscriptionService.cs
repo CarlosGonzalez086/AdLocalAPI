@@ -9,31 +9,29 @@ using Stripe.Checkout;
 public class SuscriptionService : ISuscriptionServiceV1
 {
     private readonly AppDbContext _context;
-    private readonly IConfiguration _config;
     private readonly UsuarioRepository _usuarioRepo;
     private readonly JwtContext _jwt;
     private readonly IWebHostEnvironment _env;
 
     public SuscriptionService(
         AppDbContext context,
-        IConfiguration config,
         JwtContext jwt,
         UsuarioRepository usuarioRepo,
         IWebHostEnvironment env)
     {
         _context = context;
-        _config = config;
         _jwt = jwt;
         _usuarioRepo = usuarioRepo;
         _env = env;
-
-        StripeConfiguration.ApiKey = _config["Stripe:SecretKey"];
     }
 
+    // =========================
     // SUSCRIPCIÓN CON TARJETA
+    // =========================
     public async Task<ApiResponse<string>> SuscribirseConTarjeta(
         int planId,
-        string paymentMethodId,bool autoRenew)
+        string paymentMethodId,
+        bool autoRenew)
     {
         var plan = await _context.Plans
             .FirstOrDefaultAsync(p => p.Id == planId && p.Activo);
@@ -58,14 +56,12 @@ public class SuscriptionService : ISuscriptionServiceV1
             await _usuarioRepo.UpdateAsync(usuario);
         }
 
-
         await new PaymentMethodService().AttachAsync(
             paymentMethodId,
             new PaymentMethodAttachOptions
             {
                 Customer = usuario.StripeCustomerId
             });
-
 
         await new CustomerService().UpdateAsync(
             usuario.StripeCustomerId,
@@ -76,7 +72,6 @@ public class SuscriptionService : ISuscriptionServiceV1
                     DefaultPaymentMethod = paymentMethodId
                 }
             });
-
 
         var options = new SubscriptionCreateOptions
         {
@@ -97,14 +92,9 @@ public class SuscriptionService : ISuscriptionServiceV1
         };
 
         if (!autoRenew)
-        {
-
             options.CancelAt = DateTime.UtcNow.AddDays(30);
-        }
 
         var subscription = await new SubscriptionService().CreateAsync(options);
-
-
 
         return ApiResponse<string>.Success(
             subscription.Id,
@@ -112,7 +102,9 @@ public class SuscriptionService : ISuscriptionServiceV1
         );
     }
 
+    // =========================
     // CHECKOUT (TARJETA NUEVA)
+    // =========================
     public async Task<ApiResponse<string>> CrearCheckoutSuscripcion(int planId)
     {
         var plan = await _context.Plans
@@ -153,36 +145,35 @@ public class SuscriptionService : ISuscriptionServiceV1
                 PaymentMethodTypes = new() { "card" },
                 LineItems = new()
                 {
-            new SessionLineItemOptions
-            {
-                Price = plan.StripePriceId,
-                Quantity = 1
-            }
+                    new SessionLineItemOptions
+                    {
+                        Price = plan.StripePriceId,
+                        Quantity = 1
+                    }
                 },
                 SuccessUrl = successUrl,
                 CancelUrl = cancelUrl,
                 Metadata = new()
                 {
-                { "usuarioId", usuario.Id.ToString() },
-                { "planId", plan.Id.ToString() },
-                { "autoRenew", "false" }, 
-                { "days", "30" }         
+                    { "usuarioId", usuario.Id.ToString() },
+                    { "planId", plan.Id.ToString() },
+                    { "autoRenew", "false" },
+                    { "days", "30" }
                 }
             });
-
-
 
         return ApiResponse<string>.Success(session.Url!, "Checkout creado");
     }
 
+    // =========================
     // CANCELAR PLAN
+    // =========================
     public async Task<ApiResponse<string>> CancelarPlan()
     {
         var usuarioId = _jwt.GetUserId();
 
         var suscripcion = await _context.Suscripcions
-            .Where(s => s.UsuarioId == usuarioId && s.IsActive)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultAsync(s => s.UsuarioId == usuarioId && s.IsActive);
 
         if (suscripcion == null)
             return ApiResponse<string>.Error("404", "No hay suscripción activa");
