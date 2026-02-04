@@ -154,6 +154,7 @@ builder.Services.AddScoped<ComercioVisitaService>();
 builder.Services.AddScoped<ComercioVisitaRepository>();
 
 builder.Services.AddScoped<UsoCodigoReferidoRepository>();
+builder.Services.AddScoped<UsoCodigoReferidoService>();
 
 builder.Services.AddScoped<ISuscriptionServiceV1, SuscriptionService>();
 builder.Services.AddScoped<ISuscriptionRepository, SuscriptionRepository>();
