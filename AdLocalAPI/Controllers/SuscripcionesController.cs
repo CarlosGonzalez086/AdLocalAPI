@@ -20,5 +20,20 @@ public class SuscripcionesController : ControllerBase
         var response = await _service.ObtenerMiSuscripcion();
         return response.Codigo == "200" ? Ok(response) : BadRequest(response);
     }
+    [HttpGet]
+    public async Task<IActionResult> GetAll(
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 10)
+    {
+        var response = await _service.ObtenerTodasAsync(page, pageSize);
+        return Ok(response);
+    }
+    [HttpGet("suscripciones-stats")]
+    public async Task<IActionResult> SuscripcionesStats()
+    {
+        var response = await _service.ObtenerStatsSuscripciones();
+        return Ok(response);
+    }
+
 
 }

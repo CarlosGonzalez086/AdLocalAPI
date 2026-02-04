@@ -29,5 +29,6 @@ namespace AdLocalAPI.Models
         [MaxLength(50)]
         public string? CodigoReferido { get; set; }
         public ICollection<Comercio> Comercios { get; set; } = new List<Comercio>();
+        public Suscripcion? Suscripcion { get; set; }
     }
 }
