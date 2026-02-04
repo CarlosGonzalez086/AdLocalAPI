@@ -72,5 +72,24 @@ namespace AdLocalAPI.Repositories
                 .OrderByDescending(x => x.FechaUso)
                 .ToListAsync();
         }
+        public async Task<int> ContarPorReferidorAsync(long usuarioReferidorId)
+        {
+            return await _context.UsoCodigoReferido
+                .Where(x => x.UsuarioReferidorId == usuarioReferidorId)
+                .CountAsync();
+        }
+
+        public async Task<int> ContarPorCodigoAsync(string codigoReferido)
+        {
+            return await _context.UsoCodigoReferido
+                .Where(x => x.CodigoReferido == codigoReferido)
+                .CountAsync();
+        }
+
+        public async Task<int> ContarTotalAsync()
+        {
+            return await _context.UsoCodigoReferido.CountAsync();
+        }
+
     }
 }
