@@ -12,10 +12,6 @@ namespace AdLocalAPI.Repositories
         {
             _context = context;
         }
-
-        /// <summary>
-        /// Inserta el uso de un código referido
-        /// </summary>
         public async Task<bool> InsertarAsync(
             long usuarioReferidorId,
             long usuarioReferidoId,
@@ -45,10 +41,6 @@ namespace AdLocalAPI.Repositories
 
             return true;
         }
-
-        /// <summary>
-        /// Elimina un uso de código por Id
-        /// </summary>
         public async Task<bool> EliminarAsync(long id)
         {
             var uso = await _context.UsoCodigoReferido
@@ -62,10 +54,6 @@ namespace AdLocalAPI.Repositories
 
             return true;
         }
-
-        /// <summary>
-        /// Obtiene la lista de usos por el usuario que dio el código
-        /// </summary>
         public async Task<List<UsoCodigoReferido>> ObtenerPorReferidorAsync(long usuarioReferidorId)
         {
             return await _context.UsoCodigoReferido
@@ -73,19 +61,11 @@ namespace AdLocalAPI.Repositories
                 .OrderByDescending(x => x.FechaUso)
                 .ToListAsync();
         }
-
-        /// <summary>
-        /// Obtiene un uso específico por usuario referido
-        /// </summary>
         public async Task<UsoCodigoReferido?> ObtenerPorUsuarioReferidoAsync(long usuarioReferidoId)
         {
             return await _context.UsoCodigoReferido
                 .FirstOrDefaultAsync(x => x.UsuarioReferidoId == usuarioReferidoId);
         }
-        /// <summary>
-        /// Obtiene todos los usos de códigos referidos
-        /// (admin / reportes / estadísticas)
-        /// </summary>
         public async Task<List<UsoCodigoReferido>> ObtenerTodosAsync()
         {
             return await _context.UsoCodigoReferido

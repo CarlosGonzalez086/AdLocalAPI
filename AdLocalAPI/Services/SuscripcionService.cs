@@ -73,5 +73,52 @@ namespace AdLocalAPI.Services
                 }
             );
         }
+        public async Task<ApiResponse<object>> ObtenerTodasAsync(
+    int page,
+    int pageSize)
+        {
+            var (total, suscripciones) =
+                await _suscripcionRepository.ObtenerTodasAsync(page, pageSize);
+
+            var data = suscripciones.Select(s => new SuscripcionListadoDto
+            {
+                Id = s.Id,
+                Estado = s.Status,
+                FechaInicio = s.CurrentPeriodStart,
+                FechaFin = s.CurrentPeriodEnd,
+                AutoRenew = s.AutoRenew,
+
+                UsuarioNombre = s.Usuario.Nombre,
+                UsuarioEmail = s.Usuario.Email,
+
+                PlanNombre = s.Plan.Nombre,
+                PlanTipo = s.Plan.Tipo,
+                Precio = s.Plan.Precio
+            }).ToList();
+
+            return ApiResponse<object>.Success(new
+            {
+                totalRecords = total,
+                page,
+                pageSize,
+                data
+            });
+        }
+        public async Task<ApiResponse<SuscripcionDashboardDto>> ObtenerStatsSuscripciones()
+        {
+            var porPlan = await _suscripcionRepository.ObtenerConteoPorPlan();
+            var ultimaSemana = await _suscripcionRepository.SuscripcionesUltimaSemana();
+            var ultimosTresMeses = await _suscripcionRepository.SuscripcionesUltimosTresMeses();
+
+            return ApiResponse<SuscripcionDashboardDto>.Success(
+                new SuscripcionDashboardDto
+                {
+                    PorPlan = porPlan,
+                    UltimaSemana = ultimaSemana,
+                    UltimosTresMeses = ultimosTresMeses
+                }
+            );
+        }
+
     }
 }

@@ -1,4 +1,5 @@
 ﻿using AdLocalAPI.Data;
+using AdLocalAPI.DTOs;
 using AdLocalAPI.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -122,6 +123,57 @@ namespace AdLocalAPI.Repositories
                 )
                 .ToListAsync();
         }
+        public async Task<(int total, List<Suscripcion> data)> ObtenerTodasAsync(
+    int page,
+    int pageSize)
+        {
+            var query = _context.Suscripcions
+                .Include(s => s.Usuario)
+                .Include(s => s.Plan)
+                .Where(s => !s.IsDeleted);
+
+            var total = await query.CountAsync();
+
+            var data = await query
+                .OrderByDescending(s => s.CurrentPeriodEnd ?? s.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return (total, data);
+        }
+        public async Task<List<SuscripcionPorPlanDto>> ObtenerConteoPorPlan()
+        {
+            return await _context.Suscripcions
+                .Where(s => !s.IsDeleted)
+                .GroupBy(s => new { s.Plan.Nombre, s.Plan.Tipo })
+                .Select(g => new SuscripcionPorPlanDto
+                {
+                    Plan = g.Key.Nombre,
+                    Tipo = g.Key.Tipo,
+                    Total = g.Count()
+                })
+                .OrderByDescending(x => x.Total)
+                .ToListAsync();
+        }
+        public async Task<int> SuscripcionesUltimaSemana()
+        {
+            var desde = DateTime.UtcNow.AddDays(-7);
+
+            return await _context.Suscripcions
+                .Where(s => !s.IsDeleted && s.CreatedAt >= desde && s.Plan.Tipo != "FREE")
+                .CountAsync();
+        }
+        public async Task<int> SuscripcionesUltimosTresMeses()
+        {
+            var desde = DateTime.UtcNow.AddMonths(-3);
+
+            return await _context.Suscripcions
+                .Where(s => !s.IsDeleted && s.CreatedAt >= desde && s.Plan.Tipo != "FREE")
+                .CountAsync();
+        }
+
+
 
 
     }

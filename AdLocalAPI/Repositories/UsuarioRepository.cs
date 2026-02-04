@@ -30,34 +30,81 @@ namespace AdLocalAPI.Repositories
                 .FirstOrDefaultAsync(u => u.Email == correo);
         }
 
-        public async Task<object> GetAllAsync(int page,
+        public async Task<object> GetAllAsync(
+            int page,
             int pageSize,
             string orderBy,
             string search)
         {
-            var query = _context.Usuarios.AsQueryable();
+            var now = DateTime.UtcNow;
 
+            // 1️⃣ Query base (SOLO filtros)
+            IQueryable<Usuario> baseQuery = _context.Usuarios
+                .AsNoTracking() // 🔑 IMPORTANTE para evitar tracking innecesario
+                .Where(u => u.Rol == "Comercio")
+                .Where(u =>
+                    u.Suscripcion != null &&
+                    !u.Suscripcion.IsDeleted &&
+                    u.Suscripcion.IsActive &&
+                    (u.Suscripcion.Status == "active" ||
+                     u.Suscripcion.Status == "canceling") &&
+                    u.Suscripcion.CurrentPeriodEnd != null &&
+                    u.Suscripcion.CurrentPeriodEnd >= now
+                );
 
+            // 2️⃣ Búsqueda
             if (!string.IsNullOrWhiteSpace(search))
             {
-                query = query.Where(p =>
-                    EF.Functions.ILike(p.Nombre, $"%{search}%")
+                baseQuery = baseQuery.Where(u =>
+                    EF.Functions.ILike(u.Nombre, $"%{search}%") ||
+                    EF.Functions.ILike(u.Email, $"%{search}%")
                 );
             }
 
-            query = query.Where(p => p.Rol == "Comercio");
+            // 3️⃣ TOTAL (NO se traba)
+            var totalRecords = await baseQuery.CountAsync();
+
+            // 4️⃣ Proyección (usuario + su suscripción activa)
+            var query = baseQuery.Select(u => new
+            {
+                Usuario = new
+                {
+                    u.Id,
+                    u.Nombre,
+                    u.Email,
+                    u.FechaCreacion,
+                    u.FotoUrl,
+                },
+                Suscripcion = new
+                {
+                    u.Suscripcion!.Id,
+                    u.Suscripcion.Status,
+                    u.Suscripcion.CurrentPeriodStart,
+                    u.Suscripcion.CurrentPeriodEnd,
+                    u.Suscripcion.AutoRenew,
+                    Plan = new
+                    {
+                        u.Suscripcion.Plan.Id,
+                        u.Suscripcion.Plan.Nombre,
+                        u.Suscripcion.Plan.Tipo,
+                        u.Suscripcion.Plan.Precio,
+                        u.Suscripcion.Plan.MaxFotos
+                    }
+                }
+            });
+
+            // 5️⃣ Orden
             query = orderBy switch
             {
-                "recent" => query.OrderByDescending(p => p.FechaCreacion),
-                "old" => query.OrderBy(p => p.FechaCreacion),
-                "az" => query.OrderBy(p => p.Nombre),
-                "za" => query.OrderByDescending(p => p.Nombre),
-                _ => query.OrderByDescending(p => p.FechaCreacion)
+                "recent" => query.OrderByDescending(x => x.Usuario.FechaCreacion),
+                "old" => query.OrderBy(x => x.Usuario.FechaCreacion),
+                "az" => query.OrderBy(x => x.Usuario.Nombre),
+                "za" => query.OrderByDescending(x => x.Usuario.Nombre),
+                _ => query.OrderByDescending(x => x.Usuario.FechaCreacion)
             };
 
-            var totalRecords = await query.CountAsync();
-
-            var plans = await query
+            // 6️⃣ Paginación
+            var data = await query
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
@@ -67,9 +114,12 @@ namespace AdLocalAPI.Repositories
                 totalRecords,
                 page,
                 pageSize,
-                data = plans
+                data
             };
         }
+
+
+
 
         public async Task<Usuario?> GetByIdAsync(long id)
         {

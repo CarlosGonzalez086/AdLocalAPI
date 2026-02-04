@@ -460,7 +460,6 @@ namespace AdLocalAPI.Services
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
-
         public async Task<UpdateJwtResult> ActualizarJwtAsync(string email, bool updateJWT)
         {
             var usuario = await _repository.GetByCorreoAsync(email);
