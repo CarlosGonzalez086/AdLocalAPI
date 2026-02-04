@@ -57,15 +57,34 @@ namespace AdLocalAPI.Services
             string tipo,
             double lat,
             double lng,
-            string municipio
+            string municipio,
+            int page,
+            int pageSize
         )
         {
             try
             {
-                var comercios = await _repository.GetAllAsync(tipo, lat, lng,municipio);
+                if (page < 1) page = 1;
+                if (pageSize < 1) pageSize = 10;
+                if (pageSize > 50) pageSize = 50;
+
+                var (comercios, total) = await _repository.GetAllAsync(
+                    tipo,
+                    lat,
+                    lng,
+                    municipio,
+                    page,
+                    pageSize
+                );
 
                 return ApiResponse<object>.Success(
-                    comercios,
+                    new
+                    {
+                        items = comercios,
+                        total,
+                        page,
+                        pageSize
+                    },
                     "Listado de comercios obtenido correctamente"
                 );
             }
@@ -78,6 +97,7 @@ namespace AdLocalAPI.Services
                 return ApiResponse<object>.Error("500", ex.Message);
             }
         }
+
         public async Task<ApiResponse<ComercioMineDto>> GetComercioById(long id)
         {
             try
@@ -778,14 +798,32 @@ namespace AdLocalAPI.Services
                 );
             }
         }
-        public async Task<ApiResponse<object>> GetByFiltros(int estadoId, int municipioId, string orden)
+        public async Task<ApiResponse<object>> GetByFiltros(
+            int estadoId,
+            int municipioId,
+            string orden,
+            int page,
+            int pageSize
+        )
         {
             try
             {
-                var comercios = await _repository.GetByFiltros(estadoId, municipioId, orden);
+                var (items, total) = await _repository.GetByFiltros(
+                    estadoId,
+                    municipioId,
+                    orden,
+                    page,
+                    pageSize
+                );
 
                 return ApiResponse<object>.Success(
-                    comercios,
+                    new
+                    {
+                        items,
+                        total,
+                        page,
+                        pageSize
+                    },
                     "Listado de comercios obtenido correctamente"
                 );
             }
@@ -798,6 +836,7 @@ namespace AdLocalAPI.Services
                 return ApiResponse<object>.Error("500", ex.Message);
             }
         }
+
         public async Task<ApiResponse<PagedResponse<ComercioPublicDto>>> GetAllComerciosByUserPaged(
             int page = 1,
             int pageSize = 10

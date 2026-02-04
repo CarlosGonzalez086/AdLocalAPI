@@ -58,27 +58,54 @@ namespace AdLocalAPI.Controllers
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
         [HttpGet]
+        [HttpGet]
         public async Task<IActionResult> GetAll(
-            [FromQuery] string tipo = "populares",
-            [FromQuery] double lat = 0,
-            [FromQuery] double lng = 0,
-            [FromQuery] string municipio = ""
-        )
+    [FromQuery] string tipo = "populares",
+    [FromQuery] double lat = 0,
+    [FromQuery] double lng = 0,
+    [FromQuery] string municipio = "",
+    [FromQuery] int page = 1,
+    [FromQuery] int pageSize = 10
+)
         {
-            var response = await _service.GetAllComercios(tipo, lat, lng, municipio);
-            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+
+            var response = await _service.GetAllComercios(
+                tipo,
+                lat,
+                lng,
+                municipio,
+                page,
+                pageSize
+            );
+
+            return response.Codigo == "200"
+                ? Ok(response)
+                : BadRequest(response);
         }
+
 
         [HttpGet("por-filtros")]
         public async Task<IActionResult> GetByFiltros(
             [FromQuery] int estadoId = 0,
             [FromQuery] int municipioId = 0,
-            [FromQuery] string orden = "alfabetico"
+            [FromQuery] string orden = "alfabetico",
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 8
         )
         {
-            var response = await _service.GetByFiltros(estadoId, municipioId, orden);
-            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+            var response = await _service.GetByFiltros(
+                estadoId,
+                municipioId,
+                orden,
+                page,
+                pageSize
+            );
+
+            return response.Codigo == "200"
+                ? Ok(response)
+                : BadRequest(response);
         }
+
         [Authorize]
         [HttpGet("getAllComerciosByUser")]
         public async Task<IActionResult> GetAllComerciosByUser(

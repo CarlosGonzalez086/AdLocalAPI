@@ -5,6 +5,9 @@ using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
 using Org.BouncyCastle.Crypto.Digests;
 using Supabase.Gotrue;
+using System.Globalization;
+using System.Text;
+using System.Text.RegularExpressions;
 
 
 namespace AdLocalAPI.Repositories
@@ -22,17 +25,20 @@ namespace AdLocalAPI.Repositories
             _env = env;
         }
 
-        public async Task<List<ComercioPublicDto>> GetAllAsync(
+        public async Task<(List<ComercioPublicDto> comercios, int total)> GetAllAsync(
             string tipo,
             double lat,
             double lng,
-            string municipio
+            string municipio,
+            int page,
+            int pageSize
         )
         {
             var hoy = DateTime.UtcNow.Date;
 
             if (lat == null || lng == null)
                 throw new ArgumentException("Latitud y longitud son requeridas");
+
             var userLocation = new Point(lng, lat) { SRID = 4326 };
 
             var suscripcionesVigentes = _context.Suscripcions
@@ -53,22 +59,14 @@ namespace AdLocalAPI.Repositories
                 })
                 .AsEnumerable()
                 .GroupBy(s => s.UsuarioId)
-                .Select(g => g
-                    .OrderByDescending(x => x.CurrentPeriodEnd)
-                    .First()
-                )
+                .Select(g => g.OrderByDescending(x => x.CurrentPeriodEnd).First())
                 .ToList();
 
-
-
-
-
             IQueryable<Comercio> comerciosQuery = _context.Comercios
-                .Where(c => c.Activo)
-                .Where(c => c.Ubicacion != null)
+                .Where(c => c.Activo && c.Ubicacion != null)
                 .Include(c => c.Estado)
                 .Include(c => c.Municipio)
-                .Include(c => c.CalificacionesComentarios); 
+                .Include(c => c.CalificacionesComentarios);
 
             if (!string.IsNullOrEmpty(municipio))
             {
@@ -76,28 +74,22 @@ namespace AdLocalAPI.Repositories
                     .Where(c => c.Municipio.MunicipioNombre == municipio);
             }
 
-
-
             var query =
-                from c in comerciosQuery.AsEnumerable() 
+                from c in comerciosQuery.AsEnumerable()
                 join s in suscripcionesVigentes
                     on c.IdUsuario equals s.UsuarioId into sus
                 from suscripcion in sus.DefaultIfEmpty()
                 select new
                 {
                     Comercio = c,
-                    Suscripcion = suscripcion,
+                    Suscripcion = suscripcion
                 };
-
-
-
 
             switch (tipo.ToLower())
             {
                 case "destacados":
                     query = query
-                        .Where(x =>
-                            x.Suscripcion != null)
+                        .Where(x => x.Suscripcion != null)
                         .OrderByDescending(x => x.Suscripcion.NivelVisibilidad);
                     break;
 
@@ -113,8 +105,6 @@ namespace AdLocalAPI.Repositories
                     break;
 
                 case "cercanos":
-                    if (lat == null || lng == null)
-                        throw new ArgumentException("Latitud y longitud son requeridas"); 
                     double maxKm = 5;
                     query = query
                         .Where(x => x.Comercio.Ubicacion.Distance(userLocation) <= maxKm / 111.32)
@@ -140,47 +130,32 @@ namespace AdLocalAPI.Repositories
                     Lng = x.Comercio.Ubicacion!.X,
                     ColorPrimario = x.Comercio.ColorPrimario,
                     ColorSecundario = x.Comercio.ColorSecundario,
-
-                    Badge = x.Suscripcion != null
-                        ? x.Suscripcion.BadgeTexto ?? ""
-                        : "",
-
+                    Badge = x.Suscripcion?.BadgeTexto ?? "",
                     PlanTipo = x.Suscripcion?.Tipo,
                     SuscripcionVigente = x.Suscripcion != null,
-
                     EstadoNombre = x.Comercio.Estado.EstadoNombre ?? "",
                     MunicipioNombre = x.Comercio.Municipio.MunicipioNombre ?? "",
-
                     PromedioCalificacion = x.Comercio.CalificacionesComentarios.Any()
-                        ? x.Comercio.CalificacionesComentarios.Sum(cc => cc.Calificacion)
-                          / (double)x.Comercio.CalificacionesComentarios.Count()
+                        ? x.Comercio.CalificacionesComentarios.Average(cc => cc.Calificacion)
                         : 0,
-
                     DistanciaKm = tipo == "cercanos"
-                        ? Math.Round(
-                            x.Comercio.Ubicacion.Distance(userLocation) * 111.32,
-                            2
-                          )
+                        ? Math.Round(x.Comercio.Ubicacion.Distance(userLocation) * 111.32, 2)
                         : null,
-
                     FechaCreacion = x.Comercio.FechaCreacion,
                     IdUsuario = x.Comercio.IdUsuario
                 })
                 .ToList();
 
-
-            return lista
+            var filtrado = lista
                 .GroupBy(c => c.IdUsuario)
                 .SelectMany(g =>
                 {
                     var tieneSuscripcion = g.Any(x => x.SuscripcionVigente);
-
                     int max = 1;
 
                     if (tieneSuscripcion)
                     {
                         var tipoPlan = g.First(x => x.SuscripcionVigente).PlanTipo;
-
                         max = tipoPlan switch
                         {
                             "BUSINESS" => 3,
@@ -193,12 +168,8 @@ namespace AdLocalAPI.Repositories
                     {
                         "recientes" => g.OrderByDescending(c => c.FechaCreacion),
                         "cercanos" => g.OrderBy(c => c.DistanciaKm),
-                        _ => g.OrderBy(c => c.FechaCreacion)
+                        _ => g.OrderByDescending(c => c.FechaCreacion)
                     };
-
-
-                    if (!tieneSuscripcion)
-                        ordenado = g.OrderBy(c => c.FechaCreacion);
 
                     return ordenado.Take(max);
                 })
@@ -209,8 +180,17 @@ namespace AdLocalAPI.Repositories
                 })
                 .ToList();
 
+            var total = filtrado.Count;
 
+
+            var paginados = filtrado
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            return (paginados, total);
         }
+
 
         public async Task<Comercio> GetByIdAsync(long id)
         {
@@ -308,66 +288,137 @@ namespace AdLocalAPI.Repositories
                 return false;
             }
         }
-        public async Task<List<ComercioPublicDto>> GetByFiltros(int estadoId, int municipioId, string orden)
+        public async Task<(List<ComercioPublicDto> items, int total)> GetByFiltros(
+            int estadoId,
+            int municipioId,
+            string orden,
+            int page,
+            int pageSize
+        )
         {
-            IQueryable<Comercio> query = _context.Comercios
+            var hoy = DateTime.UtcNow.Date;
+
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 8;
+            if (pageSize > 50) pageSize = 50;
+
+            var suscripcionesVigentes = _context.Suscripcions
+                .Where(s =>
+                    s.IsActive &&
+                    !s.IsDeleted &&
+                    s.CurrentPeriodEnd > hoy &&
+                    (s.Plan.Tipo == "FREE" || s.Plan.Tipo == "BASIC" ||
+                     s.Plan.Tipo == "PRO" || s.Plan.Tipo == "BUSINESS")
+                )
+                .Select(s => new
+                {
+                    s.UsuarioId,
+                    s.CurrentPeriodEnd,
+                    s.Plan.BadgeTexto,
+                    s.Plan.Tipo
+                })
+                .AsEnumerable()
+                .GroupBy(s => s.UsuarioId)
+                .Select(g => g.OrderByDescending(x => x.CurrentPeriodEnd).First())
+                .ToList();
+
+            IQueryable<Comercio> comerciosQuery = _context.Comercios
                 .Where(c => c.Activo)
                 .Include(c => c.Estado)
-                .Include(c => c.Municipio);
+                .Include(c => c.Municipio)
+                .Include(c => c.CalificacionesComentarios);
 
+            var query =
+                from c in comerciosQuery.AsEnumerable()
+                join s in suscripcionesVigentes
+                    on c.IdUsuario equals s.UsuarioId into sus
+                from suscripcion in sus.DefaultIfEmpty()
+                select new
+                {
+                    Comercio = c,
+                    Suscripcion = suscripcion
+                };
 
             if (estadoId != 0)
-                query = query.Where(c => c.EstadoId == estadoId);
+                query = query.Where(x => x.Comercio.EstadoId == estadoId);
 
             if (municipioId != 0)
-                query = query.Where(c => c.MunicipioId == municipioId);
+                query = query.Where(x => x.Comercio.MunicipioId == municipioId);
 
+            var lista = query
+                .Select(x => new ComercioPublicDto
+                {
+                    Id = x.Comercio.Id,
+                    Nombre = x.Comercio.Nombre,
+                    Direccion = x.Comercio.Direccion,
+                    Telefono = x.Comercio.Telefono,
+                    Email = x.Comercio.Email,
+                    LogoUrl = x.Comercio.LogoUrl,
+                    Lat = x.Comercio.Ubicacion!.Y,
+                    Lng = x.Comercio.Ubicacion!.X,
+                    ColorPrimario = x.Comercio.ColorPrimario,
+                    ColorSecundario = x.Comercio.ColorSecundario,
+                    Badge = x.Suscripcion?.BadgeTexto ?? "",
+                    PlanTipo = x.Suscripcion?.Tipo,
+                    SuscripcionVigente = x.Suscripcion != null,
+                    EstadoNombre = x.Comercio.Estado.EstadoNombre ?? "",
+                    MunicipioNombre = x.Comercio.Municipio.MunicipioNombre ?? "",
+                    PromedioCalificacion = x.Comercio.CalificacionesComentarios.Any()
+                        ? x.Comercio.CalificacionesComentarios.Average(cc => cc.Calificacion)
+                        : 0,
+                    FechaCreacion = x.Comercio.FechaCreacion,
+                    IdUsuario = x.Comercio.IdUsuario
+                })
+                .ToList();
+   
+            var filtrado = lista
+                .GroupBy(c => c.IdUsuario)
+                .SelectMany(g =>
+                {
+                    int max = 1;
 
-            switch (orden.ToLower())
+                    if (g.Any(x => x.SuscripcionVigente))
+                    {
+                        var tipoPlan = g.First(x => x.SuscripcionVigente).PlanTipo;
+                        max = tipoPlan switch
+                        {
+                            "BUSINESS" => 3,
+                            "PRO" => 2,
+                            _ => 1
+                        };
+                    }
+
+                    return g
+                        .OrderByDescending(c => c.FechaCreacion)
+                        .Take(max);
+                })
+                .Select(c =>
+                {
+                    c.IdUsuario = 0;
+                    return c;
+                })
+                .ToList();
+        filtrado = orden.ToLower() switch
             {
-                case "recientes":
-                    query = query.OrderByDescending(c => c.FechaCreacion);
-                    break;
-                case "antiguos":
-                    query = query.OrderBy(c => c.FechaCreacion);
-                    break;
-                case "populares":
-                    query = query
-                        .OrderByDescending(c => c.CalificacionesComentarios.Any()
-                            ? c.CalificacionesComentarios.Sum(cc => cc.Calificacion)
-                              / (double)c.CalificacionesComentarios.Count()
-                            : 0);
-                    break;
-                default:
-                    query = query.OrderBy(c => c.Nombre); 
-                    break;
-            }
+                "recientes" => filtrado.OrderByDescending(c => c.FechaCreacion).ToList(),
+                "antiguos" => filtrado.OrderBy(c => c.FechaCreacion).ToList(),
+                "populares" => filtrado.OrderByDescending(c => c.PromedioCalificacion).ToList(),
+                "az" or "alfabetico" => filtrado.OrderBy(c => NormalizarNombreNegocio(c.Nombre)).ToList(),
+                _ => filtrado.OrderBy(c => NormalizarNombreNegocio(c.Nombre)).ToList()
+            };
 
+    
+            var total = filtrado.Count;
 
-            var result = await query.Select(c => new ComercioPublicDto
-            {
-                Id = c.Id,
-                Nombre = c.Nombre,
-                Direccion = c.Direccion,
-                Telefono = c.Telefono,
-                Email = c.Email,
-                LogoUrl = c.LogoUrl,
-                Lat = c.Ubicacion!.Y,
-                Lng = c.Ubicacion!.X,
-                ColorPrimario = c.ColorPrimario,
-                ColorSecundario = c.ColorSecundario,
-                Activo = c.Activo,
-                FechaCreacion = c.FechaCreacion,
-                EstadoNombre = c.Estado!.EstadoNombre,
-                MunicipioNombre = c.Municipio!.MunicipioNombre,
-                PromedioCalificacion = c.CalificacionesComentarios.Any()
-                                            ? c.CalificacionesComentarios.Sum(cc => cc.Calificacion)
-                                              / (double)c.CalificacionesComentarios.Count()
-                                            : 0
-            }).ToListAsync();
+            var paginados = filtrado
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
 
-            return result;
+            return (paginados, total);
         }
+
+
         public async Task<ApiResponse<PagedResponse<ComercioPublicDto>>> GetAllComerciosByUserPaged(
             long idUser,
             int page = 1,
@@ -477,6 +528,30 @@ namespace AdLocalAPI.Repositories
                 pagedResponse,
                 "Listado de comercios obtenido correctamente"
             );
+        }
+        private static string NormalizarNombreNegocio(string nombre)
+        {
+            if (string.IsNullOrWhiteSpace(nombre))
+                return string.Empty;
+
+            // Quitar artículos iniciales
+            nombre = Regex.Replace(
+                nombre.Trim(),
+                @"^(la|el|los|las)\s+",
+                "",
+                RegexOptions.IgnoreCase
+            );
+
+            // Minúsculas + quitar acentos
+            nombre = nombre
+                .ToLowerInvariant()
+                .Normalize(NormalizationForm.FormD);
+
+            var chars = nombre
+                .Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+                .ToArray();
+
+            return new string(chars);
         }
 
     }

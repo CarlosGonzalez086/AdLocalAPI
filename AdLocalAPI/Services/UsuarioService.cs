@@ -454,7 +454,7 @@ namespace AdLocalAPI.Services
                 issuer: _config["Jwt:Issuer"],
                 audience: null,
                 claims: claims,
-                expires: DateTime.UtcNow.AddDays(7),
+                expires: DateTime.UtcNow.AddDays(30),
                 signingCredentials: creds
             );
 
