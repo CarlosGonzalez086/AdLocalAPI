@@ -379,10 +379,18 @@ namespace AdLocalAPI.Services
                     "comercioId",
                     comercio?.Id.ToString() ?? "0"
                 ));
+                claims.Add(new Claim(
+                    "comercioId",
+                    comercio?.Id.ToString() ?? "0"
+                ));
 
                 claims.Add(new Claim(
-                    "fotoUrl",
-                    usuario.FotoUrl ?? ""
+                    "RedeemRewards",
+                    usuario.RedeemRewards ? "true" : "false" 
+                ));
+                claims.Add(new Claim(
+                    "RedeemMonthFree",
+                    usuario.RedeemMonthFree ? "true" : "false"
                 ));
                 claims.Add(new Claim(
                     "codigoReferido",

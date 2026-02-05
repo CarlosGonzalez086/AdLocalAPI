@@ -45,7 +45,7 @@ namespace AdLocalAPI.Services
             int totalUsos = await _codigoReferidoRepository
                 .ContarPorCodigoAsync(usuario.CodigoReferido);
 
-            if (totalUsos < 15)
+            if (totalUsos < 10)
                 return ApiResponse<object>.Error(
                     "400",
                     $"Beneficio no disponible. Referidos actuales: {totalUsos} / 15"
@@ -65,6 +65,9 @@ namespace AdLocalAPI.Services
             }
 
             await ExtenderSuscripcion(subscription);
+
+            usuario.RedeemRewards = true;
+            await _usuarioRepository.UpdateAsync(usuario);
 
             return ApiResponse<object>.Success(
                 null,
