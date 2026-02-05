@@ -170,7 +170,7 @@ public class WebhooksController : ControllerBase
         DateTime periodStart = DateTime.UtcNow;
         DateTime periodEnd;
 
-        if (stripeSub.CancelAt == DateTime.UtcNow.AddMonths(1))
+        if (stripeSub.CancelAt != null)
         {
             periodEnd = stripeSub.CancelAt.Value;
         }
@@ -241,6 +241,16 @@ public class WebhooksController : ControllerBase
 
         if (sub == null)
             return;
+
+        if (stripeSub.Metadata["beneficio"] == "referidos_15")
+        {
+            sub.CurrentPeriodEnd = sub.CurrentPeriodEnd.Value.AddDays(30);
+
+            sub.UpdatedAt = DateTime.UtcNow;
+
+            await _suscripcionRepo.ActualizarAsync(sub);
+            return;
+        }
 
         if (stripeSub.CancelAtPeriodEnd)
         {
