@@ -61,5 +61,10 @@ namespace AdLocalAPI.Models
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public DateTime? UpdatedAt { get; set; }
+
+        public static implicit operator Stripe.Subscription?(Suscripcion? v)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
