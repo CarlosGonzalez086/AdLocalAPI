@@ -31,10 +31,28 @@ namespace AdLocalAPI.Repositories
             double lng,
             string municipio,
             int page,
-            int pageSize
+            int pageSize,
+               string ip
         )
         {
             var hoy = DateTime.UtcNow.Date;
+            double maxKm = 0;
+            List<long> comerciosVisitadosPorIp = new();
+            List<long> tiposDeComercio = new();
+
+            if (!string.IsNullOrEmpty(ip))
+            {
+                comerciosVisitadosPorIp = await _context.ComercioVisitas
+                    .Where(v => v.Ip == ip)
+                    .OrderByDescending(v => v.FechaVisita)
+                    .Select(v => v.ComercioId)
+                    .Distinct()
+                    .Take(20)
+                    .ToListAsync();
+
+                tiposDeComercio = await _context.TipoComercio.Select(v => v.Id).ToListAsync();
+            }
+
 
             if (lat == null || lng == null)
                 throw new ArgumentException("Latitud y longitud son requeridas");
@@ -105,11 +123,35 @@ namespace AdLocalAPI.Repositories
                     break;
 
                 case "cercanos":
-                    double maxKm = 5;
+                    maxKm = 5;
                     query = query
                         .Where(x => x.Comercio.Ubicacion.Distance(userLocation) <= maxKm / 111.32)
                         .OrderBy(x => x.Comercio.Ubicacion.Distance(userLocation));
                     break;
+
+                case "sugeridos":
+                    maxKm = 10;
+
+                    query = query
+                        .Where(x =>
+                            x.Comercio.Ubicacion.Distance(userLocation) <= maxKm / 111.32 && (tiposDeComercio.Any() && tiposDeComercio.Contains((long)x.Comercio.TipoComercioId))
+                        )
+                        .OrderByDescending(x =>
+                            (comerciosVisitadosPorIp.Any() &&
+                             comerciosVisitadosPorIp.Contains(x.Comercio.Id)) ? 1 : 0
+                        )
+                        .ThenByDescending(x =>
+                            x.Comercio.CalificacionesComentarios.Any()
+                                ? x.Comercio.CalificacionesComentarios.Average(cc => cc.Calificacion)
+                                : 0
+                        )
+                        .ThenBy(x =>
+                            x.Comercio.Ubicacion.Distance(userLocation)
+                        );
+
+                    break;
+
+
 
                 default:
                     query = query.OrderBy(x => x.Comercio.Nombre);
@@ -138,9 +180,9 @@ namespace AdLocalAPI.Repositories
                     PromedioCalificacion = x.Comercio.CalificacionesComentarios.Any()
                         ? x.Comercio.CalificacionesComentarios.Average(cc => cc.Calificacion)
                         : 0,
-                    DistanciaKm = tipo == "cercanos"
-                        ? Math.Round(x.Comercio.Ubicacion.Distance(userLocation) * 111.32, 2)
-                        : null,
+                    DistanciaKm = (tipo == "cercanos" || tipo == "sugeridos")
+        ? Math.Round(x.Comercio.Ubicacion.Distance(userLocation) * 111.32, 2)
+        : null,
                     FechaCreacion = x.Comercio.FechaCreacion,
                     IdUsuario = x.Comercio.IdUsuario
                 })
@@ -168,7 +210,10 @@ namespace AdLocalAPI.Repositories
                     {
                         "recientes" => g.OrderByDescending(c => c.FechaCreacion),
                         "cercanos" => g.OrderBy(c => c.DistanciaKm),
-                        _ => g.OrderByDescending(c => c.FechaCreacion)
+                        "sugeridos" => g
+    .OrderByDescending(c => c.PromedioCalificacion)
+    .ThenBy(c => c.DistanciaKm),
+                        _ => g.OrderByDescending(c => c.FechaCreacion),
                     };
 
                     return ordenado.Take(max);
@@ -190,8 +235,6 @@ namespace AdLocalAPI.Repositories
 
             return (paginados, total);
         }
-
-
         public async Task<Comercio> GetByIdAsync(long id)
         {
 
@@ -291,6 +334,7 @@ namespace AdLocalAPI.Repositories
         public async Task<(List<ComercioPublicDto> items, int total)> GetByFiltros(
             int estadoId,
             int municipioId,
+            long idTipoComercio,
             string orden,
             int page,
             int pageSize
@@ -344,6 +388,8 @@ namespace AdLocalAPI.Repositories
 
             if (municipioId != 0)
                 query = query.Where(x => x.Comercio.MunicipioId == municipioId);
+            if (idTipoComercio != 0)
+                query = query.Where(x => x.Comercio.TipoComercioId == idTipoComercio);
 
             var lista = query
                 .Select(x => new ComercioPublicDto

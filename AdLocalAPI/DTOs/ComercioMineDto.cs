@@ -19,6 +19,7 @@ namespace AdLocalAPI.DTOs
         public bool Activo { get; set; } = false;
         public int EstadoId { get; set; } = 0;
         public int MunicipioId { get; set; } = 0;
+        public long TipoComercioId { get; set; } = 0;
         public string EstadoNombre { get; set; } = "";
         public string MunicipioNombre { get; set; } = "";
         public string Badge { get; set; } = "";

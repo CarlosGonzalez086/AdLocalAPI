@@ -7,5 +7,6 @@
 
         public const string StripeCommissionPercentage = "STRIPE_COMMISSION_PERCENTAGE";
         public const string StripeCommissionFixed = "STRIPE_COMMISSION_FIXED";
+        public const string Ip2LocationKey = "IP2LOCATION_KEY";
     }
 }

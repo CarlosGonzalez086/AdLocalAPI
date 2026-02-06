@@ -45,5 +45,8 @@ namespace AdLocalAPI.Models
 
         public ICollection<CalificacionComentario> CalificacionesComentarios { get; set; } = new List<CalificacionComentario>();
         public Usuario Usuario { get; set; }
+        public long? TipoComercioId { get; set; }
+        public TipoComercio? TipoComercio { get; set; }
+
     }
 }

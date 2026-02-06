@@ -28,6 +28,7 @@ namespace AdLocalAPI.Data
         public DbSet<UsoCodigoReferido> UsoCodigoReferido { get; set; }
         public ICollection<UsoCodigoReferido> CodigosReferidosUsados { get; set; }
         public ICollection<UsoCodigoReferido> CodigosReferidosGenerados { get; set; }
+        public DbSet<TipoComercio> TipoComercio { get; set; }
 
 
 
@@ -285,6 +286,26 @@ namespace AdLocalAPI.Data
                 entity.Property(e => e.CodigoReferido)
                       .HasMaxLength(50)
                       .IsRequired();
+            });
+
+            modelBuilder.Entity<TipoComercio>(entity =>
+            {
+                entity.ToTable("TipoComercio");
+
+                entity.Property(e => e.Nombre)
+                      .IsRequired()
+                      .HasMaxLength(100);
+
+                entity.Property(e => e.Descripcion)
+                      .HasMaxLength(250);
+            });
+
+            modelBuilder.Entity<Comercio>(entity =>
+            {
+                entity.HasOne(c => c.TipoComercio)
+                      .WithMany(t => t.Comercios)
+                      .HasForeignKey(c => c.TipoComercioId)
+                      .OnDelete(DeleteBehavior.Restrict);
             });
 
 

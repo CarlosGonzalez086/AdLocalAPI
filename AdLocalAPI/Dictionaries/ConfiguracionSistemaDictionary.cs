@@ -22,6 +22,10 @@ namespace AdLocalAPI.Dictionaries
                 {
                     ConfiguracionKeys.StripeCommissionFixed,
                     ("Comisión fija (neta) que cobra Stripe por transacción", "DECIMAL")
+                },
+                {
+                    ConfiguracionKeys.Ip2LocationKey,
+                    ("IP2Location es una solución de geolocalización de IP que permite identificar la ubicación geográfica de los visitantes de un sitio web mediante su dirección IP", "STRING")
                 }
             };
     }
