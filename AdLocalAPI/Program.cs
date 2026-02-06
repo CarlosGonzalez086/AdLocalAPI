@@ -5,6 +5,7 @@ using AdLocalAPI.Interfaces.Comercio;
 using AdLocalAPI.Interfaces.Location;
 using AdLocalAPI.Interfaces.ProductosServicios;
 using AdLocalAPI.Interfaces.Tarjetas;
+using AdLocalAPI.Interfaces.TipoComercio;
 using AdLocalAPI.Repositories;
 using AdLocalAPI.Services;
 using AdLocalAPI.Utils;
@@ -129,6 +130,8 @@ builder.Services.AddScoped<SuscripcionRepository>();
 builder.Services.AddScoped<SuscripcionService>();
 
 builder.Services.AddScoped<StripeService>();
+builder.Services.AddScoped<GeoLocationService>();
+builder.Services.AddScoped<HttpClient>();
 
 builder.Services.AddScoped<IConfiguracionService, ConfiguracionService>();
 builder.Services.AddScoped<IConfiguracionRepository, ConfiguracionRepository>();
@@ -140,10 +143,15 @@ builder.Services.AddScoped<IStripeService, StripeService>();
 builder.Services.AddScoped<ILocationRepository, LocationRepository>();
 builder.Services.AddScoped<ILocationService, LocationService>();
 
+builder.Services.AddScoped<ITipoComercioRepository, TipoComercioRepository>();
+builder.Services.AddScoped<ITipoComercioService, TipoComercioService>();
+
+
 builder.Services.AddScoped<CalificacionComentarioRepository>();
 builder.Services.AddScoped<CalificacionComentarioService>();
 
 builder.Services.AddSingleton<StripeConfigProvider>();
+builder.Services.AddSingleton<ClavesConfigProvider>();
 
 builder.Services.Configure<EmailSettings>(
 builder.Configuration.GetSection("EmailSettings"));
@@ -160,6 +168,9 @@ builder.Services.AddScoped<BeneficiosServices>();
 
 builder.Services.AddScoped<ISuscriptionServiceV1, SuscriptionService>();
 builder.Services.AddScoped<ISuscriptionRepository, SuscriptionRepository>();
+
+builder.Services.AddSingleton<AppConfigState>();
+
 
 
 
@@ -243,6 +254,29 @@ using (var scope = app.Services.CreateScope())
     Console.WriteLine("Stripe loaded from DB: " +
         (provider.SecretKey.StartsWith("sk_live") ? "LIVE" : "TEST"));
 }
+
+using (var scope = app.Services.CreateScope())
+{
+    var repo = scope.ServiceProvider
+        .GetRequiredService<IConfiguracionRepository>();
+
+    var provider = scope.ServiceProvider
+        .GetRequiredService<ClavesConfigProvider>();
+
+    var appConfig = scope.ServiceProvider
+        .GetRequiredService<AppConfigState>();
+
+    var configs = await repo.ObtenerTodosAsync();
+
+    provider.Load(configs);
+
+    appConfig.SetIp2LocationKey(provider.Ip2LocationKey);
+
+    Console.WriteLine(
+        "Ip2LocationKey loaded from DB: " + appConfig.Ip2LocationKey
+    );
+}
+
 
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {

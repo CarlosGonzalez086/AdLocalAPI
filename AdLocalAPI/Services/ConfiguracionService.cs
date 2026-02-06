@@ -86,5 +86,32 @@ namespace AdLocalAPI.Services
                 "Configuración de Stripe registrada correctamente"
             );
         }
+        public async Task<ApiResponse<List<ConfiguracionSistema>>> RegistrarCrearClavesAsync(ClavesConfigDto dto)
+        {
+            var resultado = new List<ConfiguracionSistema>();
+
+            var acciones = new[]
+            {
+                new ConfiguracionSistemaDto { Key = ConfiguracionKeys.Ip2LocationKey, Val = dto.Ip2LocationKey },
+            };
+
+            foreach (var item in acciones)
+            {
+                var res = await CrearOActualizarAsync(item);
+
+                if (res.Codigo != "200")
+                    return ApiResponse<List<ConfiguracionSistema>>.Error(
+                        res.Codigo,
+                        res.Mensaje
+                    );
+
+                resultado.Add(res.Respuesta);
+            }
+
+            return ApiResponse<List<ConfiguracionSistema>>.Success(
+                resultado,
+                "Configuración de claves registrada correctamente"
+            );
+        }
     }
 }

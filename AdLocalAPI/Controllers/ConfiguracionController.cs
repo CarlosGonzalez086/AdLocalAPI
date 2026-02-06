@@ -29,6 +29,12 @@ namespace AdLocalAPI.Controllers
             var response = await _service.RegistrarStripeAsync(dto);
             return response.Codigo == "200" ? Ok(response) : BadRequest(response);
         }
+        [HttpPost("claves")]
+        public async Task<IActionResult> CrearClaves([FromBody] ClavesConfigDto dto)
+        {
+            var response = await _service.RegistrarCrearClavesAsync(dto);
+            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+        }
     }
 
 }

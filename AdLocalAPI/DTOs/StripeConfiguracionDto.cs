@@ -7,4 +7,9 @@
         public string CommissionPercentage { get; set; } = string.Empty;
         public string CommissionFixed { get; set; } = string.Empty;
     }
+    public class ClavesConfigDto
+    {
+        public string Ip2LocationKey { get; set; } = string.Empty;
+
+    }
 }

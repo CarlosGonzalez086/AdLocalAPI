@@ -28,10 +28,11 @@ namespace AdLocalAPI.Services
         private readonly UsuarioRepository _usuarioRepository;
         private readonly IWebHostEnvironment _env;
         private readonly EmailService _emailService;
+        private readonly GeoLocationService _geoService;
 
         public ComercioService(ComercioRepository repository, JwtContext jwtContext, 
                                IRelComercioImagenRepositorio comercioImagenRepositorio, IHorarioComercioService horarioComercioService,
-                                           SuscripcionRepository suscripcionRepository,
+                                           SuscripcionRepository suscripcionRepository, GeoLocationService geoService,
             PlanRepository planRepository,
             UsuarioRepository usuarioRepository,
                                IProductosServiciosRepository productosServiciosRepository, ILocationRepository locationRepository,
@@ -51,6 +52,7 @@ namespace AdLocalAPI.Services
             _usuarioRepository = usuarioRepository;
             _env = env;
             _emailService = emailService;
+            _geoService = geoService;
         }
 
         public async Task<ApiResponse<object>> GetAllComercios(
@@ -59,7 +61,8 @@ namespace AdLocalAPI.Services
             double lng,
             string municipio,
             int page,
-            int pageSize
+            int pageSize,
+            string ip
         )
         {
             try
@@ -68,13 +71,28 @@ namespace AdLocalAPI.Services
                 if (pageSize < 1) pageSize = 10;
                 if (pageSize > 50) pageSize = 50;
 
+                if ((lat == 0 || lng == 0) && !string.IsNullOrEmpty(ip) && tipo == "sugeridos")
+                {
+                    var geo = await _geoService.GetLocationByIp(ip);
+
+                    if (geo != null)
+                    {
+                        lat = geo.Value.lat;
+                        lng = geo.Value.lng;
+
+                        if (string.IsNullOrEmpty(municipio))
+                            municipio = geo.Value.municipio;
+                    }
+                }
+
                 var (comercios, total) = await _repository.GetAllAsync(
                     tipo,
                     lat,
                     lng,
                     municipio,
                     page,
-                    pageSize
+                    pageSize,
+                    ip
                 );
 
                 return ApiResponse<object>.Success(
@@ -97,6 +115,7 @@ namespace AdLocalAPI.Services
                 return ApiResponse<object>.Error("500", ex.Message);
             }
         }
+
 
         public async Task<ApiResponse<ComercioMineDto>> GetComercioById(long id)
         {
@@ -232,8 +251,8 @@ namespace AdLocalAPI.Services
                     EstadoId = estado == null ? 0 : estado.Id,
                     MunicipioId = municipio == null ? 0 : municipio.Id,
                     Calificacion = calificacionPromedio,
-                    Badge = badge
-
+                    Badge = badge,
+                    TipoComercioId = (long)comercio.TipoComercioId,
                 };
 
                 return ApiResponse<ComercioMineDto>.Success(
@@ -343,7 +362,8 @@ namespace AdLocalAPI.Services
                     MunicipioNombre = municipio == null ? "" : municipio.MunicipioNombre,
                     EstadoId = estado == null ? 0 : comercio.EstadoId,
                     MunicipioId = municipio == null ? 0 : municipio.Id,
-                    Calificacion = calificacionPromedio
+                    Calificacion = calificacionPromedio,
+                    TipoComercioId = (long)comercio.TipoComercioId,
                 };
 
                 return ApiResponse<ComercioMineDto>.Success(
@@ -409,6 +429,11 @@ namespace AdLocalAPI.Services
                        "400",
                        "El municipio del comercio es obligatorrio"
                    );               
+                if (dto.TipoComercioId == 0)                
+                    return ApiResponse<object>.Error(
+                       "400",
+                       "El tipo del comercio es obligatorrio"
+                   );               
 
                 string? logoUrl = null;
 
@@ -454,7 +479,8 @@ namespace AdLocalAPI.Services
                     Descripcion = dto.Descripcion,      
                     Email = dto.Email,
                     EstadoId = dto.EstadoId,
-                    MunicipioId = dto.MunicipioId,                    
+                    MunicipioId = dto.MunicipioId,
+                    TipoComercioId = dto.TipoComercioId,
                     Ubicacion = new NetTopologySuite.Geometries.Point(dto.Lng, dto.Lat)
                     {
                         SRID = 4326
@@ -559,6 +585,11 @@ namespace AdLocalAPI.Services
                        "400",
                        "El municipio del comercio es obligatorrio"
                    );
+                if (dto.TipoComercioId == 0)
+                    return ApiResponse<object>.Error(
+                       "400",
+                       "El tipo del comercio es obligatorrio"
+                   );
                 long userId = 0;
                 if (_jwtContext.GetUserRole() == "Colaborador")
                 {
@@ -597,6 +628,7 @@ namespace AdLocalAPI.Services
                 comercio.ColorSecundario = dto.ColorSecundario;
                 comercio.Email = dto.Email;
                 comercio.Activo = dto.Activo;
+                comercio.TipoComercioId = dto.TipoComercioId;
 
                 if (!string.IsNullOrWhiteSpace(dto.LogoBase64) &&
                     !EsUrl(dto.LogoBase64))
@@ -801,6 +833,7 @@ namespace AdLocalAPI.Services
         public async Task<ApiResponse<object>> GetByFiltros(
             int estadoId,
             int municipioId,
+            long idTipoComercio,
             string orden,
             int page,
             int pageSize
@@ -811,6 +844,7 @@ namespace AdLocalAPI.Services
                 var (items, total) = await _repository.GetByFiltros(
                     estadoId,
                     municipioId,
+                    idTipoComercio,
                     orden,
                     page,
                     pageSize

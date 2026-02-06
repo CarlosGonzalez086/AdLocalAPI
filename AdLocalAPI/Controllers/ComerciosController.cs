@@ -68,6 +68,7 @@ namespace AdLocalAPI.Controllers
     [FromQuery] int pageSize = 10
 )
         {
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
 
             var response = await _service.GetAllComercios(
                 tipo,
@@ -75,7 +76,8 @@ namespace AdLocalAPI.Controllers
                 lng,
                 municipio,
                 page,
-                pageSize
+                pageSize,
+                ip
             );
 
             return response.Codigo == "200"
@@ -84,10 +86,12 @@ namespace AdLocalAPI.Controllers
         }
 
 
+
         [HttpGet("por-filtros")]
         public async Task<IActionResult> GetByFiltros(
             [FromQuery] int estadoId = 0,
             [FromQuery] int municipioId = 0,
+            [FromQuery] long idTipoComercio = 0,
             [FromQuery] string orden = "alfabetico",
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 8
@@ -96,6 +100,7 @@ namespace AdLocalAPI.Controllers
             var response = await _service.GetByFiltros(
                 estadoId,
                 municipioId,
+                idTipoComercio,
                 orden,
                 page,
                 pageSize
