@@ -6,6 +6,7 @@ using NetTopologySuite.Geometries;
 using Org.BouncyCastle.Crypto.Digests;
 using Supabase.Gotrue;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -38,7 +39,7 @@ namespace AdLocalAPI.Repositories
             var hoy = DateTime.UtcNow.Date;
             double maxKm = 0;
             List<long> comerciosVisitadosPorIp = new();
-            List<long> tiposDeComercio = new();
+            List<long> tiposVisitadosPorIp = new();
 
             if (!string.IsNullOrEmpty(ip))
             {
@@ -50,8 +51,16 @@ namespace AdLocalAPI.Repositories
                     .Take(20)
                     .ToListAsync();
 
-                tiposDeComercio = await _context.TipoComercio.Select(v => v.Id).ToListAsync();
+                if (comerciosVisitadosPorIp.Any())
+                {
+                    tiposVisitadosPorIp = await _context.Comercios
+                        .Where(c => comerciosVisitadosPorIp.Contains(c.Id))
+                        .Select(c => (long)c.TipoComercioId)
+                        .Distinct()
+                        .ToListAsync();
+                }
             }
+
 
 
             if (lat == null || lng == null)
@@ -128,17 +137,20 @@ namespace AdLocalAPI.Repositories
                         .Where(x => x.Comercio.Ubicacion.Distance(userLocation) <= maxKm / 111.32)
                         .OrderBy(x => x.Comercio.Ubicacion.Distance(userLocation));
                     break;
-
                 case "sugeridos":
                     maxKm = 10;
 
                     query = query
                         .Where(x =>
-                            x.Comercio.Ubicacion.Distance(userLocation) <= maxKm / 111.32 && (tiposDeComercio.Any() && tiposDeComercio.Contains((long)x.Comercio.TipoComercioId))
+                            x.Comercio.Ubicacion.Distance(userLocation) <= maxKm / 111.32
                         )
                         .OrderByDescending(x =>
+                            (tiposVisitadosPorIp.Any() &&
+                             tiposVisitadosPorIp.Contains((long)x.Comercio.TipoComercioId)) ? 3 : 0
+                        )
+                        .ThenByDescending(x =>
                             (comerciosVisitadosPorIp.Any() &&
-                             comerciosVisitadosPorIp.Contains(x.Comercio.Id)) ? 1 : 0
+                             comerciosVisitadosPorIp.Contains(x.Comercio.Id)) ? 2 : 0
                         )
                         .ThenByDescending(x =>
                             x.Comercio.CalificacionesComentarios.Any()
