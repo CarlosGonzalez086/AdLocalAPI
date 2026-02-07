@@ -71,7 +71,15 @@ namespace AdLocalAPI.Services
                 if (pageSize < 1) pageSize = 10;
                 if (pageSize > 50) pageSize = 50;
 
-                if ((lat == 0 || lng == 0) && !string.IsNullOrEmpty(ip) && tipo == "sugeridos" || ip != "::1")
+                if (
+                     (
+                       (lat == 0 || lng == 0)
+                       && !string.IsNullOrEmpty(ip)
+                       && tipo == "sugeridos"
+                     )
+                     && ip != "::1"
+                  )
+
                 {
                     var geo = await _geoService.GetLocationByIp(ip);
 

@@ -33,33 +33,45 @@ namespace AdLocalAPI.Repositories
             string municipio,
             int page,
             int pageSize,
-               string ip
+            string ip
         )
         {
             var hoy = DateTime.UtcNow.Date;
             double maxKm = 0;
             List<long> comerciosVisitadosPorIp = new();
             List<long> tiposVisitadosPorIp = new();
-
-            if (!string.IsNullOrEmpty(ip))
+            try 
             {
-                comerciosVisitadosPorIp = await _context.ComercioVisitas
-                    .Where(v => v.Ip == ip)
-                    .OrderByDescending(v => v.FechaVisita)
-                    .Select(v => v.ComercioId)
-                    .Distinct()
-                    .Take(20)
-                    .ToListAsync();
-
-                if (comerciosVisitadosPorIp.Any())
+                if (!string.IsNullOrEmpty(ip) && tipo == "sugeridos")
                 {
-                    tiposVisitadosPorIp = await _context.Comercios
-                        .Where(c => comerciosVisitadosPorIp.Contains(c.Id))
-                        .Select(c => (long)c.TipoComercioId)
+                    comerciosVisitadosPorIp = await _context.ComercioVisitas
+                        .Where(v => v.Ip == ip)
+                        .OrderByDescending(v => v.FechaVisita)
+                        .Select(v => v.ComercioId)
                         .Distinct()
+                        .Take(20)
                         .ToListAsync();
+
+                    if (comerciosVisitadosPorIp.Any())
+                    {
+                        tiposVisitadosPorIp = await _context.Comercios
+                            .Where(c =>
+                                comerciosVisitadosPorIp.Contains(c.Id) &&
+                                c.TipoComercioId.HasValue
+                            )
+                            .Select(c => c.TipoComercioId!.Value)
+                            .Distinct()
+                            .ToListAsync();
+
+                    }
                 }
             }
+            catch (Exception ex) 
+            {
+                Console.WriteLine(ex);
+            }
+               
+
 
 
 
