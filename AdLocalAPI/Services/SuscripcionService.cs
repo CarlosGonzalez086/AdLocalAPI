@@ -65,6 +65,7 @@ namespace AdLocalAPI.Services
                     },
 
                     FechaInicio = (DateTime)suscripcion.CurrentPeriodStart,
+                    AutoRenew = suscripcion.AutoRenew,
                     FechaFin = (DateTime)suscripcion.CurrentPeriodEnd,
                     Activa = suscripcion.IsActive,
                     Estado = suscripcion.Status,

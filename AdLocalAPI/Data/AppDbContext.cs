@@ -51,8 +51,8 @@ namespace AdLocalAPI.Data
 
             modelBuilder.Entity<Suscripcion>()
                 .HasOne(s => s.Usuario)
-                .WithOne(u => u.Suscripcion)   // ✅ CAMBIO CLAVE
-                .HasForeignKey<Suscripcion>(s => s.UsuarioId)
+                .WithMany(u => u.Suscripciones)
+                .HasForeignKey(s => s.UsuarioId)
                 .OnDelete(DeleteBehavior.Cascade);
 
 

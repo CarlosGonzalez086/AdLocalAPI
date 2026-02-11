@@ -217,6 +217,7 @@ namespace AdLocalAPI.Repositories
                 .SelectMany(g =>
                 {
                     var tieneSuscripcion = g.Any(x => x.SuscripcionVigente);
+
                     int max = 1;
 
                     if (tieneSuscripcion)
@@ -230,24 +231,36 @@ namespace AdLocalAPI.Repositories
                         };
                     }
 
-                    IEnumerable<ComercioPublicDto> ordenado = tipo switch
+                    IEnumerable<ComercioPublicDto> ordenado;
+
+                    if (tieneSuscripcion)
                     {
-                        "recientes" => g.OrderByDescending(c => c.FechaCreacion),
-                        "cercanos" => g.OrderBy(c => c.DistanciaKm),
-                        "sugeridos" => g
-    .OrderByDescending(c => c.PromedioCalificacion)
-    .ThenBy(c => c.DistanciaKm),
-                        _ => g.OrderByDescending(c => c.FechaCreacion),
-                    };
+                        ordenado = g
+                            .OrderBy(c => c.FechaCreacion)
+                            .Take(1);
+                    }
+                    else
+                    {
+                        ordenado = tipo switch
+                        {
+                            "recientes" => g.OrderByDescending(c => c.FechaCreacion),
+                            "cercanos" => g.OrderBy(c => c.DistanciaKm),
+                            "sugeridos" => g
+                                .OrderByDescending(c => c.PromedioCalificacion)
+                                .ThenBy(c => c.DistanciaKm),
+                            _ => g.OrderByDescending(c => c.FechaCreacion),
+                        };
+                    }
 
                     return ordenado.Take(max);
                 })
                 .Select(c =>
                 {
-                    c.IdUsuario = 0;
+                    c.IdUsuario = 0; // ocultas usuario
                     return c;
                 })
                 .ToList();
+
 
             var total = filtrado.Count;
 
@@ -277,23 +290,26 @@ namespace AdLocalAPI.Repositories
             }
         }
 
-        public async Task<Comercio> GetComercioByUser(long idUSer)
+        public async Task<Comercio?> GetComercioByUser(long idUser)
         {
             try
             {
                 return await _context.Comercios
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(c =>
-                        c.IdUsuario == idUSer &&
+                    .Where(c =>
+                        c.IdUsuario == idUser &&
                         c.Activo
-                    );
+                    )
+                    .OrderBy(c => c.FechaCreacion)
+                    .FirstOrDefaultAsync();
             }
-            catch (Exception ex) 
+            catch (Exception ex)
             {
                 Console.WriteLine(ex);
                 return null;
             }
         }
+
 
         public async Task<Comercio> CreateAsync(Comercio comercio)
         {

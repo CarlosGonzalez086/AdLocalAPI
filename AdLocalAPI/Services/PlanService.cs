@@ -85,8 +85,6 @@ namespace AdLocalAPI.Services
 
                 if (string.IsNullOrWhiteSpace(dto.Tipo))
                     return ApiResponse<object>.Error("400", "El tipo de plan es obligatorio");
-                //if (string.IsNullOrWhiteSpace(dto.StripePriceId))
-                //    return ApiResponse<object>.Error("400", "El tipo de plan es obligatorio");
 
                 var plan = new Plan
                 {

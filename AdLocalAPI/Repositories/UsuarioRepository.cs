@@ -38,21 +38,20 @@ namespace AdLocalAPI.Repositories
         {
             var now = DateTime.UtcNow;
 
-            // 1️⃣ Query base (SOLO filtros)
+            // 1️ Query base (SOLO filtros)
             IQueryable<Usuario> baseQuery = _context.Usuarios
-                .AsNoTracking() // 🔑 IMPORTANTE para evitar tracking innecesario
-                .Where(u => u.Rol == "Comercio")
-                .Where(u =>
-                    u.Suscripcion != null &&
-                    !u.Suscripcion.IsDeleted &&
-                    u.Suscripcion.IsActive &&
-                    (u.Suscripcion.Status == "active" ||
-                     u.Suscripcion.Status == "canceling") &&
-                    u.Suscripcion.CurrentPeriodEnd != null &&
-                    u.Suscripcion.CurrentPeriodEnd >= now
-                );
+                                            .AsNoTracking()
+                                            .Where(u => u.Rol == "Comercio")
+                                            .Where(u =>
+                                                u.Suscripciones.Any(s =>
+                                                    s.IsActive &&
+                                                    !s.IsDeleted &&
+                                                    (s.Status == "active" || s.Status == "canceling") &&
+                                                    s.CurrentPeriodEnd >= now
+                                                )
+                                            );
 
-            // 2️⃣ Búsqueda
+            // 2️ Búsqueda
             if (!string.IsNullOrWhiteSpace(search))
             {
                 baseQuery = baseQuery.Where(u =>
@@ -75,23 +74,32 @@ namespace AdLocalAPI.Repositories
                     u.FechaCreacion,
                     u.FotoUrl,
                 },
-                Suscripcion = new
-                {
-                    u.Suscripcion!.Id,
-                    u.Suscripcion.Status,
-                    u.Suscripcion.CurrentPeriodStart,
-                    u.Suscripcion.CurrentPeriodEnd,
-                    u.Suscripcion.AutoRenew,
-                    Plan = new
+
+                Suscripcion = u.Suscripciones
+                    .Where(s =>
+                        s.IsActive &&
+                        !s.IsDeleted &&
+                        (s.Status == "active" || s.Status == "canceling") &&
+                        s.CurrentPeriodEnd >= now
+                    )
+                    .Select(s => new
                     {
-                        u.Suscripcion.Plan.Id,
-                        u.Suscripcion.Plan.Nombre,
-                        u.Suscripcion.Plan.Tipo,
-                        u.Suscripcion.Plan.Precio,
-                        u.Suscripcion.Plan.MaxFotos
-                    }
-                }
+                        s.Status,
+                        s.CurrentPeriodStart,
+                        s.CurrentPeriodEnd,
+                        s.AutoRenew,
+                        Plan = new
+                        {
+                            s.Plan.Id,
+                            s.Plan.Nombre,
+                            s.Plan.Tipo,
+                            s.Plan.Precio,
+                            s.Plan.MaxFotos
+                        }
+                    })
+                    .FirstOrDefault()
             });
+
 
             // 5️⃣ Orden
             query = orderBy switch

@@ -31,6 +31,7 @@ namespace AdLocalAPI.Models
         public bool RedeemMonthFree { get; set; } = false;
         public bool RedeemRewards { get; set; } = false;
         public ICollection<Comercio> Comercios { get; set; } = new List<Comercio>();
-        public Suscripcion? Suscripcion { get; set; }
+        public ICollection<Suscripcion> Suscripciones { get; set; }
+            = new List<Suscripcion>();
     }
 }
