@@ -43,6 +43,7 @@ public class SuscriptionService : ISuscriptionServiceV1
         if (usuario == null)
             return ApiResponse<string>.Error("404", "Usuario no encontrado");
 
+        // 1️ Crear customer si no existe
         if (string.IsNullOrEmpty(usuario.StripeCustomerId))
         {
             var customer = await new CustomerService().CreateAsync(
@@ -56,6 +57,7 @@ public class SuscriptionService : ISuscriptionServiceV1
             await _usuarioRepo.UpdateAsync(usuario);
         }
 
+        // 2️ Asociar payment method
         await new PaymentMethodService().AttachAsync(
             paymentMethodId,
             new PaymentMethodAttachOptions
@@ -73,34 +75,43 @@ public class SuscriptionService : ISuscriptionServiceV1
                 }
             });
 
+        // 3️ Crear suscripción (Stripe controla el tiempo)
         var options = new SubscriptionCreateOptions
         {
             Customer = usuario.StripeCustomerId,
             Items = new()
+        {
+            new SubscriptionItemOptions
             {
-                new SubscriptionItemOptions
-                {
-                    Price = plan.StripePriceId
-                }
-            },
+                Price = plan.StripePriceId
+            }
+        },
             DefaultPaymentMethod = paymentMethodId,
             PaymentSettings = new SubscriptionPaymentSettingsOptions
             {
                 SaveDefaultPaymentMethod = "on_subscription"
             },
-            ProrationBehavior = "none"
+            ProrationBehavior = "none",
+            CancelAtPeriodEnd = !autoRenew,
+                            Metadata = new()
+                {
+                    { "usuarioId", usuario.Id.ToString() },
+                    { "days", "30" }
+                }
         };
 
-        if (!autoRenew)
-            options.CancelAt = DateTime.UtcNow.AddDays(30);
+        var subscription = await new SubscriptionService()
+            .CreateAsync(options);
 
-        var subscription = await new SubscriptionService().CreateAsync(options);
+
+        // Espera a invoice.payment_succeeded
 
         return ApiResponse<string>.Success(
             subscription.Id,
             "Suscripción creada correctamente"
         );
     }
+
 
     // =========================
     // CHECKOUT (TARJETA NUEVA)
@@ -152,7 +163,7 @@ public class SuscriptionService : ISuscriptionServiceV1
                     }
                 },
                 SuccessUrl = successUrl,
-                CancelUrl = cancelUrl,
+                CancelUrl = cancelUrl,                
                 Metadata = new()
                 {
                     { "usuarioId", usuario.Id.ToString() },

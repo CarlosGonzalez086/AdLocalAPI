@@ -4,6 +4,7 @@ using AdLocalAPI.Helpers;
 using AdLocalAPI.Interfaces.Comercio;
 using AdLocalAPI.Interfaces.Location;
 using AdLocalAPI.Interfaces.ProductosServicios;
+using AdLocalAPI.Interfaces.TipoComercio;
 using AdLocalAPI.Models;
 using AdLocalAPI.Repositories;
 using AdLocalAPI.Utils;
@@ -29,9 +30,10 @@ namespace AdLocalAPI.Services
         private readonly IWebHostEnvironment _env;
         private readonly EmailService _emailService;
         private readonly GeoLocationService _geoService;
+        private readonly ITipoComercioRepository _tipoComercioRepo;
 
         public ComercioService(ComercioRepository repository, JwtContext jwtContext, 
-                               IRelComercioImagenRepositorio comercioImagenRepositorio, IHorarioComercioService horarioComercioService,
+                               IRelComercioImagenRepositorio comercioImagenRepositorio, IHorarioComercioService horarioComercioService, ITipoComercioRepository tipoComercioRepo,
                                            SuscripcionRepository suscripcionRepository, GeoLocationService geoService,
             PlanRepository planRepository,
             UsuarioRepository usuarioRepository,
@@ -53,6 +55,7 @@ namespace AdLocalAPI.Services
             _env = env;
             _emailService = emailService;
             _geoService = geoService;
+            _tipoComercioRepo = tipoComercioRepo;
         }
 
         public async Task<ApiResponse<object>> GetAllComercios(
@@ -236,6 +239,12 @@ namespace AdLocalAPI.Services
                             : "Recomendado";
                 }
 
+                long tipoComercioId = comercio.TipoComercioId != null ? (long)comercio.TipoComercioId : 0;
+                TipoComercio tipoComercio = null;
+                if (tipoComercioId != 0)
+                {
+                     tipoComercio = await _tipoComercioRepo.GetById(tipoComercioId);
+                }
 
                 var dto = new ComercioMineDto
                 {
@@ -260,7 +269,8 @@ namespace AdLocalAPI.Services
                     MunicipioId = municipio == null ? 0 : municipio.Id,
                     Calificacion = calificacionPromedio,
                     Badge = badge,
-                    TipoComercioId = (long)comercio.TipoComercioId,
+                    TipoComercioId = tipoComercioId,
+                    TipoComercio = tipoComercio != null ? tipoComercio.Nombre :"",
                 };
 
                 return ApiResponse<ComercioMineDto>.Success(
@@ -349,6 +359,13 @@ namespace AdLocalAPI.Services
                      municipio = await _locationRepository.GetMunicipalityByIdAsync(comercio.MunicipioId);
                 }
 
+                long tipoComercioId = comercio.TipoComercioId != null ? (long)comercio.TipoComercioId : 0;
+                TipoComercio tipoComercio = null;
+                if (tipoComercioId != 0)
+                {
+                    tipoComercio = await _tipoComercioRepo.GetById(tipoComercioId);
+                }
+
 
                 var dto = new ComercioMineDto
                 {
@@ -371,7 +388,8 @@ namespace AdLocalAPI.Services
                     EstadoId = estado == null ? 0 : comercio.EstadoId,
                     MunicipioId = municipio == null ? 0 : municipio.Id,
                     Calificacion = calificacionPromedio,
-                    TipoComercioId = (long)comercio.TipoComercioId,
+                    TipoComercioId = tipoComercioId,
+                    TipoComercio = tipoComercio != null ? tipoComercio.Nombre : "",
                 };
 
                 return ApiResponse<ComercioMineDto>.Success(

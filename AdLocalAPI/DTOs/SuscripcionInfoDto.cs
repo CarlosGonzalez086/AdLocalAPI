@@ -11,6 +11,7 @@
 
         public bool Activa { get; set; }
         public string Estado { get; set; }
+        public bool AutoRenew { get; set; }
 
         public decimal Monto { get; set; }
         public string Moneda { get; set; }

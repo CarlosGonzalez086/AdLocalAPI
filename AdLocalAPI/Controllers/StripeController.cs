@@ -30,11 +30,11 @@ namespace AdLocalAPI.Controllers
             long userId = _jwtContext.GetUserId();
             var user = await _usuarioRepository.GetByIdAsync(userId);
 
-            // Stripe YA está configurado al iniciar la API
-            // (esto solo es log, puedes quitarlo luego)
             Console.WriteLine(
                 $"Stripe mode: {(StripeConfiguration.ApiKey.StartsWith("sk_live") ? "LIVE" : "TEST")}"
             );
+            Console.WriteLine(StripeConfiguration.ApiKey);
+
 
             if (string.IsNullOrEmpty(user.StripeCustomerId))
             {
