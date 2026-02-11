@@ -25,5 +25,6 @@
 
         public string? PlanTipo { get; set; }     
         public bool SuscripcionVigente { get; set; } 
+        public long idColaborador { get; set; } 
     }
 }
