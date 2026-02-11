@@ -219,7 +219,7 @@ namespace AdLocalAPI.Services
                         s.UsuarioId == comercio.IdUsuario &&
                         s.IsActive &&
                         !s.IsDeleted &&
-                        (s.Plan.Tipo == "PRO" || s.Plan.Tipo == "BUSINESS")
+                        (s.Plan.Tipo == "PRO" || s.Plan.Tipo == "BUSINESS" || s.Plan.Tipo == "BASIC")
                     )
                     .Select(s => new
                     {
@@ -232,12 +232,21 @@ namespace AdLocalAPI.Services
 
                 if (suscripcionActiva != null && suscripcionActiva.TieneBadge)
                 {
-                    badge = !string.IsNullOrEmpty(suscripcionActiva.BadgeTexto)
-                        ? suscripcionActiva.BadgeTexto
-                        : suscripcionActiva.Tipo == "BUSINESS"
-                            ? "Premium"
-                            : "Recomendado";
+                    if (!string.IsNullOrWhiteSpace(suscripcionActiva.BadgeTexto))
+                    {
+                        badge = suscripcionActiva.BadgeTexto;
+                    }
+                    else
+                    {
+                        badge = suscripcionActiva.Tipo switch
+                        {
+                            "BUSINESS" => "Premium",
+                            "PRO" => "Recomendado",
+                            _ => "Esencial"
+                        };
+                    }
                 }
+
 
                 long tipoComercioId = comercio.TipoComercioId != null ? (long)comercio.TipoComercioId : 0;
                 TipoComercio tipoComercio = null;
@@ -366,6 +375,41 @@ namespace AdLocalAPI.Services
                     tipoComercio = await _tipoComercioRepo.GetById(tipoComercioId);
                 }
 
+                string badge = "";
+
+                var suscripcionActiva = await _context.Suscripcions
+                    .Where(s =>
+                        s.UsuarioId == comercio.IdUsuario &&
+                        s.IsActive &&
+                        !s.IsDeleted &&
+                        (s.Plan.Tipo == "PRO" || s.Plan.Tipo == "BUSINESS" || s.Plan.Tipo == "BASIC")
+                    )
+                    .Select(s => new
+                    {
+                        s.Plan.Tipo,
+                        s.Plan.NivelVisibilidad,
+                        s.Plan.TieneBadge,
+                        s.Plan.BadgeTexto
+                    })
+                    .FirstOrDefaultAsync();
+
+                if (suscripcionActiva != null && suscripcionActiva.TieneBadge)
+                {
+                    if (!string.IsNullOrWhiteSpace(suscripcionActiva.BadgeTexto))
+                    {
+                        badge = suscripcionActiva.BadgeTexto;
+                    }
+                    else
+                    {
+                        badge = suscripcionActiva.Tipo switch
+                        {
+                            "BUSINESS" => "Premium",
+                            "PRO" => "Recomendado",
+                            _ => "Esencial"
+                        };
+                    }
+                }
+
 
                 var dto = new ComercioMineDto
                 {
@@ -388,6 +432,7 @@ namespace AdLocalAPI.Services
                     EstadoId = estado == null ? 0 : comercio.EstadoId,
                     MunicipioId = municipio == null ? 0 : municipio.Id,
                     Calificacion = calificacionPromedio,
+                    Badge = badge,
                     TipoComercioId = tipoComercioId,
                     TipoComercio = tipoComercio != null ? tipoComercio.Nombre : "",
                 };
