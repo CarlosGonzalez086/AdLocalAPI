@@ -126,8 +126,6 @@ namespace AdLocalAPI.Services
                 return ApiResponse<object>.Error("500", ex.Message);
             }
         }
-
-
         public async Task<ApiResponse<ComercioMineDto>> GetComercioById(long id)
         {
             try
@@ -941,7 +939,6 @@ namespace AdLocalAPI.Services
                 return ApiResponse<object>.Error("500", ex.Message);
             }
         }
-
         public async Task<ApiResponse<PagedResponse<ComercioPublicDto>>> GetAllComerciosByUserPaged(
             int page = 1,
             int pageSize = 10
@@ -1079,10 +1076,6 @@ namespace AdLocalAPI.Services
                 return ApiResponse<bool>.Error("500", ex.Message);
             }
         }
-
-
-
-
         private static readonly Dictionary<string, string> TiposImagenPermitidos = new()
         {
             { "image/jpeg", "data:image/jpeg;base64," },

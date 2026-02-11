@@ -517,7 +517,8 @@ namespace AdLocalAPI.Repositories
                 .Include(c => c.Municipio)
                 .Include(c => c.CalificacionesComentarios);
 
-            // Badge del usuario (una sola vez)
+            IQueryable<Usuario> queryColaboradores = _context.Usuarios.Where(c => c.Rol == "Colaborador");
+
             var badge = await _context.Suscripcions
                 .Where(s =>
                     s.UsuarioId == idUser &&
@@ -552,6 +553,10 @@ namespace AdLocalAPI.Repositories
                     EstadoNombre = c.Estado!.EstadoNombre,
                     MunicipioNombre = c.Municipio!.MunicipioNombre,
                     Badge = badge,
+                    idColaborador = queryColaboradores
+    .Where(uc => uc.ComercioId == c.Id)
+    .Select(uc => uc.Id)
+    .FirstOrDefault(),
                     PromedioCalificacion = c.CalificacionesComentarios.Any()
                         ? c.CalificacionesComentarios.Average(x => x.Calificacion)
                         : 0
