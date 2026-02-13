@@ -111,7 +111,7 @@ namespace AdLocalAPI.Services
 
                     byte[] imageBytes = Convert.FromBase64String(base64Clean);
 
-                    logoUrl = await _repository.UploadToSupabaseAsync(
+                    logoUrl = await _repository.UploadImageAsync(
                         imageBytes,
                         userId,
                         contentType
@@ -268,10 +268,10 @@ namespace AdLocalAPI.Services
 
                 if (!string.IsNullOrWhiteSpace(entity.LogoUrl))
                 {
-                    await _repository.DeleteFromSupabaseByUrlAsync(entity.LogoUrl);
+                    await _repository.DeleteFromS3Async(entity.LogoUrl);
                 }
 
-                entity.LogoUrl = await _repository.UploadToSupabaseAsync(
+                entity.LogoUrl = await _repository.UploadImageAsync(
                     imageBytes,
                     userId,
                     contentType
@@ -319,7 +319,7 @@ namespace AdLocalAPI.Services
 
             if (!string.IsNullOrWhiteSpace(entity.LogoUrl))
             {
-                await _repository.DeleteFromSupabaseByUrlAsync(entity.LogoUrl);
+                await _repository.DeleteFromS3Async(entity.LogoUrl);
             }
 
             entity.Eliminado = true;

@@ -564,7 +564,7 @@ namespace AdLocalAPI.Services
 
                 if (!string.IsNullOrWhiteSpace(usuario.FotoUrl))
                 {
-                    bool deleted = await _repository.DeleteFromSupabaseByUrlAsync(usuario.FotoUrl);
+                    bool deleted = await _repository.DeleteFromS3Async(usuario.FotoUrl);
 
                     if (!deleted)
                     {
@@ -577,7 +577,7 @@ namespace AdLocalAPI.Services
 
                 string contentType = tipoImagen ?? "image/png";
 
-                string newUrl = await _repository.UploadToSupabaseAsync(
+                string newUrl = await _repository.UploadImageAsync(
                     imageBytes,
                     id,
                     contentType

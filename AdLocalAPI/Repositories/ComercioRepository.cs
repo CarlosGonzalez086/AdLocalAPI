@@ -1,6 +1,7 @@
 ﻿using AdLocalAPI.Data;
 using AdLocalAPI.DTOs;
 using AdLocalAPI.Models;
+using Amazon.S3;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
 using Org.BouncyCastle.Crypto.Digests;
@@ -18,11 +19,14 @@ namespace AdLocalAPI.Repositories
         private readonly AppDbContext _context;
         private readonly Supabase.Client _supabaseClient;
         private readonly IWebHostEnvironment _env;
+        private readonly string _bucketName = "logocomercio";
+        private readonly IAmazonS3 _s3Client;
 
-        public ComercioRepository(AppDbContext context, Supabase.Client supabaseClient, IWebHostEnvironment env)
+        public ComercioRepository(AppDbContext context, Supabase.Client supabaseClient, IWebHostEnvironment env, IAmazonS3 s3Client)
         {
             _context = context;
             _supabaseClient = supabaseClient;
+            _s3Client = s3Client;
             _env = env;
         }
 
@@ -333,41 +337,81 @@ namespace AdLocalAPI.Repositories
                 await _context.SaveChangesAsync();
             }
         }
-        public async Task<string> UploadToSupabaseAsync(byte[] imageBytes, int userId, string contentType = "image/png")
-        {
-            string envPrefix = _env.IsProduction() ? "prod" : "local";
-            string fileName = $"{envPrefix}_LogoComercio{userId}_{DateTime.UtcNow.Ticks}.png";
-            var bucket = _supabaseClient.Storage.From("LogoComercio");
-
-            var options = new Supabase.Storage.FileOptions
-            {
-                ContentType = contentType
-            };
-
-
-            await bucket.Upload(imageBytes, fileName, options);
-
-            return bucket.GetPublicUrl(fileName);
-        }
-        public async Task<bool> DeleteFromSupabaseByUrlAsync(string publicUrl)
+        public async Task<string> UploadImageAsync(byte[] imageBytes, long userId, string contentType = "image/png")
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(publicUrl))
-                    return false;
+                string envPrefix = _env.IsProduction() ? "prod" : "local";
+                string extension = contentType switch
+                {
+                    "image/jpeg" => ".jpg",
+                    "image/png" => ".png",
+                    "image/webp" => ".webp",
+                    _ => ".png"
+                };
 
-                var uri = new Uri(publicUrl);
+                string fileName = $"{envPrefix}_LogoComercio{userId}_{DateTime.UtcNow.Ticks}{extension}";
 
-                var path = uri.AbsolutePath.Split("/LogoComercio/").Last();
+                string key = $"logo-comercio-imagen/{fileName}";
 
-                var bucket = _supabaseClient.Storage.From("LogoComercio");
+                using var stream = new MemoryStream(imageBytes);
 
-                await bucket.Remove(path);
+                var request = new Amazon.S3.Model.PutObjectRequest
+                {
+                    BucketName = _bucketName,
+                    Key = key,
+                    InputStream = stream,
+                    ContentType = contentType,
+                    DisablePayloadSigning = true
 
+                };
+
+                await _s3Client.PutObjectAsync(request);
+
+
+                return "https://pub-d5a2e881682f4782a4be2517d547d3c7.r2.dev/" + key;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString);
+                return null;
+            }
+        }
+        public async Task<bool> DeleteFromS3Async(string storageReference)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(storageReference)) return false;
+
+                string key;
+
+                if (storageReference.StartsWith("http"))
+                {
+                    var uri = new Uri(storageReference);
+                    var path = uri.AbsolutePath.TrimStart('/');
+                    key = path;
+                }
+                else
+                {
+                    key = storageReference;
+                }
+
+                var request = new Amazon.S3.Model.DeleteObjectRequest
+                {
+                    BucketName = _bucketName,
+                    Key = key
+                };
+
+                await _s3Client.DeleteObjectAsync(request);
                 return true;
             }
-            catch
+            catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error eliminando de S3: {ex.Message}");
                 return false;
             }
         }
