@@ -1,5 +1,6 @@
 ﻿using AdLocalAPI.Data;
 using AdLocalAPI.Models;
+using Amazon.S3;
 using Microsoft.EntityFrameworkCore;
 
 namespace AdLocalAPI.Repositories
@@ -9,11 +10,14 @@ namespace AdLocalAPI.Repositories
         private readonly AppDbContext _context;
         private readonly Supabase.Client _supabaseClient;
         private readonly IWebHostEnvironment _env;
+        private readonly string _bucketName = "perfil";
+        private readonly IAmazonS3 _s3Client;
 
-        public UsuarioRepository(AppDbContext context, Supabase.Client supabaseClient, IWebHostEnvironment env)
+        public UsuarioRepository(AppDbContext context, Supabase.Client supabaseClient, IWebHostEnvironment env, IAmazonS3 s3Client)
         {
             _context = context;
             _supabaseClient = supabaseClient;
+            _s3Client = s3Client;
             _env = env;
         }
         public async Task<bool> ExistePorCorreoAsync(string correo)
@@ -235,42 +239,81 @@ namespace AdLocalAPI.Repositories
                 await _context.SaveChangesAsync();
             }
         }
-        public async Task<string> UploadToSupabaseAsync(byte[] imageBytes, int userId, string contentType = "image/png")
-        {
-
-            string envPrefix = _env.IsProduction() ? "prod" : "local";
-            string fileName = $"{envPrefix}_Perfil_{userId}_{DateTime.UtcNow.Ticks}.png";
-            var bucket = _supabaseClient.Storage.From("Perfil");
-
-            var options = new Supabase.Storage.FileOptions
-            {
-                ContentType = contentType
-            };
-
-
-            await bucket.Upload(imageBytes, fileName, options);
-
-            return bucket.GetPublicUrl(fileName);
-        }
-        public async Task<bool> DeleteFromSupabaseByUrlAsync(string publicUrl)
+        public async Task<string> UploadImageAsync(byte[] imageBytes, long userId, string contentType = "image/png")
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(publicUrl))
-                    return false;
+                string envPrefix = _env.IsProduction() ? "prod" : "local";
+                string extension = contentType switch
+                {
+                    "image/jpeg" => ".jpg",
+                    "image/png" => ".png",
+                    "image/webp" => ".webp",
+                    _ => ".png"
+                };
 
-                var uri = new Uri(publicUrl);
+                string fileName = $"{envPrefix}_Perfil{userId}_{DateTime.UtcNow.Ticks}{extension}";
 
-                var path = uri.AbsolutePath.Split("/Perfil/").Last();
+                string key = $"perfil-imagen/{fileName}";
 
-                var bucket = _supabaseClient.Storage.From("Perfil");
+                using var stream = new MemoryStream(imageBytes);
 
-                await bucket.Remove(path);
+                var request = new Amazon.S3.Model.PutObjectRequest
+                {
+                    BucketName = _bucketName,
+                    Key = key,
+                    InputStream = stream,
+                    ContentType = contentType,
+                    DisablePayloadSigning = true
 
+                };
+
+                await _s3Client.PutObjectAsync(request);
+
+
+                return "https://pub-037f80ecc77344f2ae668578f6c3d6e2.r2.dev/" + key;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString);
+                return null;
+            }
+        }
+        public async Task<bool> DeleteFromS3Async(string storageReference)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(storageReference)) return false;
+
+                string key;
+
+                if (storageReference.StartsWith("http"))
+                {
+                    var uri = new Uri(storageReference);
+                    var path = uri.AbsolutePath.TrimStart('/');
+                    key = path;
+                }
+                else
+                {
+                    key = storageReference;
+                }
+
+                var request = new Amazon.S3.Model.DeleteObjectRequest
+                {
+                    BucketName = _bucketName,
+                    Key = key
+                };
+
+                await _s3Client.DeleteObjectAsync(request);
                 return true;
             }
-            catch
+            catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error eliminando de S3: {ex.Message}");
                 return false;
             }
         }

@@ -312,12 +312,20 @@ namespace AdLocalAPI.Services
                     comercio = await _repository.GetComercioByUser(idUser);
                 }
 
+                var planActivo = await _suscripcionRepository.GetActivaByUsuarioAsync(comercio.IdUsuario);
+                long idPlan = planActivo.PlanId;
+                var plan = await _planRepository.GetByIdLongAsync(idPlan);
+
 
 
                 if (comercio == null)
                     return ApiResponse<ComercioMineDto>.Error("404", "Comercio no encontrado");
 
                 var listaImagenes = await _comercioImagenRepositorio.ObtenerPorComercio(comercio.Id);
+                int MaxFotos = plan.MaxFotos;
+                listaImagenes = listaImagenes
+                  .Take(MaxFotos)
+                  .ToList();
                 List<string> Imagenes = new List<string>();
                 if (listaImagenes.Count > 0)
                 {
@@ -525,7 +533,7 @@ namespace AdLocalAPI.Services
 
                     byte[] imageBytes = Convert.FromBase64String(base64Clean);
 
-                    logoUrl = await _repository.UploadToSupabaseAsync(
+                    logoUrl = await _repository.UploadImageAsync(
                         imageBytes,
                         (int)idUser,
                         contentType
@@ -586,7 +594,7 @@ namespace AdLocalAPI.Services
                             byte[] imageBytes = Convert.FromBase64String(base64Clean);
 
                             var imagenUrl = await _comercioImagenRepositorio
-                                .UploadToSupabaseAsync(imageBytes, (int)idUser, contentType);
+                                .UploadImageAsync(imageBytes, (int)idUser, contentType);
 
                             if (string.IsNullOrEmpty(imagenUrl))
                                 continue;
@@ -730,10 +738,10 @@ namespace AdLocalAPI.Services
 
                     if (!string.IsNullOrWhiteSpace(comercio.LogoUrl))
                     {
-                        await _repository.DeleteFromSupabaseByUrlAsync(comercio.LogoUrl);
+                        await _repository.DeleteFromS3Async(comercio.LogoUrl);
                     }
 
-                    comercio.LogoUrl = await _repository.UploadToSupabaseAsync(
+                    comercio.LogoUrl = await _repository.UploadImageAsync(
                         imageBytes,
                         (int)userId,
                         contentType
@@ -785,40 +793,48 @@ namespace AdLocalAPI.Services
                     {
                         if (!urlsRecibidas.Contains(img.FotoUrl))
                         {
-                            await _comercioImagenRepositorio.DeleteFromSupabaseByUrlAsync(img.FotoUrl);
                             await _comercioImagenRepositorio.Eliminar(comercio.Id, img.FotoUrl);
                         }
                     }
+
 
                     foreach (var item in dto.Imagenes)
                     {
                         try
                         {
-                            if (!string.IsNullOrWhiteSpace(item) &&!EsUrl(item)) 
-                            {
-                                string? contentType = TiposImagenPermitidos.FirstOrDefault(x => item.StartsWith(x.Value)).Key;
+                            if (string.IsNullOrWhiteSpace(item))
+                                continue;
 
+
+                            if (EsImagenBase64(item))  
+                            {
+                                string? contentType = TiposImagenPermitidos
+                                    .FirstOrDefault(x => item.StartsWith(x.Value))
+                                    .Key;
                                 if (contentType == null)
                                     continue;
 
-                                string base64Clean = item
-                                    .Replace($"data:{contentType};base64,", string.Empty);
-
+                                string base64Clean = item.Replace($"data:{contentType};base64,", string.Empty);
                                 byte[] imageBytes = Convert.FromBase64String(base64Clean);
 
-                                var imagenUrl = await _comercioImagenRepositorio
-                                    .UploadToSupabaseAsync(imageBytes, (int)userId, contentType);
 
-                                if (string.IsNullOrEmpty(imagenUrl))
+                                var storageKey = await _comercioImagenRepositorio.UploadImageAsync(
+                                    imageBytes,
+                                    (long)comercio.Id,  
+                                    contentType
+                                );
+
+                                if (string.IsNullOrEmpty(storageKey))
                                     continue;
 
-                                await _comercioImagenRepositorio
-                                    .Crear(comercio.Id, imagenUrl);
+
+                                await _comercioImagenRepositorio.Crear(comercio.Id, storageKey);
                             }
-  
+
                         }
-                        catch
+                        catch (Exception ex)
                         {
+
                             continue;
                         }
                     }
@@ -867,7 +883,7 @@ namespace AdLocalAPI.Services
 
                 if (!string.IsNullOrWhiteSpace(comercio.LogoUrl))
                 {
-                    await _repository.DeleteFromSupabaseByUrlAsync(comercio.LogoUrl);
+                    await _repository.DeleteFromS3Async(comercio.LogoUrl);
                 }
                 var listaImagenes = await _comercioImagenRepositorio.ObtenerPorComercio(comercio.Id);
                 if (listaImagenes.Count > 0)
@@ -1066,7 +1082,7 @@ namespace AdLocalAPI.Services
                 var user = await _usuarioRepository.GetByIdComercioAndIdUserAsync(idColaborador, idComercio);
                 if (!string.IsNullOrEmpty(user.FotoUrl))
                 {
-                    await _usuarioRepository.DeleteFromSupabaseByUrlAsync(user.FotoUrl);
+                    await _usuarioRepository.DeleteFromS3Async(user.FotoUrl);
                 }
                 await _usuarioRepository.DeleteColaboradorAsync(idColaborador,idComercio);
                 return ApiResponse<bool>.Success(true, user.Activo ? "Activado correctamente" : "Desactivado correctamente");

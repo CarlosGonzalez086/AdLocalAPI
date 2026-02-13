@@ -2,6 +2,7 @@
 using AdLocalAPI.DTOs;
 using AdLocalAPI.Interfaces.ProductosServicios;
 using AdLocalAPI.Models;
+using Amazon.S3;
 using Microsoft.EntityFrameworkCore;
 using Supabase.Interfaces;
 using System.Linq;
@@ -13,11 +14,14 @@ namespace AdLocalAPI.Repositories
         private readonly AppDbContext _context;
         private readonly Supabase.Client _supabaseClient;
         private readonly IWebHostEnvironment _env;
+        private readonly string _bucketName = "productosservicios";
+        private readonly IAmazonS3 _s3Client;
 
-        public ProductosServiciosRepository(AppDbContext context, Supabase.Client supabaseClient, IWebHostEnvironment env)
+        public ProductosServiciosRepository(AppDbContext context, Supabase.Client supabaseClient, IWebHostEnvironment env, IAmazonS3 s3Client)
         {
             _context = context;
             _supabaseClient = supabaseClient;
+            _s3Client = s3Client;
             _env = env;
         }
 
@@ -96,52 +100,82 @@ namespace AdLocalAPI.Repositories
 
             return ApiResponse<PagedResponse<ProductosServiciosDto>>.Success(pagedResponse, "Listado de productos/servicios");
         }
-        public async Task<string> UploadToSupabaseAsync(
-            byte[] imageBytes,
-            long userId,
-            string contentType = "image/png")
+        public async Task<string> UploadImageAsync(byte[] imageBytes, long userId, string contentType = "image/png")
         {
             try
             {
                 string envPrefix = _env.IsProduction() ? "prod" : "local";
-                string fileName = $"{envPrefix}_ProductosServicios_{userId}_{DateTime.UtcNow.Ticks}.png";
-
-                var bucket = _supabaseClient.Storage.From("ProductosServicios");
-
-                var options = new Supabase.Storage.FileOptions
+                string extension = contentType switch
                 {
-                    ContentType = contentType
+                    "image/jpeg" => ".jpg",
+                    "image/png" => ".png",
+                    "image/webp" => ".webp",
+                    _ => ".png"
                 };
 
-                await bucket.Upload(imageBytes, fileName, options);
+                string fileName = $"{envPrefix}_ProductosServicios{userId}_{DateTime.UtcNow.Ticks}{extension}";
 
-                return bucket.GetPublicUrl(fileName);
+                string key = $"productos-servicios-imagen/{fileName}";
+
+                using var stream = new MemoryStream(imageBytes);
+
+                var request = new Amazon.S3.Model.PutObjectRequest
+                {
+                    BucketName = _bucketName,
+                    Key = key,
+                    InputStream = stream,
+                    ContentType = contentType,
+                    DisablePayloadSigning = true
+
+                };
+
+                await _s3Client.PutObjectAsync(request);
+
+
+                return "https://pub-727cd6582d634b08bdb65548ef177d86.r2.dev/" + key;
             }
             catch (Exception ex)
             {
-                throw new Exception("Error al subir la imagen a Supabase.", ex);
+                Console.WriteLine(ex.ToString);
+                return null;
             }
         }
 
-        public async Task<bool> DeleteFromSupabaseByUrlAsync(string publicUrl)
+        public async Task<bool> DeleteFromS3Async(string storageReference)
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(publicUrl))
-                    return false;
+                if (string.IsNullOrWhiteSpace(storageReference)) return false;
 
-                var uri = new Uri(publicUrl);
+                string key;
 
-                var path = uri.AbsolutePath.Split("/ProductosServicios/").Last();
+                if (storageReference.StartsWith("http"))
+                {
+                    var uri = new Uri(storageReference);
+                    var path = uri.AbsolutePath.TrimStart('/');
+                    key = path;
+                }
+                else
+                {
+                    key = storageReference;
+                }
 
-                var bucket = _supabaseClient.Storage.From("ProductosServicios");
+                var request = new Amazon.S3.Model.DeleteObjectRequest
+                {
+                    BucketName = _bucketName,
+                    Key = key
+                };
 
-                await bucket.Remove(path);
-
+                await _s3Client.DeleteObjectAsync(request);
                 return true;
             }
-            catch
+            catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error eliminando de S3: {ex.Message}");
                 return false;
             }
         }

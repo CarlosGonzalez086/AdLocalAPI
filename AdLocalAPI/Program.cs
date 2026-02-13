@@ -10,6 +10,9 @@ using AdLocalAPI.Repositories;
 using AdLocalAPI.Services;
 using AdLocalAPI.Utils;
 using AdLocalAPI.Validators;
+using Amazon;
+using Amazon.Runtime;
+using Amazon.S3;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -80,6 +83,33 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             Encoding.UTF8.GetBytes(jwtKey)
         )
     };
+});
+
+builder.Services.AddSingleton<IAmazonS3>(sp =>
+{
+    var config = builder.Configuration;
+
+    var accessKey = config["R2:AccessKeyId"];
+    var secretKey = config["R2:SecretAccessKey"];
+    var accountId = config["R2:AccountId"];
+
+    var credentials = new BasicAWSCredentials(accessKey, secretKey);
+
+    var s3Config = new AmazonS3Config
+    {
+        ServiceURL = $"https://{accountId}.r2.cloudflarestorage.com",
+        AuthenticationRegion = "auto",
+        ForcePathStyle = true,       
+
+        UseHttp = false,                       
+
+        
+        MaxErrorRetry = 5
+    };
+
+
+
+    return new AmazonS3Client(credentials, s3Config);
 });
 
 // ======================================================
