@@ -84,26 +84,40 @@ namespace AdLocalAPI.Repositories
 
             var userLocation = new Point(lng, lat) { SRID = 4326 };
 
-            var suscripcionesVigentes = _context.Suscripcions
-                .Where(s =>
-                    s.IsActive &&
-                    !s.IsDeleted &&
-                    s.CurrentPeriodEnd > hoy &&
-                    (s.Plan.Tipo == "BASIC" || s.Plan.Tipo == "PRO" || s.Plan.Tipo == "BUSINESS")
-                )
-                .Select(s => new
-                {
-                    s.UsuarioId,
-                    s.CurrentPeriodEnd,
-                    s.Plan.MaxNegocios,
-                    s.Plan.BadgeTexto,
-                    s.Plan.NivelVisibilidad,
-                    s.Plan.Tipo
-                })
-                .AsEnumerable()
+            var planesDestacados = new[] { "BASIC", "PRO", "BUSINESS" };
+
+            var suscripcionesQuery = _context.Suscripcions
+                                        .Where(s =>
+                                            s.IsActive &&
+                                            !s.IsDeleted &&
+                                            s.CurrentPeriodEnd > hoy
+                                        );
+            if (tipo == "destacados")
+            {
+                suscripcionesQuery = suscripcionesQuery
+                    .Where(s => planesDestacados.Contains(s.Plan.Tipo));
+            }
+
+
+
+
+            var suscripcionesVigentes = await suscripcionesQuery
                 .GroupBy(s => s.UsuarioId)
-                .Select(g => g.OrderByDescending(x => x.CurrentPeriodEnd).First())
-                .ToList();
+                .Select(g => g
+                    .OrderByDescending(x => x.CurrentPeriodEnd)
+                    .Select(x => new
+                    {
+                        x.UsuarioId,
+                        x.CurrentPeriodEnd,
+                        x.Plan.MaxNegocios,
+                        x.Plan.BadgeTexto,
+                        x.Plan.NivelVisibilidad,
+                        x.Plan.Tipo
+                    })
+                    .First()
+                )
+                .ToListAsync();
+
 
             IQueryable<Comercio> comerciosQuery = _context.Comercios
                 .Where(c => c.Activo && c.Ubicacion != null)
@@ -118,15 +132,15 @@ namespace AdLocalAPI.Repositories
             }
 
             var query =
-                from c in comerciosQuery.AsEnumerable()
-                join s in suscripcionesVigentes
-                    on c.IdUsuario equals s.UsuarioId into sus
-                from suscripcion in sus.DefaultIfEmpty()
-                select new
-                {
-                    Comercio = c,
-                    Suscripcion = suscripcion
-                };
+                        from c in comerciosQuery.AsEnumerable()
+                        join s in suscripcionesVigentes
+                            on c.IdUsuario equals s.UsuarioId into sus
+                        from suscripcion in sus.DefaultIfEmpty()
+                        select new
+                        {
+                            Comercio = c,
+                            Suscripcion = suscripcion
+                        };
 
             switch (tipo.ToLower())
             {
