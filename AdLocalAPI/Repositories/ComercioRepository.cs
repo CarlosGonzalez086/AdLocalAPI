@@ -31,22 +31,18 @@ namespace AdLocalAPI.Repositories
         }
 
         public async Task<(List<ComercioPublicDto> comercios, int total)> GetAllAsync(
-            string tipo,
-            double lat,
-            double lng,
-            string municipio,
-            int page,
-            int pageSize,
-            string ip
-        )
+            string tipo, double lat, double lng,
+            string municipio, int page, int pageSize, string ip)
         {
             var hoy = DateTime.UtcNow.Date;
-            double maxKm = 0;
+            var ahora = DateTime.UtcNow;
+            double maxMetros = 0;
             List<long> comerciosVisitadosPorIp = new();
             List<long> tiposVisitadosPorIp = new();
-            try 
+
+            if (!string.IsNullOrEmpty(ip) && tipo == "sugeridos")
             {
-                if (!string.IsNullOrEmpty(ip) && tipo == "sugeridos")
+                try
                 {
                     comerciosVisitadosPorIp = await _context.ComercioVisitas
                         .Where(v => v.Ip == ip)
@@ -59,224 +55,181 @@ namespace AdLocalAPI.Repositories
                     if (comerciosVisitadosPorIp.Any())
                     {
                         tiposVisitadosPorIp = await _context.Comercios
-                            .Where(c =>
-                                comerciosVisitadosPorIp.Contains(c.Id) &&
-                                c.TipoComercioId.HasValue
-                            )
+                            .Where(c => comerciosVisitadosPorIp.Contains(c.Id) && c.TipoComercioId.HasValue)
                             .Select(c => c.TipoComercioId!.Value)
                             .Distinct()
                             .ToListAsync();
-
                     }
                 }
+                catch (Exception ex) { Console.WriteLine(ex); }
             }
-            catch (Exception ex) 
-            {
-                Console.WriteLine(ex);
-            }
-               
-
-
-
-
-            if (lat == null || lng == null)
-                throw new ArgumentException("Latitud y longitud son requeridas");
 
             var userLocation = new Point(lng, lat) { SRID = 4326 };
-
             var planesDestacados = new[] { "BASIC", "PRO", "BUSINESS" };
 
-            var suscripcionesQuery = _context.Suscripcions
-                                        .Where(s =>
-                                            s.IsActive &&
-                                            !s.IsDeleted &&
-                                            s.CurrentPeriodEnd > hoy
-                                        );
-            if (tipo == "destacados")
-            {
-                suscripcionesQuery = suscripcionesQuery
-                    .Where(s => planesDestacados.Contains(s.Plan.Tipo));
-            }
-
-
-
-
-            var suscripcionesVigentes = await suscripcionesQuery
-                .GroupBy(s => s.UsuarioId)
-                .Select(g => g
-                    .OrderByDescending(x => x.CurrentPeriodEnd)
-                    .Select(x => new
-                    {
-                        x.UsuarioId,
-                        x.CurrentPeriodEnd,
-                        x.Plan.MaxNegocios,
-                        x.Plan.BadgeTexto,
-                        x.Plan.NivelVisibilidad,
-                        x.Plan.Tipo
-                    })
-                    .First()
-                )
-                .ToListAsync();
-
-
-            IQueryable<Comercio> comerciosQuery = _context.Comercios
+            // ════════════════════════════════════════════════════════════════════
+            // FASE 1 — Todo en SQL: filtros + distancia
+            // ════════════════════════════════════════════════════════════════════
+            IQueryable<Comercio> comerciosBase = _context.Comercios
                 .Where(c => c.Activo && c.Ubicacion != null)
                 .Include(c => c.Estado)
                 .Include(c => c.Municipio)
                 .Include(c => c.CalificacionesComentarios);
 
             if (!string.IsNullOrEmpty(municipio))
-            {
-                comerciosQuery = comerciosQuery
-                    .Where(c => c.Municipio.MunicipioNombre == municipio);
-            }
-
-            var query =
-                        from c in comerciosQuery.AsEnumerable()
-                        join s in suscripcionesVigentes
-                            on c.IdUsuario equals s.UsuarioId into sus
-                        from suscripcion in sus.DefaultIfEmpty()
-                        select new
-                        {
-                            Comercio = c,
-                            Suscripcion = suscripcion
-                        };
+                comerciosBase = comerciosBase.Where(c => c.Municipio.MunicipioNombre == municipio);
 
             switch (tipo.ToLower())
             {
-                case "destacados":
-                    query = query
-                        .Where(x => x.Suscripcion != null)
-                        .OrderByDescending(x => x.Suscripcion.NivelVisibilidad);
-                    break;
-
-                case "populares":
-                    query = query.OrderByDescending(x =>
-                        x.Comercio.CalificacionesComentarios.Any()
-                            ? x.Comercio.CalificacionesComentarios.Average(cc => cc.Calificacion)
-                            : 0);
-                    break;
-
-                case "recientes":
-                    query = query.OrderByDescending(x => x.Comercio.FechaCreacion);
-                    break;
-
                 case "cercanos":
-                    maxKm = 5;
-                    query = query
-                        .Where(x => x.Comercio.Ubicacion.Distance(userLocation) <= maxKm / 111.32)
-                        .OrderBy(x => x.Comercio.Ubicacion.Distance(userLocation));
+                    maxMetros = 5_000;
+                    comerciosBase = comerciosBase
+                        .Where(c => c.Ubicacion.IsWithinDistance(userLocation, maxMetros));
                     break;
+
                 case "sugeridos":
-
-                    maxKm = 10;
-
-                    var ahora = DateTime.UtcNow;
-                    var horaActual = ahora.Hour;
-
-                    query = query
-                        .Select(x => new
-                        {
-                            x.Comercio,
-                            x.Suscripcion,
-
-                            DistanciaKm = x.Comercio.Ubicacion != null
-                                ? x.Comercio.Ubicacion.Distance(userLocation) * 111.32
-                                : 999,
-
-                            Promedio = x.Comercio.CalificacionesComentarios.Any()
-                                ? x.Comercio.CalificacionesComentarios.Average(cc => cc.Calificacion == null ? 0 : cc.Calificacion)
-                                : 0,
-
-                            MatchTipo = tiposVisitadosPorIp.Any() &&
-                                        x.Comercio.TipoComercioId.HasValue &&
-                                        tiposVisitadosPorIp.Contains(x.Comercio.TipoComercioId.Value)
-                                            ? 1 : 0,
-
-                            YaVisitado = comerciosVisitadosPorIp.Contains(x.Comercio.Id)
-                                            ? 1 : 0,
-
-                            BoostPlan = x.Suscripcion != null
-                                        ? (x.Suscripcion.Tipo == "BUSINESS" ? 3 :
-                                           x.Suscripcion.Tipo == "PRO" ? 2 : 1)
-                                        : 0,
-
-                            ContextoHora = (
-                                horaActual >= 7 && horaActual <= 11 && x.Comercio.TipoComercioId == 1 ? 1 :
-                                horaActual >= 12 && horaActual <= 16 && x.Comercio.TipoComercioId == 2 ? 1 :
-                                horaActual >= 18 && horaActual <= 23 && x.Comercio.TipoComercioId == 3 ? 1 :
-                                0
-                            )
-                        })
-                        .Where(x => x.DistanciaKm <= maxKm)
-                        .Select(x => new
-                        {
-                            x.Comercio,
-                            x.Suscripcion,
-
-                            Score =
-                                (x.MatchTipo * 4.0) +
-                                (x.YaVisitado * 2.0) +
-                                (x.Promedio * 1.5) +
-                                (x.BoostPlan * 2.0) +
-                                (x.ContextoHora * 1.5) -
-                                (x.DistanciaKm * 0.3)
-                        })
-                        .OrderByDescending(x => x.Score)
-                        .Select(x => new
-                        {
-                            x.Comercio,
-                            x.Suscripcion
-                        });
-
+                    maxMetros = 10_000;
+                    comerciosBase = comerciosBase
+                        .Where(c => c.Ubicacion.IsWithinDistance(userLocation, maxMetros));
                     break;
 
+                case "destacados":
+                    var usuariosDestacados = _context.Suscripcions
+                        .Where(s => s.IsActive && !s.IsDeleted &&
+                                    s.CurrentPeriodEnd > hoy &&
+                                    planesDestacados.Contains(s.Plan.Tipo))
+                        .Select(s => s.UsuarioId)
+                        .Distinct();
 
-
-
-                default:
-                    query = query.OrderBy(x => x.Comercio.Nombre);
+                    comerciosBase = comerciosBase
+                        .Where(c => usuariosDestacados.Contains(c.IdUsuario));
                     break;
             }
+            var comercios = await comerciosBase.ToListAsync();
 
+            // ════════════════════════════════════════════════════════════════════
+            // FASE 2 — En memoria: JOIN con suscripciones + ordenamiento + score
+            // ════════════════════════════════════════════════════════════════════
 
-            var lista = query
-                .Select(x => new ComercioPublicDto
+            var usuarioIds = comercios.Select(c => c.IdUsuario).Distinct().ToList();
+
+            var suscripcionesVigentes = await _context.Suscripcions
+                .Where(s => s.IsActive &&
+                            !s.IsDeleted &&
+                            s.CurrentPeriodEnd > hoy &&
+                            usuarioIds.Contains(s.UsuarioId))
+                .Include(s => s.Plan)
+                .ToListAsync();
+
+            var mejorSuscripcion = suscripcionesVigentes
+                .GroupBy(s => s.UsuarioId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.OrderByDescending(s => s.CurrentPeriodEnd).First()
+                );
+
+            var queryTyped = comercios.Select(c => new
+            {
+                Comercio = c,
+                Suscripcion = mejorSuscripcion.TryGetValue(c.IdUsuario, out var s) ? s : null
+            });
+
+            var horaActual = ahora.Hour;
+
+            var queryOrdenado = tipo.ToLower() switch
+            {
+                "destacados" => queryTyped
+                    .Where(x => x.Suscripcion != null)
+                    .OrderByDescending(x => x.Suscripcion!.Plan.NivelVisibilidad)
+                    .AsEnumerable(),
+
+                "populares" => queryTyped
+                    .OrderByDescending(x =>
+                        x.Comercio.CalificacionesComentarios.Any()
+                            ? x.Comercio.CalificacionesComentarios.Average(cc => cc.Calificacion)
+                            : 0)
+                    .AsEnumerable(),
+
+                "recientes" => queryTyped
+                    .OrderByDescending(x => x.Comercio.FechaCreacion)
+                    .AsEnumerable(),
+
+                "cercanos" => queryTyped
+                    .OrderBy(x => x.Comercio.Ubicacion!.Distance(userLocation))
+                    .AsEnumerable(),
+
+                "sugeridos" => queryTyped
+                    .OrderByDescending(x =>
+                    {
+                        var distanciaKm = x.Comercio.Ubicacion!.Distance(userLocation) / 1000.0;
+                        var matchTipo = tiposVisitadosPorIp.Any() &&
+                                          x.Comercio.TipoComercioId.HasValue &&
+                                          tiposVisitadosPorIp.Contains(x.Comercio.TipoComercioId.Value) ? 4.0 : 0;
+                        var yaVisitado = comerciosVisitadosPorIp.Contains(x.Comercio.Id) ? 2.0 : 0;
+                        var promedio = x.Comercio.CalificacionesComentarios.Any()
+                                              ? x.Comercio.CalificacionesComentarios.Average(cc => cc.Calificacion) * 1.5
+                                              : 0;
+                        var boostPlan = x.Suscripcion?.Plan.Tipo switch
+                        {
+                            "BUSINESS" => 6.0,
+                            "PRO" => 4.0,
+                            "BASIC" => 2.0,
+                            _ => 0.0
+                        };
+                        var contexto = (horaActual >= 7 && horaActual <= 11 && x.Comercio.TipoComercioId == 1) ||
+                                          (horaActual >= 12 && horaActual <= 16 && x.Comercio.TipoComercioId == 2) ||
+                                          (horaActual >= 18 && horaActual <= 23 && x.Comercio.TipoComercioId == 3)
+                                              ? 1.5 : 0;
+
+                        return matchTipo + yaVisitado + promedio + boostPlan + contexto - (distanciaKm * 0.3);
+                    })
+                    .AsEnumerable(),
+
+                _ => queryTyped.OrderBy(x => x.Comercio.Nombre).AsEnumerable()
+            };
+
+            var lista = queryOrdenado
+                .Select(x => new
                 {
-                    Id = x.Comercio.Id,
-                    Nombre = x.Comercio.Nombre,
-                    Direccion = x.Comercio.Direccion,
-                    Telefono = x.Comercio.Telefono,
-                    Email = x.Comercio.Email,
-                    LogoUrl = x.Comercio.LogoUrl,
-                    Lat = x.Comercio.Ubicacion!.Y,
-                    Lng = x.Comercio.Ubicacion!.X,
-                    ColorPrimario = x.Comercio.ColorPrimario,
-                    ColorSecundario = x.Comercio.ColorSecundario,
-                    Badge = x.Suscripcion?.BadgeTexto ?? "",
-                    PlanTipo = x.Suscripcion?.Tipo,
+                    Dto = new ComercioPublicDto
+                    {
+                        Id = x.Comercio.Id,
+                        Nombre = x.Comercio.Nombre,
+                        Direccion = x.Comercio.Direccion,
+                        Telefono = x.Comercio.Telefono,
+                        Email = x.Comercio.Email,
+                        LogoUrl = x.Comercio.LogoUrl,
+                        Lat = x.Comercio.Ubicacion!.Y,
+                        Lng = x.Comercio.Ubicacion!.X,
+                        ColorPrimario = x.Comercio.ColorPrimario,
+                        ColorSecundario = x.Comercio.ColorSecundario,
+                        Badge = x.Suscripcion?.Plan.BadgeTexto ?? "",
+                        PlanTipo = x.Suscripcion?.Plan.Tipo,
+                        SuscripcionVigente = x.Suscripcion != null,
+                        EstadoNombre = x.Comercio.Estado?.EstadoNombre ?? "",
+                        MunicipioNombre = x.Comercio.Municipio?.MunicipioNombre ?? "",
+
+                        PromedioCalificacion = x.Comercio.CalificacionesComentarios.Any()
+                                                   ? x.Comercio.CalificacionesComentarios.Average(cc => cc.Calificacion)
+                                                   : 0,
+                        DistanciaKm = (tipo == "cercanos" || tipo == "sugeridos") ? Math.Round(x.Comercio.Ubicacion.Distance(userLocation) * 111.32, 2) : 0,
+                        FechaCreacion = x.Comercio.FechaCreacion,
+                        IdUsuario = x.Comercio.IdUsuario
+                    },
+                    x.Comercio.IdUsuario,
                     SuscripcionVigente = x.Suscripcion != null,
-                    EstadoNombre = x.Comercio.Estado.EstadoNombre ?? "",
-                    MunicipioNombre = x.Comercio.Municipio.MunicipioNombre ?? "",
-                    PromedioCalificacion = x.Comercio.CalificacionesComentarios.Any()
-                        ? x.Comercio.CalificacionesComentarios.Average(cc => cc.Calificacion)
-                        : 0,
-                    DistanciaKm = (tipo == "cercanos" || tipo == "sugeridos")
-        ? Math.Round(x.Comercio.Ubicacion.Distance(userLocation) * 111.32, 2)
-        : null,
-                    FechaCreacion = x.Comercio.FechaCreacion,
-                    IdUsuario = x.Comercio.IdUsuario
+                    PlanTipo = x.Suscripcion?.Plan.Tipo,
+                    MaxNegocios = x.Suscripcion?.Plan.MaxNegocios ?? 1
                 })
                 .ToList();
 
             var filtrado = lista
-                .GroupBy(c => c.IdUsuario)
+                .GroupBy(x => x.IdUsuario)
                 .SelectMany(g =>
                 {
                     var tieneSuscripcion = g.Any(x => x.SuscripcionVigente);
 
                     int max = 1;
-
                     if (tieneSuscripcion)
                     {
                         var tipoPlan = g.First(x => x.SuscripcionVigente).PlanTipo;
@@ -288,44 +241,20 @@ namespace AdLocalAPI.Repositories
                         };
                     }
 
-                    IEnumerable<ComercioPublicDto> ordenado;
-
-                    if (tieneSuscripcion)
+                    return tipo switch
                     {
-                        ordenado = g
-                            .OrderBy(c => c.FechaCreacion)
-                            .Take(1);
-                    }
-                    else
-                    {
-                        ordenado = tipo switch
-                        {
-                            "recientes" => g.OrderByDescending(c => c.FechaCreacion),
-                            "cercanos" => g.OrderBy(c => c.DistanciaKm),
-                            "sugeridos" => g
-                                .OrderByDescending(c => c.PromedioCalificacion)
-                                .ThenBy(c => c.DistanciaKm),
-                            _ => g.OrderByDescending(c => c.FechaCreacion),
-                        };
-                    }
-
-                    return ordenado.Take(max);
+                        "recientes" => g.Select(x => x.Dto).OrderByDescending(c => c.FechaCreacion).Take(max),
+                        "cercanos" => g.Select(x => x.Dto).OrderBy(c => c.DistanciaKm).Take(max),
+                        "sugeridos" => g.Select(x => x.Dto).OrderByDescending(c => c.PromedioCalificacion)
+                                                            .ThenBy(c => c.DistanciaKm).Take(max),
+                        _ => g.Select(x => x.Dto).OrderByDescending(c => c.FechaCreacion).Take(max),
+                    };
                 })
-                .Select(c =>
-                {
-                    c.IdUsuario = 0; // ocultas usuario
-                    return c;
-                })
+                .Select(c => { c.IdUsuario = 0; return c; })
                 .ToList();
-
 
             var total = filtrado.Count;
-
-
-            var paginados = filtrado
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToList();
+            var paginados = filtrado.Skip((page - 1) * pageSize).Take(pageSize).ToList();
 
             return (paginados, total);
         }
