@@ -278,6 +278,7 @@ public class WebhooksController : ControllerBase
         var sub = await _suscripcionRepo
             .ObtenerPorStripeId(stripeSub.Id);
         var planFree = await _planRepo.GetByTipoAsync("FREE");
+        Console.WriteLine(sub);
         if (sub == null)
         {
             var user = await _usuarioRepo.GetByStripeId(stripeSub.CustomerId);
