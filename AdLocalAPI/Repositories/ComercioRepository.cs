@@ -212,7 +212,7 @@ namespace AdLocalAPI.Repositories
                         PromedioCalificacion = x.Comercio.CalificacionesComentarios.Any()
                                                    ? x.Comercio.CalificacionesComentarios.Average(cc => cc.Calificacion)
                                                    : 0,
-                        DistanciaKm = (tipo == "cercanos" || tipo == "sugeridos") ? Math.Round(x.Comercio.Ubicacion.Distance(userLocation) * 111.32, 2) : 0,
+                        DistanciaKm = (tipo == "cercanos") ? Math.Round(x.Comercio.Ubicacion.Distance(userLocation) * 111.32, 2) : 0,
                         FechaCreacion = x.Comercio.FechaCreacion,
                         IdUsuario = x.Comercio.IdUsuario
                     },
