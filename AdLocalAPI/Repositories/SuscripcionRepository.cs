@@ -39,10 +39,15 @@ namespace AdLocalAPI.Repositories
                 .FirstOrDefaultAsync(s =>
                     s.UsuarioId == usuarioId &&
                     s.IsActive &&
-                    (s.Status == "active" || s.Status == "canceling") &&
+                    (
+                        s.Status == "active" ||
+                        s.Status == "canceling" ||
+                        s.Status == "past_due"
+                    ) &&
                     s.CurrentPeriodEnd >= DateTime.UtcNow
                 );
         }
+
         public async Task<Suscripcion?> ObtenerActiva(int usuarioId)
         {
             return await _context.Suscripcions
@@ -95,21 +100,16 @@ namespace AdLocalAPI.Repositories
                     s.UsuarioId == usuarioId &&
                     !s.IsDeleted &&
                     (
-                        (
-                            s.Status == "active" &&
-                            s.CurrentPeriodEnd >= DateTime.UtcNow
-                        )
-                        ||
-                        (
-                            s.Status == "canceling" &&
-                            s.CurrentPeriodEnd >= DateTime.UtcNow
-                        )
+                        s.Status == "active" ||
+                        s.Status == "canceling" ||
+                        s.Status == "past_due"
                     )
                 )
                 .OrderByDescending(s => s.CurrentPeriodEnd)
                 .FirstOrDefaultAsync();
-
         }
+
+
         public async Task<List<Suscripcion>> ObtenerParaAutoRenovacionAsync(DateTime fecha)
         {
             return await _context.Suscripcions
