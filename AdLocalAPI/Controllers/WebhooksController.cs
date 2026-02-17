@@ -257,11 +257,39 @@ public class WebhooksController : ControllerBase
     // =================================================
     private async Task OnSubscriptionDeleted(Subscription stripeSub)
     {
+
         var sub = await _suscripcionRepo
             .ObtenerPorStripeId(stripeSub.Id);
-
+        var planFree = await _planRepo.GetByTipoAsync("FREE");
         if (sub == null)
-            return;
+        {
+            var user = await _usuarioRepo.GetByStripeId(stripeSub.CustomerId);
+            if (planFree == null)
+                return;
+            try
+            {
+                await _suscripcionRepo.CrearAsync(new Suscripcion
+                {
+                    UsuarioId = user.Id,
+                    PlanId = planFree.Id,
+                    CurrentPeriodStart = DateTime.UtcNow,
+                    CurrentPeriodEnd = DateTime.MaxValue,
+                    Status = "active",
+                    IsActive = true,
+                    AutoRenew = false,
+                    CreatedAt = DateTime.UtcNow,
+                    StripeCustomerId = "",
+                    StripeSubscriptionId = "",
+                    StripePriceId = "",
+                    StripeCheckoutSessionId = "",
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString());
+            }
+        }
+        
 
         sub.Status = "canceled";
         sub.IsActive = false;
@@ -269,7 +297,6 @@ public class WebhooksController : ControllerBase
         sub.UpdatedAt = DateTime.UtcNow;
 
         await _suscripcionRepo.ActualizarAsync(sub);
-        var planFree = await _planRepo.GetByTipoAsync("FREE");
         if (planFree == null)
             return;
         try
