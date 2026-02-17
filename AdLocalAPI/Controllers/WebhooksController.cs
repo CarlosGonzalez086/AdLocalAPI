@@ -214,7 +214,7 @@ public class WebhooksController : ControllerBase
             return;
 
         sub.Status = "past_due";
-        sub.IsActive = false;
+        sub.IsActive = true;
         sub.UpdatedAt = DateTime.UtcNow;
 
         await _suscripcionRepo.ActualizarAsync(sub);
@@ -231,6 +231,7 @@ public class WebhooksController : ControllerBase
 
         if (sub == null)
             return;
+        sub.Status = stripeSub.Status;
 
         if (stripeSub.CancelAtPeriodEnd)
         {
@@ -240,17 +241,33 @@ public class WebhooksController : ControllerBase
         }
         else
         {
-            sub.Status = stripeSub.Status;
             sub.AutoRenew = true;
             sub.CanceledAt = null;
+        }
+
+        if (
+            stripeSub.Status == "active" ||
+            stripeSub.Status == "trialing" ||
+            stripeSub.Status == "past_due" ||
+            sub.Status == "canceling"
+        )
+        {
+            sub.IsActive = true;
+        }
+        else
+        {
+            sub.IsActive = false;
         }
 
         if (stripeSub.Items?.Data?.Any() == true)
             sub.StripePriceId = stripeSub.Items.Data[0].Price.Id;
 
         sub.UpdatedAt = DateTime.UtcNow;
+
         await _suscripcionRepo.ActualizarAsync(sub);
     }
+
+
 
     // =================================================
     // 5️ Eliminada
