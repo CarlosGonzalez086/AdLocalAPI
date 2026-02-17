@@ -168,30 +168,69 @@ namespace AdLocalAPI.Repositories
                         .OrderBy(x => x.Comercio.Ubicacion.Distance(userLocation));
                     break;
                 case "sugeridos":
+
                     maxKm = 10;
 
+                    var ahora = DateTime.UtcNow;
+                    var horaActual = ahora.Hour;
+
                     query = query
-                        .Where(x =>
-                            x.Comercio.Ubicacion.Distance(userLocation) <= maxKm / 111.32
-                        )
-                        .OrderByDescending(x =>
-                            (tiposVisitadosPorIp.Any() &&
-                             tiposVisitadosPorIp.Contains((long)x.Comercio.TipoComercioId)) ? 3 : 0
-                        )
-                        .ThenByDescending(x =>
-                            (comerciosVisitadosPorIp.Any() &&
-                             comerciosVisitadosPorIp.Contains(x.Comercio.Id)) ? 2 : 0
-                        )
-                        .ThenByDescending(x =>
-                            x.Comercio.CalificacionesComentarios.Any()
-                                ? x.Comercio.CalificacionesComentarios.Average(cc => cc.Calificacion)
-                                : 0
-                        )
-                        .ThenBy(x =>
-                            x.Comercio.Ubicacion.Distance(userLocation)
-                        );
+                        .Select(x => new
+                        {
+                            x.Comercio,
+                            x.Suscripcion,
+
+                            DistanciaKm = x.Comercio.Ubicacion != null
+                                ? x.Comercio.Ubicacion.Distance(userLocation) * 111.32
+                                : 999,
+
+                            Promedio = x.Comercio.CalificacionesComentarios.Any()
+                                ? x.Comercio.CalificacionesComentarios.Average(cc => cc.Calificacion == null ? 0 : cc.Calificacion)
+                                : 0,
+
+                            MatchTipo = tiposVisitadosPorIp.Any() &&
+                                        x.Comercio.TipoComercioId.HasValue &&
+                                        tiposVisitadosPorIp.Contains(x.Comercio.TipoComercioId.Value)
+                                            ? 1 : 0,
+
+                            YaVisitado = comerciosVisitadosPorIp.Contains(x.Comercio.Id)
+                                            ? 1 : 0,
+
+                            BoostPlan = x.Suscripcion != null
+                                        ? (x.Suscripcion.Tipo == "BUSINESS" ? 3 :
+                                           x.Suscripcion.Tipo == "PRO" ? 2 : 1)
+                                        : 0,
+
+                            ContextoHora = (
+                                horaActual >= 7 && horaActual <= 11 && x.Comercio.TipoComercioId == 1 ? 1 :
+                                horaActual >= 12 && horaActual <= 16 && x.Comercio.TipoComercioId == 2 ? 1 :
+                                horaActual >= 18 && horaActual <= 23 && x.Comercio.TipoComercioId == 3 ? 1 :
+                                0
+                            )
+                        })
+                        .Where(x => x.DistanciaKm <= maxKm)
+                        .Select(x => new
+                        {
+                            x.Comercio,
+                            x.Suscripcion,
+
+                            Score =
+                                (x.MatchTipo * 4.0) +
+                                (x.YaVisitado * 2.0) +
+                                (x.Promedio * 1.5) +
+                                (x.BoostPlan * 2.0) +
+                                (x.ContextoHora * 1.5) -
+                                (x.DistanciaKm * 0.3)
+                        })
+                        .OrderByDescending(x => x.Score)
+                        .Select(x => new
+                        {
+                            x.Comercio,
+                            x.Suscripcion
+                        });
 
                     break;
+
 
 
 
