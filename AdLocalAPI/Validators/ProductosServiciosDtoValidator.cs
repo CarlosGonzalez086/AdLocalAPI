@@ -27,11 +27,6 @@ namespace AdLocalAPI.Validators
                 .LessThanOrEqualTo(999999999).WithMessage("Precio fuera de rango permitido")
                 .When(x => x.Precio.HasValue);
 
-            RuleFor(x => x.Stock)
-                .GreaterThanOrEqualTo(0).WithMessage("El stock no puede ser negativo")
-                .LessThanOrEqualTo(999999).WithMessage("Stock fuera de rango")
-                .When(x => x.Stock.HasValue);
-
 
             RuleFor(x => x)
                 .Must(x => x.Precio.HasValue || x.Tipo != 1) 
