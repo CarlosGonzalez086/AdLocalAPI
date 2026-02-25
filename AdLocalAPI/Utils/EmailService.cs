@@ -23,6 +23,7 @@ namespace AdLocalAPI.Utils
             email.Body = new BodyBuilder { HtmlBody = htmlContenido }.ToMessageBody();
 
             using var smtp = new SmtpClient();
+            Console.WriteLine(smtp);
             smtp.Timeout = 15000;
 
             await smtp.ConnectAsync(
@@ -30,7 +31,7 @@ namespace AdLocalAPI.Utils
                 _settings.Port,
                 SecureSocketOptions.StartTls,
                 CancellationToken.None);
-
+            Console.WriteLine("PAso");
             await smtp.AuthenticateAsync(_settings.User, _settings.Password);
             await smtp.SendAsync(email);
             await smtp.DisconnectAsync(true);
