@@ -15,8 +15,9 @@ namespace AdLocalAPI.Utils
 
         public async Task EnviarCorreoAsync(string para, string asunto, string htmlContenido)
         {
+            Console.WriteLine(_settings);
             var client = new SendGridClient(_settings.ApiKey);
-
+            Console.WriteLine(client);
             var msg = MailHelper.CreateSingleEmail(
                 from: new EmailAddress(_settings.FromEmail, _settings.FromName),
                 to: new EmailAddress(para),
