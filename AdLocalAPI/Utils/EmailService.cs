@@ -1,40 +1,37 @@
-﻿using MailKit.Net.Smtp;
-using MailKit.Security;
-using Microsoft.Extensions.Options;
-using MimeKit;
+﻿using Microsoft.Extensions.Options;
+using SendGrid;
+using SendGrid.Helpers.Mail;
 
 namespace AdLocalAPI.Utils
 {
     public class EmailService
     {
-        private readonly EmailSettings _settings;
+        private readonly EmailSettingsSendGrid _settings;
 
-        public EmailService(IOptions<EmailSettings> settings)
+        public EmailService(IOptions<EmailSettingsSendGrid> settings)
         {
             _settings = settings.Value;
         }
 
         public async Task EnviarCorreoAsync(string para, string asunto, string htmlContenido)
         {
-            var email = new MimeMessage();
-            email.From.Add(new MailboxAddress("AdLocal", _settings.User));
-            email.To.Add(MailboxAddress.Parse(para));
-            email.Subject = asunto;
-            email.Body = new BodyBuilder { HtmlBody = htmlContenido }.ToMessageBody();
+            var client = new SendGridClient(_settings.ApiKey);
 
-            using var smtp = new SmtpClient();
-            Console.WriteLine(smtp);
-            smtp.Timeout = 15000;
+            var msg = MailHelper.CreateSingleEmail(
+                from: new EmailAddress(_settings.FromEmail, _settings.FromName),
+                to: new EmailAddress(para),
+                subject: asunto,
+                plainTextContent: null,
+                htmlContent: htmlContenido
+            );
 
-            await smtp.ConnectAsync(
-                _settings.Host,
-                _settings.Port,
-                SecureSocketOptions.StartTls,
-                CancellationToken.None);
-            Console.WriteLine("PAso");
-            await smtp.AuthenticateAsync(_settings.User, _settings.Password);
-            await smtp.SendAsync(email);
-            await smtp.DisconnectAsync(true);
+            var response = await client.SendEmailAsync(msg);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Body.ReadAsStringAsync();
+                throw new Exception($"Error al enviar correo: {response.StatusCode} - {body}");
+            }
         }
     }
 }
