@@ -614,9 +614,10 @@ namespace AdLocalAPI.Services
 
                 bool esProduccion = _env.IsProduction();
                 var link = UrlHelper.GenerarLinkCambioPassword(token, esProduccion);
+                Console.WriteLine(link);
 
                 var html = TemplatesEmail.PlantillaCorreoCambioPasswordCoffee(codigo, link);
-
+                Console.WriteLine(html);
                 await _emailService.EnviarCorreoAsync(
                     usuario.Email,
                     "Restablecer contraseña - AdLocal",
