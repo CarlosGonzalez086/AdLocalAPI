@@ -14,23 +14,23 @@ namespace AdLocalAPI.Utils
             _settings = settings.Value;
         }
 
-        public async Task EnviarCorreoAsync(
-            string para,
-            string asunto,
-            string htmlContenido)
+        public async Task EnviarCorreoAsync(string para, string asunto, string htmlContenido)
         {
             var email = new MimeMessage();
             email.From.Add(new MailboxAddress("AdLocal", _settings.User));
             email.To.Add(MailboxAddress.Parse(para));
             email.Subject = asunto;
-
-            email.Body = new BodyBuilder
-            {
-                HtmlBody = htmlContenido
-            }.ToMessageBody();
+            email.Body = new BodyBuilder { HtmlBody = htmlContenido }.ToMessageBody();
 
             using var smtp = new SmtpClient();
-            await smtp.ConnectAsync(_settings.Host, _settings.Port, SecureSocketOptions.StartTls);
+            smtp.Timeout = 15000;
+
+            await smtp.ConnectAsync(
+                _settings.Host,
+                _settings.Port,
+                SecureSocketOptions.StartTls,
+                CancellationToken.None);
+
             await smtp.AuthenticateAsync(_settings.User, _settings.Password);
             await smtp.SendAsync(email);
             await smtp.DisconnectAsync(true);
