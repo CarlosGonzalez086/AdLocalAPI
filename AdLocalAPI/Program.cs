@@ -183,8 +183,9 @@ builder.Services.AddScoped<CalificacionComentarioService>();
 builder.Services.AddSingleton<StripeConfigProvider>();
 builder.Services.AddSingleton<ClavesConfigProvider>();
 
-builder.Services.Configure<EmailSettings>(
-builder.Configuration.GetSection("EmailSettings"));
+builder.Services.Configure<EmailSettingsSendGrid>(
+    builder.Configuration.GetSection("EmailSettingsSendGrid")
+);
 
 builder.Services.AddScoped<EmailService>();
 

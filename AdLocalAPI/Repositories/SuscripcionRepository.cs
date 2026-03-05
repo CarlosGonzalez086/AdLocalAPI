@@ -43,8 +43,7 @@ namespace AdLocalAPI.Repositories
                         s.Status == "active" ||
                         s.Status == "canceling" ||
                         s.Status == "past_due"
-                    ) &&
-                    s.CurrentPeriodEnd >= DateTime.UtcNow
+                    ) 
                 );
         }
 
