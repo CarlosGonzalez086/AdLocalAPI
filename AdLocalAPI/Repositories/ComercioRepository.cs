@@ -103,15 +103,14 @@ namespace AdLocalAPI.Repositories
             var userLocation = new Point(lng, lat) { SRID = 4326 };
             var planesDestacados = new[] { "BASIC", "PRO", "BUSINESS" };
 
-            bool necesitaCalificaciones = tipo.ToLower() is "populares" or "sugeridos";
 
             IQueryable<Comercio> comerciosBase = _context.Comercios
                 .Where(c => c.Activo && c.Ubicacion != null)
                 .Include(c => c.Estado)
                 .Include(c => c.Municipio);
 
-            if (necesitaCalificaciones)
-                comerciosBase = comerciosBase.Include(c => c.CalificacionesComentarios);
+
+            comerciosBase = comerciosBase.Include(c => c.CalificacionesComentarios);
 
             if (!string.IsNullOrEmpty(municipio))
                 comerciosBase = comerciosBase.Where(c => c.Municipio.MunicipioNombre == municipio);
