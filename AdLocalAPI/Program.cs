@@ -10,6 +10,7 @@ using AdLocalAPI.Repositories;
 using AdLocalAPI.Services;
 using AdLocalAPI.Utils;
 using AdLocalAPI.Validators;
+using Amazon;
 using Amazon.Runtime;
 using Amazon.S3;
 using FluentValidation;
@@ -23,72 +24,209 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+//Singlenton variable
+builder.Services.AddSingleton<StripeSettings>();
+
 // ======================================================
-// CONFIGURACIÓN DEL SERVIDOR
+// VARIABLES DE ENTORNO (Docker / Producción / Local)
 // ======================================================
 
-// Puerto utilizado por Railway, Render o Docker.
+// Puerto (Railway / Docker)
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-
 builder.WebHost.UseUrls($"http://*:{port}");
 
-// ======================================================
-// VARIABLES DE ENTORNO
-// ======================================================
-
 // JWT
-var jwtKey =
-    Environment.GetEnvironmentVariable("JWT__Key")
-    ?? throw new Exception("JWT__Key no está definido.");
+var jwtKey = Environment.GetEnvironmentVariable("JWT__Key")
+    ?? throw new Exception("❌ JWT__Key no está definido");
 
-var jwtIssuer =
-    Environment.GetEnvironmentVariable("JWT__Issuer")
+var jwtIssuer = Environment.GetEnvironmentVariable("JWT__Issuer")
     ?? "AdLocalAPI";
 
-// Stripe
-var webhookSecret =
-    Environment.GetEnvironmentVariable("STRIPE_WEBHOOK_SECRET");
+var webhookSecret = Environment.GetEnvironmentVariable("STRIPE_WEBHOOK_SECRET");
 
 if (string.IsNullOrWhiteSpace(webhookSecret))
 {
-    throw new Exception(
-        "STRIPE_WEBHOOK_SECRET no está definido."
-    );
+    throw new Exception("Stripe Webhook Secret no configurado");
 }
 
-// Supabase
-//var supabaseUrl =
-//    Environment.GetEnvironmentVariable("SUPABASE__URL")
-//    ?? "https://uzgnfwbztoizcctyfdiv.supabase.co";
+var supabaseUrl = Environment.GetEnvironmentVariable("SUPABASE__URL")
+    ?? "https://uzgnfwbztoizcctyfdiv.supabase.co";
 
-var supabaseKey =
-    Environment.GetEnvironmentVariable(
-        "SUPABASE__SERVICE_ROLE_KEY"
-    )
-    ?? throw new Exception(
-        "SUPABASE__SERVICE_ROLE_KEY no está definida."
-    );
+var supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6Z25md2J6dG9pemNjdHlmZGl2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2Njk0MzUyNywiZXhwIjoyMDgyNTE5NTI3fQ.opjCm_q7U9GX0ah7UUgRMzQJwBQhyBupWVGJQXY6v0I";
 
-// PostgreSQL
-var connectionString =
-    Environment
-        .GetEnvironmentVariable(
-            "SUPABASE_DB_CONNECTION"
+// PostgreSQL / Supabase
+var connectionString = Environment
+    .GetEnvironmentVariable("SUPABASE_DB_CONNECTION")
+    ?.Trim()
+    ?? throw new Exception("❌ SUPABASE_DB_CONNECTION no está definida");
+
+Stripe.StripeConfiguration.ApiKey =
+   builder.Configuration["Stripe:SecretKey"];
+
+//var connectionString = "User Id=postgres.uzgnfwbztoizcctyfdiv;Password=q8dZ1szsEYIOzKrM;Server=aws-1-us-east-2.pooler.supabase.com;Port=6543;Database=postgres;SSL Mode=Require;Trust Server Certificate=true";
+
+// ======================================================
+// AUTH JWT
+// ======================================================
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = false,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtIssuer,
+        IssuerSigningKey = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(jwtKey)
         )
-        ?.Trim()
-    ?? throw new Exception(
-        "SUPABASE_DB_CONNECTION no está definida."
-    );
+    };
+});
+
+builder.Services.AddSingleton<IAmazonS3>(sp =>
+{
+    var config = builder.Configuration;
+
+    var accessKey = config["R2:AccessKeyId"];
+    var secretKey = config["R2:SecretAccessKey"];
+    var accountId = config["R2:AccountId"];
+
+    var credentials = new BasicAWSCredentials(accessKey, secretKey);
+
+    var s3Config = new AmazonS3Config
+    {
+        ServiceURL = $"https://{accountId}.r2.cloudflarestorage.com",
+        AuthenticationRegion = "auto",
+        ForcePathStyle = true,
+
+        UseHttp = false,
+
+
+        MaxErrorRetry = 5
+    };
+
+
+
+    return new AmazonS3Client(credentials, s3Config);
+});
 
 // ======================================================
-// ORÍGENES PERMITIDOS POR CORS
+// ENTITY FRAMEWORK CORE - PostgreSQL (Supabase)
+// ======================================================
+builder.Services.AddDbContext<AppDbContext>(options =>
+{
+    options.UseNpgsql(
+        connectionString,
+        npgsql =>
+        {
+            npgsql.UseNetTopologySuite();
+            npgsql.CommandTimeout(30);
+            npgsql.ExecutionStrategy(deps =>
+                new NonRetryingExecutionStrategy(deps)
+            );
+        });
+
+    options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
+});
+
+builder.Services.AddValidatorsFromAssemblyContaining<ProductosServiciosDtoValidator>();
+
+// ======================================================
+// SERVICIOS Y REPOSITORIOS
 // ======================================================
 
-// Puedes sobrescribir estos dominios con la variable:
-// CORS__ALLOWED_ORIGINS
-//
-// Ejemplo:
-// https://adlocal.store,https://www.adlocal.store
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<JwtContext>();
+
+builder.Services.AddScoped<ComercioRepository>();
+builder.Services.AddScoped<ComercioService>();
+builder.Services.AddScoped<IRelComercioImagenRepositorio, RelComercioImagenRepositorio>();
+
+
+builder.Services.AddScoped<UsuarioRepository>();
+builder.Services.AddScoped<UsuarioService>();
+
+builder.Services.AddScoped<IProductosServiciosRepository, ProductosServiciosRepository>();
+builder.Services.AddScoped<IProductosServiciosService, ProductosServiciosService>();
+builder.Services.AddScoped<IHorarioComercioService, HorarioComercioRepository>();
+
+
+builder.Services.AddScoped<PlanRepository>();
+builder.Services.AddScoped<AdLocalAPI.Services.PlanService>();
+
+builder.Services.AddScoped<SuscripcionRepository>();
+builder.Services.AddScoped<SuscripcionService>();
+
+builder.Services.AddScoped<StripeService>();
+builder.Services.AddScoped<GeoLocationService>();
+builder.Services.AddScoped<HttpClient>();
+
+builder.Services.AddScoped<IConfiguracionService, ConfiguracionService>();
+builder.Services.AddScoped<IConfiguracionRepository, ConfiguracionRepository>();
+
+builder.Services.AddScoped<ITarjetaService, TarjetaService>();
+builder.Services.AddScoped<ITarjetaRepository, TarjetaRepository>();
+builder.Services.AddScoped<IStripeService, StripeService>();
+
+builder.Services.AddScoped<ILocationRepository, LocationRepository>();
+builder.Services.AddScoped<ILocationService, LocationService>();
+
+builder.Services.AddScoped<ITipoComercioRepository, TipoComercioRepository>();
+builder.Services.AddScoped<ITipoComercioService, TipoComercioService>();
+
+
+builder.Services.AddScoped<CalificacionComentarioRepository>();
+builder.Services.AddScoped<CalificacionComentarioService>();
+
+builder.Services.AddSingleton<StripeConfigProvider>();
+builder.Services.AddSingleton<ClavesConfigProvider>();
+
+builder.Services.Configure<EmailSettingsSendGrid>(
+    builder.Configuration.GetSection("EmailSettingsSendGrid")
+);
+
+builder.Services.AddScoped<EmailService>();
+
+builder.Services.AddScoped<ComercioVisitaService>();
+builder.Services.AddScoped<ComercioVisitaRepository>();
+
+builder.Services.AddScoped<UsoCodigoReferidoRepository>();
+builder.Services.AddScoped<UsoCodigoReferidoService>();
+
+builder.Services.AddScoped<BeneficiosServices>();
+
+builder.Services.AddScoped<ISuscriptionServiceV1, SuscriptionService>();
+builder.Services.AddScoped<ISuscriptionRepository, SuscriptionRepository>();
+
+builder.Services.AddSingleton<AppConfigState>();
+
+
+
+
+builder.Services.AddSingleton(new Supabase.Client(supabaseUrl, supabaseKey));
+
+// ======================================================
+// CONTROLLERS + SWAGGER
+// ======================================================
+
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    {
+        Title = "AdLocal API",
+        Version = "v1"
+    });
+});
+
+
+
+// ======================================================
+// CORS
+// ======================================================
 
 var defaultOrigins = string.Join(
     ",",
@@ -98,8 +236,7 @@ var defaultOrigins = string.Join(
     "http://127.0.0.1:5173",
     "https://adlocal.store",
     "https://www.adlocal.store",
-    "https://ad-local-gamma.vercel.app",
-    "https://adlocalweb.jcarlosgonzalez086.workers.dev"
+    "https://ad-local-gamma.vercel.app"
 );
 
 var corsOrigins =
@@ -118,411 +255,6 @@ var allowedOrigins = corsOrigins
     .Distinct(StringComparer.OrdinalIgnoreCase)
     .ToArray();
 
-// ======================================================
-// CONFIGURACIÓN DE STRIPE
-// ======================================================
-
-builder.Services.AddSingleton<StripeSettings>();
-
-var initialStripeSecretKey =
-    builder.Configuration["Stripe:SecretKey"]
-    ?? Environment.GetEnvironmentVariable(
-        "STRIPE__SECRET_KEY"
-    );
-
-if (!string.IsNullOrWhiteSpace(initialStripeSecretKey))
-{
-    StripeConfiguration.ApiKey =
-        initialStripeSecretKey;
-}
-
-// ======================================================
-// AUTENTICACIÓN JWT
-// ======================================================
-
-builder.Services
-    .AddAuthentication(
-        JwtBearerDefaults.AuthenticationScheme
-    )
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters =
-            new TokenValidationParameters
-            {
-                ValidateIssuer = true,
-                ValidateAudience = false,
-                ValidateLifetime = true,
-                ValidateIssuerSigningKey = true,
-
-                ValidIssuer = jwtIssuer,
-
-                IssuerSigningKey =
-                    new SymmetricSecurityKey(
-                        Encoding.UTF8.GetBytes(jwtKey)
-                    ),
-
-                ClockSkew = TimeSpan.Zero
-            };
-    });
-
-builder.Services.AddAuthorization();
-
-// ======================================================
-// CLOUDFLARE R2
-// ======================================================
-
-builder.Services.AddSingleton<IAmazonS3>(_ =>
-{
-    var configuration = builder.Configuration;
-
-    var accessKey =
-        configuration["R2:AccessKeyId"]
-        ?? Environment.GetEnvironmentVariable(
-            "R2__ACCESS_KEY_ID"
-        );
-
-    var secretKey =
-        configuration["R2:SecretAccessKey"]
-        ?? Environment.GetEnvironmentVariable(
-            "R2__SECRET_ACCESS_KEY"
-        );
-
-    var accountId =
-        configuration["R2:AccountId"]
-        ?? Environment.GetEnvironmentVariable(
-            "R2__ACCOUNT_ID"
-        );
-
-    if (string.IsNullOrWhiteSpace(accessKey))
-    {
-        throw new Exception(
-            "La clave R2 AccessKeyId no está configurada."
-        );
-    }
-
-    if (string.IsNullOrWhiteSpace(secretKey))
-    {
-        throw new Exception(
-            "La clave R2 SecretAccessKey no está configurada."
-        );
-    }
-
-    if (string.IsNullOrWhiteSpace(accountId))
-    {
-        throw new Exception(
-            "La variable R2 AccountId no está configurada."
-        );
-    }
-
-    var credentials =
-        new BasicAWSCredentials(
-            accessKey,
-            secretKey
-        );
-
-    var s3Config = new AmazonS3Config
-    {
-        ServiceURL =
-            $"https://{accountId}.r2.cloudflarestorage.com",
-
-        AuthenticationRegion = "auto",
-        ForcePathStyle = true,
-        UseHttp = false,
-        MaxErrorRetry = 5
-    };
-
-    return new AmazonS3Client(
-        credentials,
-        s3Config
-    );
-});
-
-// ======================================================
-// ENTITY FRAMEWORK CORE
-// ======================================================
-
-builder.Services.AddDbContext<AppDbContext>(
-    options =>
-    {
-        options.UseNpgsql(
-            connectionString,
-            npgsql =>
-            {
-                npgsql.UseNetTopologySuite();
-                npgsql.CommandTimeout(30);
-
-                npgsql.ExecutionStrategy(
-                    dependencies =>
-                        new NonRetryingExecutionStrategy(
-                            dependencies
-                        )
-                );
-            }
-        );
-
-        options.UseQueryTrackingBehavior(
-            QueryTrackingBehavior.NoTracking
-        );
-    }
-);
-
-// ======================================================
-// FLUENT VALIDATION
-// ======================================================
-
-builder.Services
-    .AddValidatorsFromAssemblyContaining<
-        ProductosServiciosDtoValidator
-    >();
-
-// ======================================================
-// SERVICIOS GENERALES
-// ======================================================
-
-builder.Services.AddHttpContextAccessor();
-
-builder.Services.AddHttpClient();
-
-builder.Services.AddScoped<JwtContext>();
-
-// ======================================================
-// COMERCIOS
-// ======================================================
-
-builder.Services.AddScoped<ComercioRepository>();
-
-builder.Services.AddScoped<ComercioService>();
-
-builder.Services.AddScoped<
-    IRelComercioImagenRepositorio,
-    RelComercioImagenRepositorio
->();
-
-// ======================================================
-// USUARIOS
-// ======================================================
-
-builder.Services.AddScoped<UsuarioRepository>();
-
-builder.Services.AddScoped<UsuarioService>();
-
-// ======================================================
-// PRODUCTOS Y SERVICIOS
-// ======================================================
-
-builder.Services.AddScoped<
-    IProductosServiciosRepository,
-    ProductosServiciosRepository
->();
-
-builder.Services.AddScoped<
-    IProductosServiciosService,
-    ProductosServiciosService
->();
-
-builder.Services.AddScoped<
-    IHorarioComercioService,
-    HorarioComercioRepository
->();
-
-// ======================================================
-// PLANES
-// ======================================================
-
-builder.Services.AddScoped<PlanRepository>();
-
-builder.Services.AddScoped<
-    AdLocalAPI.Services.PlanService
->();
-
-// ======================================================
-// SUSCRIPCIONES
-// ======================================================
-
-builder.Services.AddScoped<SuscripcionRepository>();
-
-builder.Services.AddScoped<SuscripcionService>();
-
-builder.Services.AddScoped<
-    ISuscriptionServiceV1,
-    SuscriptionService
->();
-
-builder.Services.AddScoped<
-    ISuscriptionRepository,
-    SuscriptionRepository
->();
-
-// ======================================================
-// STRIPE
-// ======================================================
-
-builder.Services.AddScoped<
-    AdLocalAPI.Services.StripeService
->();
-
-builder.Services.AddScoped<
-    IStripeService,
-    AdLocalAPI.Services.StripeService
->();
-
-builder.Services.AddSingleton<
-    StripeConfigProvider
->();
-
-builder.Services.AddSingleton<
-    ClavesConfigProvider
->();
-
-// ======================================================
-// GEOLOCALIZACIÓN
-// ======================================================
-
-builder.Services.AddScoped<GeoLocationService>();
-
-builder.Services.AddScoped<
-    ILocationRepository,
-    LocationRepository
->();
-
-builder.Services.AddScoped<
-    ILocationService,
-    LocationService
->();
-
-// ======================================================
-// CONFIGURACIONES
-// ======================================================
-
-builder.Services.AddScoped<
-    IConfiguracionService,
-    ConfiguracionService
->();
-
-builder.Services.AddScoped<
-    IConfiguracionRepository,
-    ConfiguracionRepository
->();
-
-builder.Services.AddSingleton<AppConfigState>();
-
-// ======================================================
-// TARJETAS
-// ======================================================
-
-builder.Services.AddScoped<
-    ITarjetaService,
-    TarjetaService
->();
-
-builder.Services.AddScoped<
-    ITarjetaRepository,
-    TarjetaRepository
->();
-
-// ======================================================
-// TIPOS DE COMERCIO
-// ======================================================
-
-builder.Services.AddScoped<
-    ITipoComercioRepository,
-    TipoComercioRepository
->();
-
-builder.Services.AddScoped<
-    ITipoComercioService,
-    TipoComercioService
->();
-
-// ======================================================
-// CALIFICACIONES Y COMENTARIOS
-// ======================================================
-
-builder.Services.AddScoped<
-    CalificacionComentarioRepository
->();
-
-builder.Services.AddScoped<
-    CalificacionComentarioService
->();
-
-// ======================================================
-// CORREO ELECTRÓNICO
-// ======================================================
-
-builder.Services.Configure<EmailSettingsSendGrid>(
-    builder.Configuration.GetSection(
-        "EmailSettingsSendGrid"
-    )
-);
-
-builder.Services.AddScoped<EmailService>();
-
-// ======================================================
-// VISITAS DE COMERCIOS
-// ======================================================
-
-builder.Services.AddScoped<
-    ComercioVisitaRepository
->();
-
-builder.Services.AddScoped<
-    ComercioVisitaService
->();
-
-// ======================================================
-// CÓDIGOS REFERIDOS
-// ======================================================
-
-builder.Services.AddScoped<
-    UsoCodigoReferidoRepository
->();
-
-builder.Services.AddScoped<
-    UsoCodigoReferidoService
->();
-
-// ======================================================
-// BENEFICIOS
-// ======================================================
-
-builder.Services.AddScoped<BeneficiosServices>();
-
-// ======================================================
-// SUPABASE CLIENT
-// ======================================================
-
-//builder.Services.AddSingleton(
-//    new Supabase.Client(
-//        supabaseUrl,
-//        supabaseKey
-//    )
-//);
-
-// ======================================================
-// CONTROLADORES Y SWAGGER
-// ======================================================
-
-builder.Services.AddControllers();
-
-builder.Services.AddEndpointsApiExplorer();
-
-builder.Services.AddSwaggerGen(options =>
-{
-    options.SwaggerDoc(
-        "v1",
-        new Microsoft.OpenApi.Models.OpenApiInfo
-        {
-            Title = "AdLocal API",
-            Version = "v1"
-        }
-    );
-});
-
-// ======================================================
-// CORS
-// ======================================================
-
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(
@@ -538,164 +270,89 @@ builder.Services.AddCors(options =>
     );
 });
 
-// ======================================================
-// CONSTRUIR APLICACIÓN
-// ======================================================
 
-var app = builder.Build();
-
-// ======================================================
-// CARGAR CONFIGURACIÓN DE STRIPE DESDE LA BASE DE DATOS
-// ======================================================
-
-using (var scope = app.Services.CreateScope())
-{
-    var dbContext =
-        scope.ServiceProvider
-            .GetRequiredService<AppDbContext>();
-
-    var stripeSettings =
-        scope.ServiceProvider
-            .GetRequiredService<StripeSettings>();
-
-    var secretKey = await dbContext
-        .ConfiguracionSistema
-        .Where(
-            configuration =>
-                configuration.Key
-                == "STRIPE_SECRET_KEY"
-        )
-        .Select(
-            configuration =>
-                configuration.Val
-        )
-        .FirstOrDefaultAsync();
-
-    stripeSettings.Inicializar(
-        secretKey ?? "sk_test_default_value"
-    );
-}
-
-// ======================================================
-// CARGAR CONFIGURACIÓN GLOBAL DE STRIPE
-// ======================================================
-
-using (var scope = app.Services.CreateScope())
-{
-    var repository =
-        scope.ServiceProvider
-            .GetRequiredService<
-                IConfiguracionRepository
-            >();
-
-    var provider =
-        scope.ServiceProvider
-            .GetRequiredService<
-                StripeConfigProvider
-            >();
-
-    var configurations =
-        await repository.ObtenerTodosAsync();
-
-    provider.Load(configurations);
-
-    if (!string.IsNullOrWhiteSpace(
-        provider.SecretKey
-    ))
-    {
-        StripeConfiguration.ApiKey =
-            provider.SecretKey;
-
-        var environment =
-            provider.SecretKey.StartsWith(
-                "sk_live",
-                StringComparison.OrdinalIgnoreCase
-            )
-                ? "LIVE"
-                : "TEST";
-
-        Console.WriteLine(
-            $"Stripe cargado desde la base de datos: {environment}"
-        );
-    }
-    else
-    {
-        Console.WriteLine(
-            "No se encontró una clave válida de Stripe."
-        );
-    }
-}
-
-// ======================================================
-// CARGAR CLAVES DE CONFIGURACIÓN
-// ======================================================
-
-using (var scope = app.Services.CreateScope())
-{
-    var repository =
-        scope.ServiceProvider
-            .GetRequiredService<
-                IConfiguracionRepository
-            >();
-
-    var provider =
-        scope.ServiceProvider
-            .GetRequiredService<
-                ClavesConfigProvider
-            >();
-
-    var appConfig =
-        scope.ServiceProvider
-            .GetRequiredService<AppConfigState>();
-
-    var configurations =
-        await repository.ObtenerTodosAsync();
-
-    provider.Load(configurations);
-
-    appConfig.SetIp2LocationKey(
-        provider.Ip2LocationKey
-    );
-
-    Console.WriteLine(
-        "Configuración de geolocalización cargada."
-    );
-}
 
 // ======================================================
 // PIPELINE HTTP
 // ======================================================
 
-app.UseForwardedHeaders(
-    new ForwardedHeadersOptions
-    {
-        ForwardedHeaders =
-            ForwardedHeaders.XForwardedFor
-            | ForwardedHeaders.XForwardedProto
-    }
-);
+
+var app = builder.Build();
+
+
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var stripeSettings = scope.ServiceProvider.GetRequiredService<StripeSettings>();
+
+    var secretKey = await dbContext.ConfiguracionSistema
+        .Where(c => c.Key == "STRIPE_SECRET_KEY")
+        .Select(c => c.Val)
+        .FirstOrDefaultAsync();
+
+    stripeSettings.Inicializar(secretKey ?? "sk_test_default_value");
+}
+
+using (var scope = app.Services.CreateScope())
+{
+    var repo = scope.ServiceProvider
+        .GetRequiredService<IConfiguracionRepository>();
+
+    var provider = scope.ServiceProvider
+        .GetRequiredService<StripeConfigProvider>();
+
+    var configs = await repo.ObtenerTodosAsync();
+
+    provider.Load(configs);
+
+    Stripe.StripeConfiguration.ApiKey = provider.SecretKey;
+
+    Console.WriteLine("Stripe loaded from DB: " +
+        (provider.SecretKey.StartsWith("sk_live") ? "LIVE" : "TEST"));
+}
+
+using (var scope = app.Services.CreateScope())
+{
+    var repo = scope.ServiceProvider
+        .GetRequiredService<IConfiguracionRepository>();
+
+    var provider = scope.ServiceProvider
+        .GetRequiredService<ClavesConfigProvider>();
+
+    var appConfig = scope.ServiceProvider
+        .GetRequiredService<AppConfigState>();
+
+    var configs = await repo.ObtenerTodosAsync();
+
+    provider.Load(configs);
+
+    appConfig.SetIp2LocationKey(provider.Ip2LocationKey);
+
+    Console.WriteLine(
+        "Ip2LocationKey loaded from DB: " + appConfig.Ip2LocationKey
+    );
+}
+
+
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor |
+        ForwardedHeaders.XForwardedProto
+});
 
 app.UseSwagger();
-
 app.UseSwaggerUI(options =>
 {
-    options.SwaggerEndpoint(
-        "/swagger/v1/swagger.json",
-        "AdLocalAPI V1"
-    );
-
+    options.SwaggerEndpoint("/swagger/v1/swagger.json", "AdLocalAPI V1");
     options.RoutePrefix = "swagger";
 });
 
-app.UseRouting();
-
-// Debe coincidir exactamente con el nombre registrado.
 app.UseCors("AllowFrontend");
 
 app.UseAuthentication();
-
 app.UseAuthorization();
 
 app.MapControllers();
-
 app.Run();
+
