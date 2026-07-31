@@ -231,17 +231,11 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
-        policy.WithOrigins(
-            "http://localhost:5173",
-            "http://localhost:4321",
-            "http://localhost:3000",
-            "http://localhost:3001",
-            "https://ad-local-gamma.vercel.app",
-            "https://ad-local-web.vercel.app",
-            "https://www.adlocal.store"
-        )
-        .AllowAnyHeader()
-        .AllowAnyMethod()
+        policy
+            .SetIsOriginAllowed(origin => true)
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials()
     );
 });
 
@@ -323,7 +317,7 @@ app.UseSwaggerUI(options =>
     options.RoutePrefix = "swagger";
 });
 
-app.UseCors("AllowFrontend");
+app.UseCors("AllowAll");
 
 app.UseAuthentication();
 app.UseAuthorization();

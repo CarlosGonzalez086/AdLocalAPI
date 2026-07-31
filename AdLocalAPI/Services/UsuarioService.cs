@@ -300,6 +300,7 @@ namespace AdLocalAPI.Services
             if (usuario == null)
                 return ApiResponse<object>.Error("401", "Credenciales inválidas");
 
+
             bool valid = BCrypt.Net.BCrypt.Verify(password, usuario.PasswordHash);
 
             if (!valid)
