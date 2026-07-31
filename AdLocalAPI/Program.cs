@@ -57,9 +57,9 @@ if (string.IsNullOrWhiteSpace(webhookSecret))
 }
 
 // Supabase
-var supabaseUrl =
-    Environment.GetEnvironmentVariable("SUPABASE__URL")
-    ?? "https://uzgnfwbztoizcctyfdiv.supabase.co";
+//var supabaseUrl =
+//    Environment.GetEnvironmentVariable("SUPABASE__URL")
+//    ?? "https://uzgnfwbztoizcctyfdiv.supabase.co";
 
 var supabaseKey =
     Environment.GetEnvironmentVariable(
@@ -492,12 +492,12 @@ builder.Services.AddScoped<BeneficiosServices>();
 // SUPABASE CLIENT
 // ======================================================
 
-builder.Services.AddSingleton(
-    new Supabase.Client(
-        supabaseUrl,
-        supabaseKey
-    )
-);
+//builder.Services.AddSingleton(
+//    new Supabase.Client(
+//        supabaseUrl,
+//        supabaseKey
+//    )
+//);
 
 // ======================================================
 // CONTROLADORES Y SWAGGER
