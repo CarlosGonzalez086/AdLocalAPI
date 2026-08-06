@@ -237,7 +237,8 @@ var defaultOrigins = string.Join(
     "https://adlocal.store",
     "https://www.adlocal.store",
     "https://ad-local-gamma.vercel.app",
-    "https://adlocalweb.jcarlosgonzalez086.workers.dev"
+    "https://adlocalweb.jcarlosgonzalez086.workers.dev",
+    "https://adlocal.jcarlosgonzalez086.workers.dev"
 );
 
 var corsOrigins =
