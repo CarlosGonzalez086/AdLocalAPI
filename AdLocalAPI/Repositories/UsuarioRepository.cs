@@ -219,9 +219,18 @@ namespace AdLocalAPI.Repositories
 
         public async Task<Usuario> CreateAsync(Usuario usuario)
         {
-            _context.Usuarios.Add(usuario);
-            await _context.SaveChangesAsync();
-            return usuario;
+            try 
+            {
+                _context.Usuarios.Add(usuario);
+                await _context.SaveChangesAsync();
+                return usuario;
+            } 
+            catch 
+            (Exception ex) 
+            {
+                Console.WriteLine(ex);
+                return null;
+            }            
         }
 
         public async Task UpdateAsync(Usuario usuario)
@@ -317,7 +326,7 @@ namespace AdLocalAPI.Repositories
                 return false;
             }
         }
-        public async Task UpdateUserPhotoUrlAsync(int userId, string url)
+        public async Task UpdateUserPhotoUrlAsync(long userId, string url)
         {
             var user = await _context.Usuarios.FirstOrDefaultAsync(u => u.Id == userId);
             if (user == null)

@@ -50,28 +50,74 @@ namespace AdLocalAPI.Repositories
             await _context.SaveChangesAsync();
         }
         public async Task<ApiResponse<PagedResponse<ProductosServiciosDto>>> GetAllPagedAsync(
-                   long idUser, long idComercio, int page = 1, int pageSize = 10, string orderBy = "recent", string search = "",int maxProductos = 0)
+            long idUser,
+            long idComercio,
+            int page = 1,
+            int pageSize = 10,
+            string orderBy = "recent",
+            string search = "",
+            int maxProductos = 0)
         {
-            var query = _context.ProductosServicios
-                .Where(x => x.IdComercio == idComercio && x.IdUsuario == idUser);
+            if (page <= 0)
+                page = 1;
 
-            query = query.Take(maxProductos);
+            if (pageSize <= 0)
+                pageSize = 10;
+
+            var query = _context.ProductosServicios
+                .AsNoTracking()
+                .Where(x =>
+                    x.IdComercio == idComercio &&
+                    x.IdUsuario == idUser
+                );
 
             if (!string.IsNullOrWhiteSpace(search))
-                query = query.Where(x => x.Nombre.Contains(search));
+            {
+                var searchTerm = search.Trim();
+
+                query = query.Where(x =>
+                    x.Nombre.Contains(searchTerm) ||
+                    x.Descripcion.Contains(searchTerm)
+                );
+            }
 
             query = orderBy.ToLower() switch
             {
                 "az" => query.OrderBy(x => x.Nombre),
+
                 "za" => query.OrderByDescending(x => x.Nombre),
-                "recent" => query.OrderByDescending(x => x.Id), 
-                "old" => query.OrderBy(x => x.Id),          
-                _ => query.OrderByDescending(x => x.Id) 
+
+                "recent" => query.OrderByDescending(x => x.Id),
+
+                "old" => query.OrderBy(x => x.Id),
+
+                _ => query.OrderByDescending(x => x.Id)
             };
 
+            /*
+             * Si maxProductos > 0,
+             * limitamos la cantidad máxima de registros
+             * que el usuario puede consultar.
+             */
+            if (maxProductos > 0)
+            {
+                query = query.Take(maxProductos);
+            }
 
             var totalItems = await query.CountAsync();
-            var totalPages = (int)Math.Ceiling(totalItems / (double)pageSize);
+
+            var totalPages = totalItems > 0
+                ? (int)Math.Ceiling(totalItems / (double)pageSize)
+                : 0;
+
+            /*
+             * Si la página solicitada supera las páginas existentes,
+             * regresamos la última página disponible.
+             */
+            if (totalPages > 0 && page > totalPages)
+            {
+                page = totalPages;
+            }
 
             var items = await query
                 .Skip((page - 1) * pageSize)
@@ -79,13 +125,23 @@ namespace AdLocalAPI.Repositories
                 .Select(x => new ProductosServiciosDto
                 {
                     Id = x.Id,
+                    IdComercio = x.IdComercio,
                     Nombre = x.Nombre,
                     Descripcion = x.Descripcion,
                     Tipo = (int)x.Tipo,
+                    Modalidad = (int)x.Modalidad,
                     Precio = x.Precio,
-                    Stock = (int)x.Stock,
+                    PrecioDesde = x.PrecioDesde,
+                    ManejaStock = x.ManejaStock,
+                    Stock = x.Stock,
+                    Disponible = x.Disponible,
+                    PermiteDomicilio = x.PermiteDomicilio,
+                    PermiteRecoger = x.PermiteRecoger,
+                    DuracionMinutos = x.DuracionMinutos,
                     Activo = x.Activo,
-                    ImagenBase64 = x.LogoUrl,
+                    Visible = x.Visible,
+                    CodigoInterno = x.CodigoInterno,
+                    ImagenBase64 = x.LogoUrl
                 })
                 .ToListAsync();
 
@@ -98,7 +154,10 @@ namespace AdLocalAPI.Repositories
                 Items = items
             };
 
-            return ApiResponse<PagedResponse<ProductosServiciosDto>>.Success(pagedResponse, "Listado de productos/servicios");
+            return ApiResponse<PagedResponse<ProductosServiciosDto>>.Success(
+                pagedResponse,
+                "Listado de productos/servicios"
+            );
         }
         public async Task<string> UploadImageAsync(byte[] imageBytes, long userId, string contentType = "image/png")
         {

@@ -12,4 +12,12 @@
         public string Ip2LocationKey { get; set; } = string.Empty;
 
     }
+    public class ComisionMarketplaceDto
+    {
+        public decimal Porcentaje { get; set; }
+
+        public decimal MontoFijo { get; set; } = 0;
+
+        public bool Activa { get; set; } = true;
+    }
 }

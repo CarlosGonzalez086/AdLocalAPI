@@ -65,7 +65,8 @@ namespace AdLocalAPI.Services
             string municipio,
             int page,
             int pageSize,
-            string ip
+            string ip,
+            long? idCliente = null
         )
         {
             try
@@ -82,7 +83,8 @@ namespace AdLocalAPI.Services
                     municipio,
                     page,
                     pageSize,
-                    ip
+                    ip,
+                    idCliente
                 );
 
                 return ApiResponse<object>.Success(
@@ -278,20 +280,22 @@ namespace AdLocalAPI.Services
                 Comercio comercio;
 
                 var rol = _jwtContext.GetUserRole();
-
+                var planActivo = new Suscripcion();
                 if (rol == "Colaborador")
                 {
                     var comercioId = _jwtContext.GetComercioId();
 
 
                     comercio = await _repository.GetByIdAsync(comercioId);
+                    planActivo = await _suscripcionRepository.GetActivaByUsuarioAsync(comercio.IdUsuario);
                 }
                 else
                 {
                     comercio = await _repository.GetComercioByUser(idUser);
+                    planActivo = await _suscripcionRepository.GetActivaByUsuarioAsync(idUser);
                 }
 
-                var planActivo = await _suscripcionRepository.GetActivaByUsuarioAsync(comercio.IdUsuario);
+                
                 long idPlan = planActivo.PlanId;
                 var plan = await _planRepository.GetByIdLongAsync(idPlan);
 
@@ -528,11 +532,13 @@ namespace AdLocalAPI.Services
                     Telefono = dto.Telefono,
                     LogoUrl = logoUrl,
                     Activo = true,
+                    Visible = true,
+                    Uuid = Guid.NewGuid(),
                     FechaCreacion = DateTime.UtcNow,
                     IdUsuario = idUser,
                     ColorPrimario = dto.ColorPrimario,
                     ColorSecundario = dto.ColorSecundario,
-                    Descripcion = dto.Descripcion,      
+                    Descripcion = dto.Descripcion,
                     Email = dto.Email,
                     EstadoId = dto.EstadoId,
                     MunicipioId = dto.MunicipioId,
@@ -541,7 +547,7 @@ namespace AdLocalAPI.Services
                     {
                         SRID = 4326
                     }
-                    
+
                 };
 
                 var creado = await _repository.CreateAsync(comercio);

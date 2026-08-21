@@ -31,7 +31,7 @@ namespace AdLocalAPI.Services
 
         public async Task<ApiResponse<SuscripcionInfoDto>> ObtenerMiSuscripcion()
         {
-            int usuarioId = _jwt.GetUserId();
+            long usuarioId = _jwt.GetUserId();
 
             var suscripcion = await _suscripcionRepository.GetActivaByUsuario(usuarioId);
 

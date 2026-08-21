@@ -1,6 +1,7 @@
 ﻿using AdLocalAPI.Data;
 using AdLocalAPI.DTOs;
 using AdLocalAPI.Models;
+using AdLocalAPI.Utils;
 using Amazon.S3;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
@@ -51,7 +52,7 @@ namespace AdLocalAPI.Repositories
 
         public async Task<(List<ComercioPublicDto> comercios, int total)> GetAllAsync(
             string tipo, double lat, double lng,
-            string municipio, int page, int pageSize, string ip)
+            string municipio, int page, int pageSize, string ip, long? idCliente = null)
         {
             var hoy = DateTime.UtcNow.Date;
             var ahora = DateTime.UtcNow;
@@ -61,6 +62,18 @@ namespace AdLocalAPI.Repositories
             List<long> tiposVisitadosPorIp = new();
 
             Dictionary<long, (int Veces, DateTime UltimaVisita)> frecuenciaVisitas = new();
+            Dictionary<long, int> tiposComprados = new();
+            List<long> comerciosComprados = new();
+
+            if (idCliente.HasValue && tipo.Equals("sugeridos", StringComparison.OrdinalIgnoreCase))
+            {
+                var compras = await (from p in _context.Pedidos.AsNoTracking()
+                                     join c in _context.Comercios.AsNoTracking() on p.IdComercio equals c.Id
+                                     where p.IdUsuario == idCliente.Value && p.EstadoPago == EstadoPagoPedido.Pagado && c.TipoComercioId.HasValue
+                                     select new { p.IdComercio, Tipo = c.TipoComercioId!.Value }).ToListAsync();
+                comerciosComprados = compras.Select(x => x.IdComercio).Distinct().ToList();
+                tiposComprados = compras.GroupBy(x => x.Tipo).ToDictionary(g => g.Key, g => g.Count());
+            }
 
             if (!string.IsNullOrEmpty(ip) && tipo.Equals("sugeridos", StringComparison.OrdinalIgnoreCase))
             {
@@ -123,20 +136,18 @@ namespace AdLocalAPI.Repositories
                     break;
 
                 case "sugeridos":
-                    comerciosBase = comerciosBase
-                        .Where(c => c.Ubicacion.IsWithinDistance(userLocation, RadioSugeridosMetros));
+                    if (tiposComprados.Count > 0)
+                    {
+                        var idsTipo = tiposComprados.Keys.ToList();
+                        comerciosBase = comerciosBase.Where(c => c.TipoComercioId.HasValue && idsTipo.Contains(c.TipoComercioId.Value));
+                    }
+                    else if (lat != 0 || lng != 0)
+                    {
+                        comerciosBase = comerciosBase.Where(c => c.Ubicacion.IsWithinDistance(userLocation, RadioSugeridosMetros));
+                    }
                     break;
 
                 case "destacados":
-                    var usuariosDestacados = _context.Suscripcions
-                        .Where(s => s.IsActive && !s.IsDeleted &&
-                                    s.CurrentPeriodEnd > hoy &&
-                                    planesDestacados.Contains(s.Plan.Tipo))
-                        .Select(s => s.UsuarioId)
-                        .Distinct();
-
-                    comerciosBase = comerciosBase
-                        .Where(c => usuariosDestacados.Contains(c.IdUsuario));
                     break;
             }
 
@@ -159,6 +170,11 @@ namespace AdLocalAPI.Repositories
                 );
 
             var hace7Dias = ahora.AddDays(-7);
+            var ventasPorComercio = await _context.Pedidos.AsNoTracking()
+                .Where(p => p.EstadoPago == EstadoPagoPedido.Pagado)
+                .GroupBy(p => p.IdComercio)
+                .Select(g => new { ComercioId = g.Key, Ventas = g.Count(), Monto = g.Sum(x => x.Total) })
+                .ToDictionaryAsync(x => x.ComercioId, x => (x.Ventas, x.Monto));
 
             var queryTyped = comercios.Select(c => new
             {
@@ -171,8 +187,7 @@ namespace AdLocalAPI.Repositories
             var queryOrdenado = tipo.ToLower() switch
             {
                 "destacados" => queryTyped
-                    .Where(x => x.Suscripcion != null)
-                    .OrderByDescending(x => x.Suscripcion!.Plan.NivelVisibilidad)
+                    .OrderByDescending(x => CalcularScoreDestacado(x.Comercio, ventasPorComercio))
                     .AsEnumerable(),
 
                 "populares" => queryTyped
@@ -191,15 +206,7 @@ namespace AdLocalAPI.Repositories
                     .AsEnumerable(),
 
                 "sugeridos" => queryTyped
-                    .OrderByDescending(x => CalcularScoreHeuristico(
-                        x.Comercio,
-                        x.Suscripcion,
-                        userLocation,
-                        tiposVisitadosPorIp,
-                        comerciosVisitadosPorIp,
-                        frecuenciaVisitas,
-                        horaActual,
-                        ahora))
+                    .OrderByDescending(x => CalcularScoreSugerido(x.Comercio, tiposComprados, comerciosComprados, ventasPorComercio))
                     .AsEnumerable(),
 
                 _ => queryTyped.OrderBy(x => x.Comercio.Nombre).AsEnumerable()
@@ -265,6 +272,21 @@ namespace AdLocalAPI.Repositories
             var paginados = filtrado.Skip((page - 1) * pageSize).Take(pageSize).ToList();
 
             return (paginados, total);
+        }
+
+        private static double CalcularScoreDestacado(Comercio comercio, Dictionary<long, (int Ventas, decimal Monto)> ventas)
+        {
+            var promedio = comercio.CalificacionesComentarios.Any() ? comercio.CalificacionesComentarios.Average(x => x.Calificacion) : 0;
+            var cantidadResenas = comercio.CalificacionesComentarios.Count;
+            var totalVentas = ventas.TryGetValue(comercio.Id, out var valor) ? valor.Ventas : 0;
+            return Math.Log10(1 + totalVentas) * 5 + promedio * 2 + Math.Log10(1 + cantidadResenas);
+        }
+
+        private static double CalcularScoreSugerido(Comercio comercio, Dictionary<long, int> tiposComprados, List<long> comerciosComprados, Dictionary<long, (int Ventas, decimal Monto)> ventas)
+        {
+            var afinidad = comercio.TipoComercioId.HasValue && tiposComprados.TryGetValue(comercio.TipoComercioId.Value, out var compras) ? compras * 10 : 0;
+            var descubrimiento = comerciosComprados.Contains(comercio.Id) ? -4 : 3;
+            return afinidad + descubrimiento + CalcularScoreDestacado(comercio, ventas);
         }
 
         private double CalcularScoreHeuristico(

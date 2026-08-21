@@ -113,5 +113,104 @@ namespace AdLocalAPI.Services
                 "Configuración de claves registrada correctamente"
             );
         }
+        public async Task<ApiResponse<List<ConfiguracionSistema>>>RegistrarComisionMarketplaceAsync(ComisionMarketplaceDto dto)
+        {
+            if (dto == null)
+            {
+                return ApiResponse<List<ConfiguracionSistema>>
+                    .Error(
+                        "400",
+                        "La configuración de comisión es requerida."
+                    );
+            }
+
+            if (dto.Porcentaje < 0 || dto.Porcentaje > 100)
+            {
+                return ApiResponse<List<ConfiguracionSistema>>
+                    .Error(
+                        "400",
+                        "El porcentaje de comisión debe estar entre 0 y 100."
+                    );
+            }
+
+            if (dto.MontoFijo < 0)
+            {
+                return ApiResponse<List<ConfiguracionSistema>>
+                    .Error(
+                        "400",
+                        "El monto fijo de comisión no puede ser negativo."
+                    );
+            }
+
+            var resultado =
+                new List<ConfiguracionSistema>();
+
+            var acciones = new[]
+            {
+        new ConfiguracionSistemaDto
+        {
+            Key =
+                ConfiguracionKeys
+                    .MarketplaceCommissionPercentage,
+
+            Val =
+                dto.Porcentaje.ToString(
+                    System.Globalization.CultureInfo.InvariantCulture
+                )
+        },
+
+        new ConfiguracionSistemaDto
+        {
+            Key =
+                ConfiguracionKeys
+                    .MarketplaceCommissionFixed,
+
+            Val =
+                dto.MontoFijo.ToString(
+                    System.Globalization.CultureInfo.InvariantCulture
+                )
+        },
+
+        new ConfiguracionSistemaDto
+        {
+            Key =
+                ConfiguracionKeys
+                    .MarketplaceCommissionEnabled,
+
+            Val =
+                dto.Activa.ToString()
+        }
+    };
+
+            foreach (var item in acciones)
+            {
+                var res =
+                    await CrearOActualizarAsync(
+                        item
+                    );
+
+                if (res.Codigo != "200")
+                {
+                    return ApiResponse<List<ConfiguracionSistema>>
+                        .Error(
+                            res.Codigo,
+                            res.Mensaje
+                        );
+                }
+
+                if (res.Respuesta != null)
+                {
+                    resultado.Add(
+                        res.Respuesta
+                    );
+                }
+            }
+
+            return ApiResponse<List<ConfiguracionSistema>>
+                .Success(
+                    resultado,
+                    "Configuración de comisión registrada correctamente."
+                );
+        }
     }
 }
