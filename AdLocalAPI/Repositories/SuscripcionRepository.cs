@@ -31,7 +31,7 @@ namespace AdLocalAPI.Repositories
         }
 
 
-        public async Task<Suscripcion?> GetActivaByUsuario(int usuarioId)
+        public async Task<Suscripcion?> GetActivaByUsuario(long usuarioId)
         {
             return await _context.Suscripcions
                 .Include(s => s.Plan)

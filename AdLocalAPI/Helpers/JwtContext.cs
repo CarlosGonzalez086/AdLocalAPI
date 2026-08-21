@@ -1,7 +1,6 @@
 ﻿using Microsoft.IdentityModel.JsonWebTokens;
 using System.Security.Claims;
 
-
 namespace AdLocalAPI.Helpers
 {
     public class JwtContext
@@ -13,108 +12,222 @@ namespace AdLocalAPI.Helpers
             _httpContextAccessor = httpContextAccessor;
         }
 
-        private ClaimsPrincipal User => _httpContextAccessor.HttpContext?.User;
+        private ClaimsPrincipal? User =>
+            _httpContextAccessor.HttpContext?.User;
 
         // ======================
         // USUARIO
         // ======================
 
-        public int GetUserId()
+        public long GetUserId()
         {
-            var id = User?.FindFirst("id")?.Value;
-            if (string.IsNullOrEmpty(id))
-                throw new Exception("No se encontró el ID del usuario en el JWT");
+            var value = User?.FindFirst("id")?.Value;
 
-            return int.Parse(id);
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                throw new UnauthorizedAccessException(
+                    "No se encontró el ID del usuario en el JWT."
+                );
+            }
+
+            if (!long.TryParse(value, out var idUsuario))
+            {
+                throw new UnauthorizedAccessException(
+                    "El ID del usuario contenido en el JWT no es válido."
+                );
+            }
+
+            return idUsuario;
         }
 
         public string GetUserRole()
         {
-            return User?.FindFirst("rol")?.Value ?? "";
+            return User?.FindFirst("rol")?.Value
+                ?? User?.FindFirst(ClaimTypes.Role)?.Value
+                ?? string.Empty;
         }
 
         public string GetNombre()
         {
-            return User?.FindFirst("nombre")?.Value ?? "";
+            return User?.FindFirst("nombre")?.Value
+                ?? string.Empty;
         }
 
         public string GetEmail()
         {
-            return User?.FindFirst(ClaimTypes.Email)?.Value
+            return User?.FindFirst(JwtRegisteredClaimNames.Email)?.Value
+                ?? User?.FindFirst(ClaimTypes.Email)?.Value
                 ?? User?.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
-                ?? "";
-        }
-
-        public long GetComercioId()
-        {
-            var comercio = User?.FindFirst("comercioId")?.Value;
-            return string.IsNullOrEmpty(comercio) ? 0 : int.Parse(comercio);
+                ?? string.Empty;
         }
 
         public string GetFotoUrl()
         {
-            return User?.FindFirst("fotoUrl")?.Value ?? "";
+            return User?.FindFirst("fotoUrl")?.Value
+                ?? string.Empty;
+        }
+
+        // ======================
+        // COMERCIO
+        // ======================
+
+        public long GetComercioId()
+        {
+            var value = User?.FindFirst("comercioId")?.Value;
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return 0;
+            }
+
+            return long.TryParse(value, out var idComercio)
+                ? idComercio
+                : 0;
         }
 
         // ======================
         // PLAN / SUSCRIPCIÓN
         // ======================
 
-        public int GetPlanId()
+        public long GetPlanId()
         {
             var value = User?.FindFirst("planId")?.Value;
-            return string.IsNullOrEmpty(value) ? 0 : int.Parse(value);
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return 0;
+            }
+
+            return long.TryParse(value, out var idPlan)
+                ? idPlan
+                : 0;
         }
 
         public string GetPlanTipo()
         {
-            return User?.FindFirst("planTipo")?.Value ?? "FREE";
+            return User?.FindFirst("planTipo")?.Value
+                ?? "FREE";
         }
 
         public int GetNivelVisibilidad()
         {
             var value = User?.FindFirst("nivelVisibilidad")?.Value;
-            return string.IsNullOrEmpty(value) ? 0 : int.Parse(value);
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return 0;
+            }
+
+            return int.TryParse(value, out var nivel)
+                ? nivel
+                : 0;
         }
 
         public int GetMaxNegocios()
         {
             var value = User?.FindFirst("maxNegocios")?.Value;
-            return string.IsNullOrEmpty(value) ? 0 : int.Parse(value);
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return 0;
+            }
+
+            return int.TryParse(value, out var maxNegocios)
+                ? maxNegocios
+                : 0;
         }
 
         public int GetMaxProductos()
         {
             var value = User?.FindFirst("maxProductos")?.Value;
-            return string.IsNullOrEmpty(value) ? 0 : int.Parse(value);
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return 0;
+            }
+
+            return int.TryParse(value, out var maxProductos)
+                ? maxProductos
+                : 0;
         }
 
         public int GetMaxFotos()
         {
             var value = User?.FindFirst("maxFotos")?.Value;
-            return string.IsNullOrEmpty(value) ? 0 : int.Parse(value);
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return 0;
+            }
+
+            return int.TryParse(value, out var maxFotos)
+                ? maxFotos
+                : 0;
         }
 
         public bool PermiteCatalogo()
         {
             var value = User?.FindFirst("permiteCatalogo")?.Value;
-            return !string.IsNullOrEmpty(value) && bool.Parse(value);
+
+            return bool.TryParse(value, out var resultado)
+                && resultado;
         }
 
         public bool TieneAnalytics()
         {
             var value = User?.FindFirst("tieneAnalytics")?.Value;
-            return !string.IsNullOrEmpty(value) && bool.Parse(value);
+
+            return bool.TryParse(value, out var resultado)
+                && resultado;
         }
 
         public bool TieneBadge()
         {
-            return !string.IsNullOrEmpty(GetBadgeTexto());
+            return !string.IsNullOrWhiteSpace(GetBadgeTexto());
         }
 
         public string GetBadgeTexto()
         {
-            return User?.FindFirst("badge")?.Value ?? "";
+            return User?.FindFirst("badge")?.Value
+                ?? string.Empty;
+        }
+
+        // ======================
+        // VALIDACIONES
+        // ======================
+
+        public bool EstaAutenticado()
+        {
+            return User?.Identity?.IsAuthenticated == true;
+        }
+
+        public bool EsRol(string rol)
+        {
+            return string.Equals(
+                GetUserRole(),
+                rol,
+                StringComparison.OrdinalIgnoreCase
+            );
+        }
+
+        public bool EsCliente()
+        {
+            return EsRol("Cliente");
+        }
+
+        public bool EsComercio()
+        {
+            return EsRol("Comercio");
+        }
+
+        public bool EsColaborador()
+        {
+            return EsRol("Colaborador");
+        }
+
+        public bool EsAdministrador()
+        {
+            return EsRol("Administrador");
         }
     }
 }

@@ -9,6 +9,7 @@ namespace AdLocalAPI.Interfaces
         Task<ApiResponse<List<ConfiguracionSistema>>> ObtenerTodosAsync();
         Task<ApiResponse<List<ConfiguracionSistema>>> RegistrarStripeAsync(StripeConfiguracionDto dto);
         Task<ApiResponse<List<ConfiguracionSistema>>> RegistrarCrearClavesAsync(ClavesConfigDto dto);
+        Task<ApiResponse<List<ConfiguracionSistema>>>RegistrarComisionMarketplaceAsync(ComisionMarketplaceDto dto);
     }
 }
 

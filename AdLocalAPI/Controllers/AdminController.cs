@@ -61,6 +61,34 @@ namespace AdLocalAPI.Controllers
           ? Ok(response)
           : BadRequest(response);
         }
+        [HttpPost("forget-password")]
+        public async Task<IActionResult> ForgetPassword([FromBody] EmailDto email)
+        {
+            var response = await _service.ForgetPassword(email.Email);
+
+            return response.Codigo == "200"
+                ? Ok(response)
+                : BadRequest(response);
+        }
+
+        [HttpPost("new-password")]
+        public async Task<IActionResult> NewPassword([FromBody] NewPasswordDto dto)
+        {
+            var response = await _service.NewPassword(dto);
+
+            return response.Codigo == "200"
+                ? Ok(response)
+                : BadRequest(response);
+        }
+        [HttpPost("check-token")]
+        public async Task<IActionResult> CheckToken(string token)
+        {
+            var response = await _service.CheckToken(token);
+
+            return response.Codigo == "200"
+                ? Ok(response)
+                : BadRequest(response);
+        }
         [Authorize]
         [HttpPost("actualizar-jwt")]
         public async Task<IActionResult> ActualizarJwt([FromBody] UpdateJwtRequest request)

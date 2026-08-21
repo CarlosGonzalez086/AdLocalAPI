@@ -4,10 +4,13 @@ using AdLocalAPI.Interfaces;
 using AdLocalAPI.Interfaces.Comercio;
 using AdLocalAPI.Interfaces.Location;
 using AdLocalAPI.Interfaces.ProductosServicios;
+using AdLocalAPI.Interfaces.Repository;
 using AdLocalAPI.Interfaces.Tarjetas;
 using AdLocalAPI.Interfaces.TipoComercio;
 using AdLocalAPI.Repositories;
+using AdLocalAPI.Repositories.Interfaces;
 using AdLocalAPI.Services;
+using AdLocalAPI.Services.Interfaces;
 using AdLocalAPI.Utils;
 using AdLocalAPI.Validators;
 using Amazon;
@@ -55,10 +58,9 @@ var supabaseUrl = Environment.GetEnvironmentVariable("SUPABASE__URL")
 var supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6Z25md2J6dG9pemNjdHlmZGl2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2Njk0MzUyNywiZXhwIjoyMDgyNTE5NTI3fQ.opjCm_q7U9GX0ah7UUgRMzQJwBQhyBupWVGJQXY6v0I";
 
 // PostgreSQL / Supabase
-var connectionString = Environment
-    .GetEnvironmentVariable("SUPABASE_DB_CONNECTION")
-    ?.Trim()
-    ?? throw new Exception("❌ SUPABASE_DB_CONNECTION no está definida");
+var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION")
+    ?? builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new Exception("No se encontró cadena de conexión");
 
 Stripe.StripeConfiguration.ApiKey =
    builder.Configuration["Stripe:SecretKey"];
@@ -142,6 +144,7 @@ builder.Services.AddScoped<JwtContext>();
 
 builder.Services.AddScoped<ComercioRepository>();
 builder.Services.AddScoped<ComercioService>();
+builder.Services.AddScoped<CitaService>();
 builder.Services.AddScoped<IRelComercioImagenRepositorio, RelComercioImagenRepositorio>();
 
 
@@ -199,6 +202,31 @@ builder.Services.AddScoped<BeneficiosServices>();
 
 builder.Services.AddScoped<ISuscriptionServiceV1, SuscriptionService>();
 builder.Services.AddScoped<ISuscriptionRepository, SuscriptionRepository>();
+
+builder.Services.AddScoped<IClienteService, ClienteService>();
+builder.Services.AddScoped<IClienteRepository, ClienteRepository>();
+
+builder.Services.AddScoped<ICarritoService, CarritoService>();
+builder.Services.AddScoped<ICarritoRepository, CarritoRepository>();
+
+builder.Services.AddScoped<IDireccionUsuarioRepository, DireccionUsuarioRepository>();
+builder.Services.AddScoped<IDireccionUsuarioService, DireccionUsuarioService>();
+
+builder.Services.AddScoped<IConfiguracionPagoComercioRepository, ConfiguracionPagoComercioRepository>();
+builder.Services.AddScoped<IConfiguracionPagoComercioService, ConfiguracionPagoComercioService>();
+
+builder.Services.AddScoped<ICuentaBancariaComercioRepository, CuentaBancariaComercioRepository>();
+builder.Services.AddScoped<ICuentaBancariaComercioService, CuentaBancariaComercioService>();
+
+builder.Services.AddScoped<IPedidoRepository,PedidoRepository>();
+builder.Services.AddScoped<ICheckoutService,AdLocalAPI.Services.CheckoutService>();
+builder.Services.AddScoped<IComprobantePagoService, ComprobantePagoService>();
+builder.Services.AddScoped<IPedidoClienteService, PedidoClienteService>();
+
+builder.Services.AddScoped<IPedidoComercioRepository, PedidoComercioRepository>();
+builder.Services.AddScoped<IPedidoComercioService, PedidoComercioService>();
+builder.Services.AddScoped<INotificacionService, NotificacionService>();
+builder.Services.AddScoped<IComisionService, ComisionService>();
 
 builder.Services.AddSingleton<AppConfigState>();
 
@@ -282,58 +310,58 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 
-using (var scope = app.Services.CreateScope())
-{
-    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    var stripeSettings = scope.ServiceProvider.GetRequiredService<StripeSettings>();
+//using (var scope = app.Services.CreateScope())
+//{
+//    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+//    var stripeSettings = scope.ServiceProvider.GetRequiredService<StripeSettings>();
 
-    var secretKey = await dbContext.ConfiguracionSistema
-        .Where(c => c.Key == "STRIPE_SECRET_KEY")
-        .Select(c => c.Val)
-        .FirstOrDefaultAsync();
+//    var secretKey = await dbContext.ConfiguracionSistema
+//        .Where(c => c.Key == "STRIPE_SECRET_KEY")
+//        .Select(c => c.Val)
+//        .FirstOrDefaultAsync();
 
-    stripeSettings.Inicializar(secretKey ?? "sk_test_default_value");
-}
+//    stripeSettings.Inicializar(secretKey ?? "sk_test_default_value");
+//}
 
-using (var scope = app.Services.CreateScope())
-{
-    var repo = scope.ServiceProvider
-        .GetRequiredService<IConfiguracionRepository>();
+//using (var scope = app.Services.CreateScope())
+//{
+//    var repo = scope.ServiceProvider
+//        .GetRequiredService<IConfiguracionRepository>();
 
-    var provider = scope.ServiceProvider
-        .GetRequiredService<StripeConfigProvider>();
+//    var provider = scope.ServiceProvider
+//        .GetRequiredService<StripeConfigProvider>();
 
-    var configs = await repo.ObtenerTodosAsync();
+//    var configs = await repo.ObtenerTodosAsync();
 
-    provider.Load(configs);
+//    provider.Load(configs);
 
-    Stripe.StripeConfiguration.ApiKey = provider.SecretKey;
+//    Stripe.StripeConfiguration.ApiKey = provider.SecretKey;
 
-    Console.WriteLine("Stripe loaded from DB: " +
-        (provider.SecretKey.StartsWith("sk_live") ? "LIVE" : "TEST"));
-}
+//    Console.WriteLine("Stripe loaded from DB: " +
+//        (provider.SecretKey.StartsWith("sk_live") ? "LIVE" : "TEST"));
+//}
 
-using (var scope = app.Services.CreateScope())
-{
-    var repo = scope.ServiceProvider
-        .GetRequiredService<IConfiguracionRepository>();
+//using (var scope = app.Services.CreateScope())
+//{
+//    var repo = scope.ServiceProvider
+//        .GetRequiredService<IConfiguracionRepository>();
 
-    var provider = scope.ServiceProvider
-        .GetRequiredService<ClavesConfigProvider>();
+//    var provider = scope.ServiceProvider
+//        .GetRequiredService<ClavesConfigProvider>();
 
-    var appConfig = scope.ServiceProvider
-        .GetRequiredService<AppConfigState>();
+//    var appConfig = scope.ServiceProvider
+//        .GetRequiredService<AppConfigState>();
 
-    var configs = await repo.ObtenerTodosAsync();
+//    var configs = await repo.ObtenerTodosAsync();
 
-    provider.Load(configs);
+//    provider.Load(configs);
 
-    appConfig.SetIp2LocationKey(provider.Ip2LocationKey);
+//    appConfig.SetIp2LocationKey(provider.Ip2LocationKey);
 
-    Console.WriteLine(
-        "Ip2LocationKey loaded from DB: " + appConfig.Ip2LocationKey
-    );
-}
+//    Console.WriteLine(
+//        "Ip2LocationKey loaded from DB: " + appConfig.Ip2LocationKey
+//    );
+//}
 
 
 app.UseForwardedHeaders(new ForwardedHeadersOptions
@@ -343,12 +371,27 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
         ForwardedHeaders.XForwardedProto
 });
 
+// ======================================================
+// SWAGGER
+// ======================================================
+
 app.UseSwagger();
+
 app.UseSwaggerUI(options =>
 {
     options.SwaggerEndpoint("/swagger/v1/swagger.json", "AdLocalAPI V1");
     options.RoutePrefix = "swagger";
 });
+
+app.MapGet("/", () => Results.Redirect("/swagger/index.html"));
+
+app.MapGet("/ping", () => Results.Ok(new
+{
+    mensaje = "API funcionando correctamente",
+    ambiente = app.Environment.EnvironmentName,
+    puerto = port,
+    fecha = DateTime.Now
+}));
 
 app.UseCors("AllowFrontend");
 

@@ -15,6 +15,18 @@
                 Empresarial
             };
         }
+        public enum TipoProductoServicio
+        {
+            Producto = 1,
+            Servicio = 2
+        }
+
+        public enum ModalidadProductoServicio
+        {
+            Compra = 1,
+            Reservacion = 2,
+            Cotizacion = 3
+        }
 
     }
 }

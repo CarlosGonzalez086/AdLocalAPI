@@ -32,47 +32,71 @@ namespace AdLocalAPI.Services
         }
 
 
-        public async Task<ApiResponse<ProductosServiciosDto>> CreateAsync(ProductosServiciosDto dto)
+        public async Task<ApiResponse<ProductosServiciosDto>> CreateAsync(
+         ProductosServiciosDto dto)
         {
             long userId = 0;
+
             if (_jwtContext.GetUserRole() == "Colaborador")
             {
-                var usuario = await _usuarioRepository.GetByIdComercioAsync(_jwtContext.GetComercioId());
+                var usuario = await _usuarioRepository
+                    .GetByIdComercioAsync(
+                        _jwtContext.GetComercioId()
+                    );
+
                 userId = usuario.Id;
-                var planActivo = await _suscripcionRepository.GetActivaByUsuarioAsync(userId);
-                if (planActivo.Plan.Tipo == "BASIC" || planActivo.Plan.Tipo == "FREE")
+
+                var planActivo = await _suscripcionRepository
+                    .GetActivaByUsuarioAsync(userId);
+
+                if (
+                    planActivo.Plan.Tipo == "BASIC" ||
+                    planActivo.Plan.Tipo == "FREE"
+                )
                 {
                     return ApiResponse<ProductosServiciosDto>.Error(
-                       "400",
-                       "El dueño del negocio necesita actualizar su suscripción para que puedas usar las funciones de colaborador."
-                   );
-
+                        "400",
+                        "El dueño del negocio necesita actualizar su suscripción para que puedas usar las funciones de colaborador."
+                    );
                 }
             }
             else
             {
                 userId = _jwtContext.GetUserId();
             }
-            int maxProductos = _jwtContext.GetMaxProductos();
-            long idComercio = dto.IdComercio == 0 ? _jwtContext.GetComercioId() : dto.IdComercio;
-            var validationResult = await _validator.ValidateAsync(dto);
+
+            int maxProductos =
+                _jwtContext.GetMaxProductos();
+
+            long idComercio =
+                dto.IdComercio == 0
+                    ? _jwtContext.GetComercioId()
+                    : dto.IdComercio;
+
+            var validationResult =
+                await _validator.ValidateAsync(dto);
 
             if (!validationResult.IsValid)
             {
-                var errors = validationResult.Errors
-                    .GroupBy(e => e.PropertyName)
-                    .ToDictionary(
-                        g => g.Key,
-                        g => g.Select(e => e.ErrorMessage).ToArray()
-                    );
+                var errors =
+                    validationResult.Errors
+                        .GroupBy(e => e.PropertyName)
+                        .ToDictionary(
+                            g => g.Key,
+                            g => g
+                                .Select(e => e.ErrorMessage)
+                                .ToArray()
+                        );
 
-                return ApiResponse<ProductosServiciosDto>.Error("400", "Validación fallida");
+                return ApiResponse<ProductosServiciosDto>.Error(
+                    "400",
+                    "Validación fallida"
+                );
             }
 
             try
             {
-
-                if (idComercio == 0 || idComercio == null)
+                if (idComercio == 0)
                 {
                     return ApiResponse<ProductosServiciosDto>.Error(
                         "900",
@@ -80,9 +104,12 @@ namespace AdLocalAPI.Services
                     );
                 }
 
-                var list = await _repository.GetAllAsync(idComercio);
+                var list =
+                    await _repository.GetAllAsync(
+                        idComercio
+                    );
 
-                if (list.Count() == maxProductos )
+                if (list.Count() >= maxProductos)
                 {
                     return ApiResponse<ProductosServiciosDto>.Error(
                         "900",
@@ -90,13 +117,147 @@ namespace AdLocalAPI.Services
                     );
                 }
 
+                if (
+                    !Enum.IsDefined(
+                        typeof(TipoProductoServicio),
+                        dto.Tipo
+                    )
+                )
+                {
+                    return ApiResponse<ProductosServiciosDto>.Error(
+                        "400",
+                        "El tipo de producto o servicio no es válido."
+                    );
+                }
+
+                if (
+                    !Enum.IsDefined(
+                        typeof(ModalidadProductoServicio),
+                        dto.Modalidad
+                    )
+                )
+                {
+                    return ApiResponse<ProductosServiciosDto>.Error(
+                        "400",
+                        "La modalidad no es válida."
+                    );
+                }
+
+                var tipo =
+                    (TipoProductoServicio)dto.Tipo;
+
+                var modalidad =
+                    (ModalidadProductoServicio)dto.Modalidad;
+
+                /*
+                 * Un producto físico se compra directamente.
+                 */
+                if (
+                    tipo == TipoProductoServicio.Producto &&
+                    modalidad != ModalidadProductoServicio.Compra
+                )
+                {
+                    return ApiResponse<ProductosServiciosDto>.Error(
+                        "400",
+                        "Los productos deben utilizar la modalidad de compra."
+                    );
+                }
+
+                /*
+                 * Compra directa requiere precio.
+                 */
+                if (
+                    modalidad == ModalidadProductoServicio.Compra &&
+                    (!dto.Precio.HasValue || dto.Precio.Value < 0)
+                )
+                {
+                    return ApiResponse<ProductosServiciosDto>.Error(
+                        "400",
+                        "Los productos disponibles para compra deben tener un precio válido."
+                    );
+                }
+
+                /*
+                 * Reservación requiere precio y duración.
+                 */
+                if (
+                    modalidad == ModalidadProductoServicio.Reservacion
+                )
+                {
+                    if (
+                        !dto.Precio.HasValue ||
+                        dto.Precio.Value < 0
+                    )
+                    {
+                        return ApiResponse<ProductosServiciosDto>.Error(
+                            "400",
+                            "Los servicios con reservación deben tener un precio."
+                        );
+                    }
+
+                    if (
+                        !dto.DuracionMinutos.HasValue ||
+                        dto.DuracionMinutos.Value <= 0
+                    )
+                    {
+                        return ApiResponse<ProductosServiciosDto>.Error(
+                            "400",
+                            "Los servicios con reservación deben indicar su duración."
+                        );
+                    }
+                }
+
+                /*
+                 * Cotización puede no tener precio fijo.
+                 */
+                if (
+                    modalidad == ModalidadProductoServicio.Cotizacion &&
+                    tipo != TipoProductoServicio.Servicio
+                )
+                {
+                    return ApiResponse<ProductosServiciosDto>.Error(
+                        "400",
+                        "La modalidad de cotización solo está disponible para servicios."
+                    );
+                }
+
+                if (dto.ManejaStock)
+                {
+                    if (!dto.Stock.HasValue)
+                    {
+                        return ApiResponse<ProductosServiciosDto>.Error(
+                            "400",
+                            "Debes indicar el stock disponible."
+                        );
+                    }
+
+                    if (dto.Stock.Value < 0)
+                    {
+                        return ApiResponse<ProductosServiciosDto>.Error(
+                            "400",
+                            "El stock no puede ser negativo."
+                        );
+                    }
+                }
+                else
+                {
+                    dto.Stock = null;
+                }
 
                 string? logoUrl = null;
+
                 if (!string.IsNullOrWhiteSpace(dto.ImagenBase64))
                 {
-                    string? contentType = TiposImagenPermitidos
-                        .FirstOrDefault(x => dto.ImagenBase64.StartsWith(x.Value))
-                        .Key;
+                    string? contentType =
+                        TiposImagenPermitidos
+                            .FirstOrDefault(
+                                x =>
+                                    dto.ImagenBase64
+                                        .StartsWith(
+                                            x.Value
+                                        )
+                            )
+                            .Key;
 
                     if (contentType == null)
                     {
@@ -106,68 +267,188 @@ namespace AdLocalAPI.Services
                         );
                     }
 
-                    string base64Clean = dto.ImagenBase64
-                        .Replace($"data:{contentType};base64,", string.Empty);
+                    string base64Clean =
+                        dto.ImagenBase64.Replace(
+                            $"data:{contentType};base64,",
+                            string.Empty
+                        );
 
-                    byte[] imageBytes = Convert.FromBase64String(base64Clean);
+                    byte[] imageBytes =
+                        Convert.FromBase64String(
+                            base64Clean
+                        );
 
-                    logoUrl = await _repository.UploadImageAsync(
-                        imageBytes,
-                        userId,
-                        contentType
-                    );
+                    logoUrl =
+                        await _repository.UploadImageAsync(
+                            imageBytes,
+                            userId,
+                            contentType
+                        );
                 }
-                var entity = new ProductosServicios
-                {
-                    IdComercio = idComercio,
-                    IdUsuario = userId,
-                    Nombre = dto.Nombre,
-                    Descripcion = dto.Descripcion,
-                    Tipo = (TipoProductoServicio)dto.Tipo,
-                    Precio = dto.Precio,
-                    Stock = dto.Stock,
-                    FechaCreacion = DateTime.UtcNow,
-                    LogoUrl = logoUrl,
-                };
 
-                var result = await _repository.CreateAsync(entity);
+                var entity =
+                    new ProductosServicios
+                    {
+                        Uuid = Guid.NewGuid(),
+
+                        IdComercio = idComercio,
+
+                        IdUsuario = userId,
+
+                        Nombre = dto.Nombre.Trim(),
+
+                        Descripcion =
+                            string.IsNullOrWhiteSpace(
+                                dto.Descripcion
+                            )
+                                ? null
+                                : dto.Descripcion.Trim(),
+
+                        Tipo = tipo,
+
+                        Modalidad = modalidad,
+
+                        Precio = dto.Precio,
+
+                        PrecioDesde =
+                            dto.PrecioDesde,
+
+                        ManejaStock =
+                            dto.ManejaStock,
+
+                        Stock = dto.ManejaStock
+                            ? dto.Stock
+                            : null,
+
+                        Disponible =
+                            dto.Disponible,
+
+                        PermiteDomicilio =
+                            dto.PermiteDomicilio,
+
+                        PermiteRecoger =
+                            dto.PermiteRecoger,
+
+                        DuracionMinutos =
+                            dto.DuracionMinutos,
+
+                        Activo =
+                            dto.Activo,
+
+                        Visible =
+                            dto.Visible,
+
+                        CodigoInterno =
+                            string.IsNullOrWhiteSpace(
+                                dto.CodigoInterno
+                            )
+                                ? null
+                                : dto.CodigoInterno.Trim(),
+
+                        FechaCreacion =
+                            DateTime.UtcNow,
+
+                        LogoUrl =
+                            logoUrl
+                    };
+
+                var result =
+                    await _repository.CreateAsync(
+                        entity
+                    );
+
                 dto.Id = result.Id;
-                return ApiResponse<ProductosServiciosDto>.Success(dto, "Producto/Servicio creado correctamente");
+                dto.Uuid = result.Uuid;
+
+                return ApiResponse<ProductosServiciosDto>.Success(
+                    dto,
+                    "Producto/Servicio creado correctamente"
+                );
             }
             catch (Exception ex)
             {
-                return ApiResponse<ProductosServiciosDto>.Error("500", ex.Message);
+                return ApiResponse<ProductosServiciosDto>.Error(
+                    "500",
+                    ex.Message
+                );
             }
         }
 
-        public async Task<ApiResponse<IEnumerable<ProductosServiciosDto>>> GetAllAsync(long idComercio)
+        public async Task<ApiResponse<IEnumerable<ProductosServiciosDto>>> GetAllAsync(
+            long idComercio)
         {
-
-            if (_jwtContext.PermiteCatalogo())
+            if (!_jwtContext.PermiteCatalogo())
             {
-                var list = await _repository.GetAllAsync(idComercio);
-                list = list.Take(_jwtContext.GetMaxProductos());
+                return ApiResponse<IEnumerable<ProductosServiciosDto>>
+                    .Success(
+                        Enumerable.Empty<ProductosServiciosDto>(),
+                        "Listado obtenido correctamente"
+                    );
+            }
 
-                var result = list.Select(x => new ProductosServiciosDto
+            var list = await _repository.GetAllAsync(idComercio);
+
+            int maxProductos = _jwtContext.GetMaxProductos();
+
+            var query = list
+                .Where(x =>
+                    x.Activo &&
+                    !x.Eliminado
+                );
+
+            if (maxProductos > 0)
+            {
+                query = query.Take(maxProductos);
+            }
+
+            var result = query
+                .Select(x => new ProductosServiciosDto
                 {
                     Id = x.Id,
+
+                    Uuid = x.Uuid,
+
                     Nombre = x.Nombre,
+
                     Descripcion = x.Descripcion,
+
                     Tipo = (int)x.Tipo,
+
+                    Modalidad = (int)x.Modalidad,
+
                     Precio = x.Precio,
-                    Stock = (int)x.Stock,
+
+                    PrecioDesde = x.PrecioDesde,
+
+                    ManejaStock = x.ManejaStock,
+
+                    Stock = x.Stock,
+
+                    Disponible = x.Disponible,
+
+                    PermiteDomicilio = x.PermiteDomicilio,
+
+                    PermiteRecoger = x.PermiteRecoger,
+
+                    DuracionMinutos = x.DuracionMinutos,
+
                     Activo = x.Activo,
+
+                    Visible = x.Visible,
+
+                    CodigoInterno = x.CodigoInterno,
+
                     ImagenBase64 = x.LogoUrl,
-                }).Where(c => c.Activo);
 
-                return ApiResponse<IEnumerable<ProductosServiciosDto>>
-                    .Success(result, "Listado obtenido correctamente");
-            }
-            else
-            {
-                return ApiResponse<IEnumerable<ProductosServiciosDto>>.Success([], "Listado obtenido correctamente");
-            }
+                    IdComercio = x.IdComercio
+                })
+                .ToList();
 
+            return ApiResponse<IEnumerable<ProductosServiciosDto>>
+                .Success(
+                    result,
+                    "Listado obtenido correctamente"
+                );
         }
 
         public async Task<ApiResponse<ProductosServiciosDto>> GetByIdAsync(long id)
@@ -211,36 +492,188 @@ namespace AdLocalAPI.Services
             return ApiResponse<ProductosServiciosDto>.Success(dto);
         }
 
-        public async Task<ApiResponse<bool>> UpdateAsync(long id, ProductosServiciosDto dto)
+        public async Task<ApiResponse<bool>> UpdateAsync(
+            long id,
+            ProductosServiciosDto dto)
         {
             long userId = 0;
+
             if (_jwtContext.GetUserRole() == "Colaborador")
             {
-                var usuario = await _usuarioRepository.GetByIdComercioAsync(_jwtContext.GetComercioId());
+                var usuario =
+                    await _usuarioRepository
+                        .GetByIdComercioAsync(
+                            _jwtContext.GetComercioId()
+                        );
+
                 userId = usuario.Id;
-                var planActivo = await _suscripcionRepository.GetActivaByUsuarioAsync(userId);
-                if (planActivo.Plan.Tipo == "BASIC" || planActivo.Plan.Tipo == "FREE")
+
+                var planActivo =
+                    await _suscripcionRepository
+                        .GetActivaByUsuarioAsync(
+                            userId
+                        );
+
+                if (
+                    planActivo.Plan.Tipo == "BASIC" ||
+                    planActivo.Plan.Tipo == "FREE"
+                )
                 {
                     return ApiResponse<bool>.Error(
-                       "400",
-                       "El dueño del negocio necesita actualizar su suscripción para que puedas usar las funciones de colaborador."
-                   );
-
+                        "400",
+                        "El dueño del negocio necesita actualizar su suscripción para que puedas usar las funciones de colaborador."
+                    );
                 }
             }
             else
             {
-                userId = _jwtContext.GetUserId();
+                userId =
+                    _jwtContext.GetUserId();
             }
-            long idComercio = dto.IdComercio == 0 ? _jwtContext.GetComercioId() : dto.IdComercio;
-            var entity = await _repository.GetByIdAsync(id, idComercio, userId);
+
+            long idComercio =
+                dto.IdComercio == 0
+                    ? _jwtContext.GetComercioId()
+                    : dto.IdComercio;
+
+            var entity =
+                await _repository.GetByIdAsync(
+                    id,
+                    idComercio,
+                    userId
+                );
 
             if (entity == null)
-                return ApiResponse<bool>.Error("404", "Producto/Servicio no encontrado");
-
-            if (!string.IsNullOrWhiteSpace(dto.ImagenBase64) && !EsUrl(dto.ImagenBase64))
             {
-                if (!EsImagenBase64(dto.ImagenBase64))
+                return ApiResponse<bool>.Error(
+                    "404",
+                    "Producto/Servicio no encontrado"
+                );
+            }
+
+            if (
+                !Enum.IsDefined(
+                    typeof(TipoProductoServicio),
+                    dto.Tipo
+                )
+            )
+            {
+                return ApiResponse<bool>.Error(
+                    "400",
+                    "El tipo de producto o servicio no es válido."
+                );
+            }
+
+            if (
+                !Enum.IsDefined(
+                    typeof(ModalidadProductoServicio),
+                    dto.Modalidad
+                )
+            )
+            {
+                return ApiResponse<bool>.Error(
+                    "400",
+                    "La modalidad no es válida."
+                );
+            }
+
+            var tipo =
+                (TipoProductoServicio)dto.Tipo;
+
+            var modalidad =
+                (ModalidadProductoServicio)dto.Modalidad;
+
+            if (
+                tipo == TipoProductoServicio.Producto &&
+                modalidad != ModalidadProductoServicio.Compra
+            )
+            {
+                return ApiResponse<bool>.Error(
+                    "400",
+                    "Los productos deben utilizar la modalidad de compra."
+                );
+            }
+
+            if (
+                modalidad == ModalidadProductoServicio.Compra &&
+                (!dto.Precio.HasValue || dto.Precio.Value < 0)
+            )
+            {
+                return ApiResponse<bool>.Error(
+                    "400",
+                    "Los productos o servicios de compra directa deben tener un precio válido."
+                );
+            }
+
+            if (
+                modalidad == ModalidadProductoServicio.Reservacion
+            )
+            {
+                if (
+                    !dto.Precio.HasValue ||
+                    dto.Precio.Value < 0
+                )
+                {
+                    return ApiResponse<bool>.Error(
+                        "400",
+                        "Los servicios con reservación deben tener un precio."
+                    );
+                }
+
+                if (
+                    !dto.DuracionMinutos.HasValue ||
+                    dto.DuracionMinutos.Value <= 0
+                )
+                {
+                    return ApiResponse<bool>.Error(
+                        "400",
+                        "Los servicios con reservación deben indicar su duración."
+                    );
+                }
+            }
+
+            if (
+                modalidad == ModalidadProductoServicio.Cotizacion &&
+                tipo != TipoProductoServicio.Servicio
+            )
+            {
+                return ApiResponse<bool>.Error(
+                    "400",
+                    "La modalidad de cotización solo está disponible para servicios."
+                );
+            }
+
+            if (dto.ManejaStock)
+            {
+                if (!dto.Stock.HasValue)
+                {
+                    return ApiResponse<bool>.Error(
+                        "400",
+                        "Debes indicar el stock disponible."
+                    );
+                }
+
+                if (dto.Stock.Value < 0)
+                {
+                    return ApiResponse<bool>.Error(
+                        "400",
+                        "El stock no puede ser negativo."
+                    );
+                }
+            }
+
+            if (
+                !string.IsNullOrWhiteSpace(
+                    dto.ImagenBase64
+                ) &&
+                !EsUrl(dto.ImagenBase64)
+            )
+            {
+                if (
+                    !EsImagenBase64(
+                        dto.ImagenBase64
+                    )
+                )
                 {
                     return ApiResponse<bool>.Error(
                         "400",
@@ -248,9 +681,16 @@ namespace AdLocalAPI.Services
                     );
                 }
 
-                string? contentType = TiposImagenPermitidos
-                    .FirstOrDefault(x => dto.ImagenBase64.StartsWith(x.Value))
-                    .Key;
+                string? contentType =
+                    TiposImagenPermitidos
+                        .FirstOrDefault(
+                            x =>
+                                dto.ImagenBase64
+                                    .StartsWith(
+                                        x.Value
+                                    )
+                        )
+                        .Key;
 
                 if (contentType == null)
                 {
@@ -260,34 +700,101 @@ namespace AdLocalAPI.Services
                     );
                 }
 
-                string base64Clean = dto.ImagenBase64.Replace(
-                    $"data:{contentType};base64,", string.Empty
-                );
+                string base64Clean =
+                    dto.ImagenBase64.Replace(
+                        $"data:{contentType};base64,",
+                        string.Empty
+                    );
 
-                byte[] imageBytes = Convert.FromBase64String(base64Clean);
+                byte[] imageBytes =
+                    Convert.FromBase64String(
+                        base64Clean
+                    );
 
-                if (!string.IsNullOrWhiteSpace(entity.LogoUrl))
+                if (
+                    !string.IsNullOrWhiteSpace(
+                        entity.LogoUrl
+                    )
+                )
                 {
-                    await _repository.DeleteFromS3Async(entity.LogoUrl);
+                    await _repository.DeleteFromS3Async(
+                        entity.LogoUrl
+                    );
                 }
 
-                entity.LogoUrl = await _repository.UploadImageAsync(
-                    imageBytes,
-                    userId,
-                    contentType
-                );
+                entity.LogoUrl =
+                    await _repository.UploadImageAsync(
+                        imageBytes,
+                        userId,
+                        contentType
+                    );
             }
 
-            entity.Nombre = dto.Nombre;
-            entity.Descripcion = dto.Descripcion;
-            entity.Precio = dto.Precio;
-            entity.Stock = dto.Stock;
-            entity.Activo = dto.Activo;
-            entity.FechaActualizacion = DateTime.UtcNow;
+            entity.Nombre =
+                dto.Nombre.Trim();
 
-            await _repository.UpdateAsync(entity);
+            entity.Descripcion =
+                string.IsNullOrWhiteSpace(
+                    dto.Descripcion
+                )
+                    ? null
+                    : dto.Descripcion.Trim();
 
-            return ApiResponse<bool>.Success(true, "Actualizado correctamente");
+            entity.Tipo = tipo;
+
+            entity.Modalidad =
+                modalidad;
+
+            entity.Precio =
+                dto.Precio;
+
+            entity.PrecioDesde =
+                dto.PrecioDesde;
+
+            entity.ManejaStock =
+                dto.ManejaStock;
+
+            entity.Stock =
+                dto.ManejaStock
+                    ? dto.Stock
+                    : null;
+
+            entity.Disponible =
+                dto.Disponible;
+
+            entity.PermiteDomicilio =
+                dto.PermiteDomicilio;
+
+            entity.PermiteRecoger =
+                dto.PermiteRecoger;
+
+            entity.DuracionMinutos =
+                dto.DuracionMinutos;
+
+            entity.Activo =
+                dto.Activo;
+
+            entity.Visible =
+                dto.Visible;
+
+            entity.CodigoInterno =
+                string.IsNullOrWhiteSpace(
+                    dto.CodigoInterno
+                )
+                    ? null
+                    : dto.CodigoInterno.Trim();
+
+            entity.FechaActualizacion =
+                DateTime.UtcNow;
+
+            await _repository.UpdateAsync(
+                entity
+            );
+
+            return ApiResponse<bool>.Success(
+                true,
+                "Actualizado correctamente"
+            );
         }
 
         public async Task<ApiResponse<bool>> DeleteAsync(long id,long idComercio)

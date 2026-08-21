@@ -213,7 +213,7 @@ namespace AdLocalAPI.Services
         }
         public async Task<ApiResponse<object>> ActualizarUsuario(UsuarioUpdateDto dto)
         {
-            int id = _jwtContext.GetUserId();
+            long id = _jwtContext.GetUserId();
             var usuario = await _repository.GetByIdAsync(id);
 
             if (usuario == null)
@@ -228,7 +228,7 @@ namespace AdLocalAPI.Services
         }
         public async Task<ApiResponse<UsuarioInfoDto>> ObtenerInfoUsuario()
         {
-            int id = _jwtContext.GetUserId();
+            long id = _jwtContext.GetUserId();
             var usuario = await _repository.GetByIdAsync(id);
 
             if (usuario == null)
@@ -357,117 +357,359 @@ namespace AdLocalAPI.Services
         }
         public async Task<string> GenerateJwtToken(Usuario usuario)
         {
+            var jwtKey = _config["Jwt:Key"];
+
+            if (string.IsNullOrWhiteSpace(jwtKey))
+            {
+                throw new InvalidOperationException(
+                    "No se encontró la configuración Jwt:Key."
+                );
+            }
+
             var key = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(_config["Jwt:Key"])
+                Encoding.UTF8.GetBytes(jwtKey)
             );
 
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+            var creds = new SigningCredentials(
+                key,
+                SecurityAlgorithms.HmacSha256
+            );
 
             var claims = new List<Claim>
-                                        {
-                                            new Claim(JwtRegisteredClaimNames.Sub, usuario.Email),
-                                            new Claim("id", usuario.Id.ToString()),
-                                            new Claim("nombre", usuario.Nombre),
-                                            new Claim("rol", usuario.Rol)
-                                        };
+    {
+        new Claim(
+            JwtRegisteredClaimNames.Sub,
+            usuario.Email
+        ),
 
+        new Claim(
+            JwtRegisteredClaimNames.Email,
+            usuario.Email
+        ),
 
-            if (usuario.Rol == "Comercio")
+        new Claim(
+            JwtRegisteredClaimNames.Jti,
+            Guid.NewGuid().ToString()
+        ),
+
+        new Claim(
+            "id",
+            usuario.Id.ToString()
+        ),
+
+        new Claim(
+            "nombre",
+            usuario.Nombre
+        ),
+
+        new Claim(
+            "rol",
+            usuario.Rol
+        ),
+
+        new Claim(
+            ClaimTypes.Role,
+            usuario.Rol
+        )
+    };
+
+            if (
+                usuario.Rol.Equals(
+                    "Comercio",
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
             {
-                var comercio = await _comercioRepository.GetComercioByUser(usuario.Id);
+                var comercio =
+                    await _comercioRepository
+                        .GetComercioByUser(usuario.Id);
 
-                claims.Add(new Claim(
-                    "comercioId",
-                    comercio?.Id.ToString() ?? "0"
-                ));
-                claims.Add(new Claim(
-                    "comercioId",
-                    comercio?.Id.ToString() ?? "0"
-                ));
+                claims.Add(
+                    new Claim(
+                        "comercioId",
+                        comercio?.Id.ToString() ?? "0"
+                    )
+                );
 
-                claims.Add(new Claim(
-                    "RedeemRewards",
-                    usuario.RedeemRewards ? "true" : "false" 
-                ));
-                claims.Add(new Claim(
-                    "RedeemMonthFree",
-                    usuario.RedeemMonthFree ? "true" : "false"
-                ));
-                claims.Add(new Claim(
-                    "codigoReferido",
-                    usuario.CodigoReferido ?? ""
-                ));
-                var suscripcion = await _suscripcionRepository
-                    .GetActivaByUsuarioAsync(usuario.Id);
+                claims.Add(
+                    new Claim(
+                        "RedeemRewards",
+                        usuario.RedeemRewards
+                            ? "true"
+                            : "false"
+                    )
+                );
 
-                if (suscripcion != null && suscripcion.Plan != null)
+                claims.Add(
+                    new Claim(
+                        "RedeemMonthFree",
+                        usuario.RedeemMonthFree
+                            ? "true"
+                            : "false"
+                    )
+                );
+
+                claims.Add(
+                    new Claim(
+                        "codigoReferido",
+                        usuario.CodigoReferido ?? ""
+                    )
+                );
+
+                claims.Add(
+                    new Claim(
+                        "fotoUrl",
+                        usuario.FotoUrl ?? ""
+                    )
+                );
+
+                var suscripcion =
+                    await _suscripcionRepository
+                        .GetActivaByUsuarioAsync(
+                            usuario.Id
+                        );
+
+                if (
+                    suscripcion != null &&
+                    suscripcion.Plan != null
+                )
                 {
                     var plan = suscripcion.Plan;
 
-                    claims.Add(new Claim("planId", plan.Id.ToString()));
-                    claims.Add(new Claim("planTipo", plan.Tipo));
-                    claims.Add(new Claim("nivelVisibilidad", plan.NivelVisibilidad.ToString()));
-                    claims.Add(new Claim("esatdo", suscripcion.Status));
-                    claims.Add(new Claim("maxNegocios", plan.MaxNegocios.ToString()));
-                    claims.Add(new Claim("maxProductos", plan.MaxProductos.ToString()));
-                    claims.Add(new Claim("maxFotos", plan.MaxFotos.ToString()));
+                    claims.Add(
+                        new Claim(
+                            "planId",
+                            plan.Id.ToString()
+                        )
+                    );
 
-                    claims.Add(new Claim("permiteCatalogo", plan.PermiteCatalogo.ToString()));
-                    claims.Add(new Claim("tieneAnalytics", plan.TieneAnalytics.ToString()));
+                    claims.Add(
+                        new Claim(
+                            "planTipo",
+                            plan.Tipo ?? "FREE"
+                        )
+                    );
 
-                    claims.Add(new Claim(
-                        "badge",
-                        plan.TieneBadge ? plan.BadgeTexto ?? "" : ""
-                    ));
+                    claims.Add(
+                        new Claim(
+                            "nivelVisibilidad",
+                            plan.NivelVisibilidad.ToString()
+                        )
+                    );
+
+                    claims.Add(
+                        new Claim(
+                            "estado",
+                            suscripcion.Status ?? ""
+                        )
+                    );
+
+                    claims.Add(
+                        new Claim(
+                            "maxNegocios",
+                            plan.MaxNegocios.ToString()
+                        )
+                    );
+
+                    claims.Add(
+                        new Claim(
+                            "maxProductos",
+                            plan.MaxProductos.ToString()
+                        )
+                    );
+
+                    claims.Add(
+                        new Claim(
+                            "maxFotos",
+                            plan.MaxFotos.ToString()
+                        )
+                    );
+
+                    claims.Add(
+                        new Claim(
+                            "permiteCatalogo",
+                            plan.PermiteCatalogo.ToString()
+                        )
+                    );
+
+                    claims.Add(
+                        new Claim(
+                            "tieneAnalytics",
+                            plan.TieneAnalytics.ToString()
+                        )
+                    );
+
+                    claims.Add(
+                        new Claim(
+                            "badge",
+                            plan.TieneBadge
+                                ? plan.BadgeTexto ?? ""
+                                : ""
+                        )
+                    );
                 }
                 else
                 {
-                    claims.Add(new Claim("planTipo", "FREE"));
-                    claims.Add(new Claim("nivelVisibilidad", "0"));
+                    claims.Add(
+                        new Claim(
+                            "planTipo",
+                            "FREE"
+                        )
+                    );
+
+                    claims.Add(
+                        new Claim(
+                            "nivelVisibilidad",
+                            "0"
+                        )
+                    );
                 }
             }
-            else if (usuario.Rol == "Colaborador")
+            else if (
+                usuario.Rol.Equals(
+                    "Colaborador",
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
             {
-                var comercio = await _comercioRepository.GetByIdAsync((long)usuario.ComercioId);
-                claims.Add(new Claim(
-                    "comercioId",
-                    comercio?.Id.ToString() ?? "0"
-                ));
-
-                claims.Add(new Claim(
-                    "fotoUrl",
-                    usuario.FotoUrl ?? ""
-                ));
-
-                var usuarioManager = await _repository.GetByIdComercioAsync((long)usuario.ComercioId);
-                var planActivo = await _suscripcionRepository.GetActivaByUsuarioAsync(usuarioManager.Id);
-                if (planActivo != null && planActivo.Plan != null)
+                if (usuario.ComercioId.HasValue)
                 {
-                    var plan = planActivo.Plan;
+                    var comercio =
+                        await _comercioRepository
+                            .GetByIdAsync(
+                                usuario.ComercioId.Value
+                            );
 
-                    claims.Add(new Claim("planId", plan.Id.ToString()));
-                    claims.Add(new Claim("planTipo", plan.Tipo));
-                    claims.Add(new Claim("nivelVisibilidad", plan.NivelVisibilidad.ToString()));
-                    claims.Add(new Claim("esatdo", planActivo.Status));
-                    claims.Add(new Claim("maxProductos", plan.MaxProductos.ToString()));
-                    claims.Add(new Claim("maxFotos", plan.MaxFotos.ToString()));
-                    claims.Add(new Claim("permiteCatalogo", plan.PermiteCatalogo.ToString()));
-                    claims.Add(new Claim(
-                        "badge",
-                        plan.TieneBadge ? plan.BadgeTexto ?? "" : ""
-                    ));
+                    claims.Add(
+                        new Claim(
+                            "comercioId",
+                            comercio?.Id.ToString() ?? "0"
+                        )
+                    );
+
+                    var usuarioManager =
+                        await _repository
+                            .GetByIdComercioAsync(
+                                usuario.ComercioId.Value
+                            );
+
+                    if (usuarioManager != null)
+                    {
+                        var planActivo =
+                            await _suscripcionRepository
+                                .GetActivaByUsuarioAsync(
+                                    usuarioManager.Id
+                                );
+
+                        if (
+                            planActivo != null &&
+                            planActivo.Plan != null
+                        )
+                        {
+                            var plan =
+                                planActivo.Plan;
+
+                            claims.Add(
+                                new Claim(
+                                    "planId",
+                                    plan.Id.ToString()
+                                )
+                            );
+
+                            claims.Add(
+                                new Claim(
+                                    "planTipo",
+                                    plan.Tipo ?? "FREE"
+                                )
+                            );
+
+                            claims.Add(
+                                new Claim(
+                                    "nivelVisibilidad",
+                                    plan.NivelVisibilidad.ToString()
+                                )
+                            );
+
+                            claims.Add(
+                                new Claim(
+                                    "estado",
+                                    planActivo.Status ?? ""
+                                )
+                            );
+
+                            claims.Add(
+                                new Claim(
+                                    "maxProductos",
+                                    plan.MaxProductos.ToString()
+                                )
+                            );
+
+                            claims.Add(
+                                new Claim(
+                                    "maxFotos",
+                                    plan.MaxFotos.ToString()
+                                )
+                            );
+
+                            claims.Add(
+                                new Claim(
+                                    "permiteCatalogo",
+                                    plan.PermiteCatalogo.ToString()
+                                )
+                            );
+
+                            claims.Add(
+                                new Claim(
+                                    "tieneAnalytics",
+                                    plan.TieneAnalytics.ToString()
+                                )
+                            );
+
+                            claims.Add(
+                                new Claim(
+                                    "badge",
+                                    plan.TieneBadge
+                                        ? plan.BadgeTexto ?? ""
+                                        : ""
+                                )
+                            );
+                        }
+                    }
                 }
+
+                claims.Add(
+                    new Claim(
+                        "fotoUrl",
+                        usuario.FotoUrl ?? ""
+                    )
+                );
+            }
+            else if (
+                usuario.Rol.Equals(
+                    "Cliente",
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            {
+                claims.Add(
+                    new Claim(
+                        "fotoUrl",
+                        usuario.FotoUrl ?? ""
+                    )
+                );
             }
 
             var token = new JwtSecurityToken(
                 issuer: _config["Jwt:Issuer"],
                 audience: null,
                 claims: claims,
+                notBefore: DateTime.UtcNow,
                 expires: DateTime.UtcNow.AddDays(30),
                 signingCredentials: creds
             );
 
-            return new JwtSecurityTokenHandler().WriteToken(token);
+            return new JwtSecurityTokenHandler()
+                .WriteToken(token);
         }
         public async Task<UpdateJwtResult> ActualizarJwtAsync(string email, bool updateJWT)
         {
@@ -501,7 +743,7 @@ namespace AdLocalAPI.Services
         }
         public async Task<ApiResponse<object>> CambiarPassword(ChangePasswordDto dto)
         {
-            int userId = _jwtContext.GetUserId();
+            long userId = _jwtContext.GetUserId();
 
             var usuario = await _repository.GetByIdAsync(userId);
             if (usuario == null)
@@ -536,7 +778,7 @@ namespace AdLocalAPI.Services
         }
         public async Task<ApiResponse<string>> UploadPhotoAsync(UploadPhotoDto dto)
         {
-            int id = _jwtContext.GetUserId();
+            long id = _jwtContext.GetUserId();
             var usuario = await _repository.GetByIdAsync(id);
             if (string.IsNullOrEmpty(dto.Base64))
                 return ApiResponse<string>.Error("400", "No se recibió la imagen");

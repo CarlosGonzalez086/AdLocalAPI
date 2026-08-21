@@ -69,6 +69,9 @@ namespace AdLocalAPI.Controllers
 )
         {
             var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
+            long? idCliente = null;
+            var claimId = User.FindFirst("id")?.Value;
+            if (User.Identity?.IsAuthenticated == true && long.TryParse(claimId, out var id)) idCliente = id;
 
             var response = await _service.GetAllComercios(
                 tipo,
@@ -77,7 +80,8 @@ namespace AdLocalAPI.Controllers
                 municipio,
                 page,
                 pageSize,
-                ip
+                ip,
+                idCliente
             );
 
             return response.Codigo == "200"
