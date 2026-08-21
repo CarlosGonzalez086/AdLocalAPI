@@ -22,7 +22,7 @@ ENV ASPNETCORE_URLS=http://+:8080
 ENV AllowedHosts=*
 
 # Connection String (EF Core)
-ENV SUPABASE_DB_CONNECTION=Host=ep-empty-moon-adsd2mcc-pooler.c-2.us-east-1.aws.neon.tech;Port=5432;Database=neondb;Username=neondb_owner;Password=npg_vXt9sekfG3rY;SslMode=Require
+ENV SUPABASE_DB_CONNECTION=Host=ep-empty-moon-adsd2mcc-pooler.c-2.us-east-1.aws.neon.tech;Port=5432;Database=AdLocal;Username=neondb_owner;Password=npg_vXt9sekfG3rY;SslMode=Require
 ENV STRIPE_WEBHOOK_SECRET=whsec_vRaXms0x16TSCd2LYEAEDGBdBtmuT1tz
 
 
