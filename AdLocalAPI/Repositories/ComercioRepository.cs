@@ -787,6 +787,27 @@ namespace AdLocalAPI.Repositories
 
             return new string(chars);
         }
+        public async Task<bool> PuedeAdministrarAsync(
+    long comercioId,
+    long usuarioId
+)
+        {
+            var esPropietario = await _context.Comercios
+                .AnyAsync(x =>
+                    x.Id == comercioId &&
+                    x.IdUsuario == usuarioId
+                );
 
+            if (esPropietario)
+            {
+                return true;
+            }
+
+            return await _context.Usuarios
+                .AnyAsync(x =>
+                    x.Id == usuarioId &&
+                    x.ComercioId == comercioId
+                );
+        }
     }
 }

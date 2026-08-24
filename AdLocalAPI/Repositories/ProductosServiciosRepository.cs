@@ -238,5 +238,27 @@ namespace AdLocalAPI.Repositories
                 return false;
             }
         }
+        public async Task<ProductosServicios?> ObtenerReservablePorUuidAsync(
+    Guid uuid
+)
+        {
+            return await _context.ProductosServicios
+                .FirstOrDefaultAsync(x =>
+                    x.Uuid == uuid &&
+                    x.Activo &&
+                    x.Visible &&
+                    x.Disponible &&
+                    x.Modalidad ==
+                        ModalidadProductoServicio.Reservacion
+                );
+        }
+
+        public async Task<ProductosServicios?> ObtenerPorIdAsync(
+            long id
+        )
+        {
+            return await _context.ProductosServicios
+                .FirstOrDefaultAsync(x => x.Id == id);
+        }
     }
 }

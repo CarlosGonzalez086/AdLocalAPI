@@ -13,5 +13,8 @@ namespace AdLocalAPI.Interfaces.ProductosServicios
    long idUser, long idComercio, int page = 1, int pageSize = 10, string orderBy = "recent", string search = "",int maxProductos = 0);
         Task<string> UploadImageAsync(byte[] imageBytes, long userId, string contentType = "image/png");
         Task<bool> DeleteFromS3Async(string storageReference);
+        Task<AdLocalAPI.Models.ProductosServicios?> ObtenerReservablePorUuidAsync(Guid uuid);
+
+        Task<AdLocalAPI.Models.ProductosServicios?> ObtenerPorIdAsync(long id);
     }
 }
