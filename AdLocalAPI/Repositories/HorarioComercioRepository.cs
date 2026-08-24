@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AdLocalAPI.Repositories
 {
-    public class HorarioComercioRepository : IHorarioComercioService
+    public class HorarioComercioRepository : IHorarioComercioRepository
     {
         private readonly AppDbContext _context;
 
@@ -92,6 +92,15 @@ namespace AdLocalAPI.Repositories
         {
             return await _context.HorarioComercio
                 .AnyAsync(h => h.ComercioId == comercioId);
+        }
+        public async Task<HorarioComercio?> ObtenerAsync(long comercioId,DayOfWeek dia)
+        {
+            return await _context.HorarioComercio
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x =>
+                    x.ComercioId == comercioId &&
+                    x.Dia == dia
+                );
         }
     }
 }

@@ -2,7 +2,7 @@
 
 namespace AdLocalAPI.Interfaces.Comercio
 {
-    public interface IHorarioComercioService
+    public interface IHorarioComercioRepository
     {
         Task<bool> CrearHorariosAsync(
             long comercioId,
@@ -21,5 +21,6 @@ namespace AdLocalAPI.Interfaces.Comercio
         Task<bool> ComercioTieneHorariosAsync(
             long comercioId
         );
+        Task<HorarioComercio?> ObtenerAsync(long comercioId, DayOfWeek dia);
     }
 }

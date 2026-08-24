@@ -153,7 +153,7 @@ builder.Services.AddScoped<UsuarioService>();
 
 builder.Services.AddScoped<IProductosServiciosRepository, ProductosServiciosRepository>();
 builder.Services.AddScoped<IProductosServiciosService, ProductosServiciosService>();
-builder.Services.AddScoped<IHorarioComercioService, HorarioComercioRepository>();
+builder.Services.AddScoped<IHorarioComercioRepository, HorarioComercioRepository>();
 
 
 builder.Services.AddScoped<PlanRepository>();
@@ -227,6 +227,13 @@ builder.Services.AddScoped<IPedidoComercioRepository, PedidoComercioRepository>(
 builder.Services.AddScoped<IPedidoComercioService, PedidoComercioService>();
 builder.Services.AddScoped<INotificacionService, NotificacionService>();
 builder.Services.AddScoped<IComisionService, ComisionService>();
+
+builder.Services.AddScoped<ICitaService,CitaService>();
+builder.Services.AddScoped<ICitaRepository,CitaRepository>();
+builder.Services.AddScoped<IHorarioCitaServicioRepository,HorarioCitaServicioRepository>();
+
+
+
 
 builder.Services.AddSingleton<AppConfigState>();
 

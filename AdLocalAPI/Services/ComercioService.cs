@@ -19,7 +19,7 @@ namespace AdLocalAPI.Services
         private readonly ComercioRepository _repository;
         private readonly JwtContext _jwtContext;
         private readonly IRelComercioImagenRepositorio _comercioImagenRepositorio;
-        private readonly IHorarioComercioService _horarioComercioService;
+        private readonly IHorarioComercioRepository _horarioComercioRepository;
         private readonly IProductosServiciosRepository _productosServiciosRepository;
         private readonly ILocationRepository _locationRepository;
         private readonly CalificacionComentarioRepository _calificacionComentarioRepository;
@@ -33,7 +33,7 @@ namespace AdLocalAPI.Services
         private readonly ITipoComercioRepository _tipoComercioRepo;
 
         public ComercioService(ComercioRepository repository, JwtContext jwtContext, 
-                               IRelComercioImagenRepositorio comercioImagenRepositorio, IHorarioComercioService horarioComercioService, ITipoComercioRepository tipoComercioRepo,
+                               IRelComercioImagenRepositorio comercioImagenRepositorio, IHorarioComercioRepository horarioComercioRepository, ITipoComercioRepository tipoComercioRepo,
                                            SuscripcionRepository suscripcionRepository, GeoLocationService geoService,
             PlanRepository planRepository,
             UsuarioRepository usuarioRepository,
@@ -44,7 +44,7 @@ namespace AdLocalAPI.Services
             _repository = repository;
             _jwtContext = jwtContext;
             _comercioImagenRepositorio = comercioImagenRepositorio;
-            _horarioComercioService = horarioComercioService;
+            _horarioComercioRepository = horarioComercioRepository;
             _productosServiciosRepository = productosServiciosRepository;
             _locationRepository = locationRepository;
             _calificacionComentarioRepository = calificacionComentarioRepository;
@@ -135,7 +135,7 @@ namespace AdLocalAPI.Services
                     }
                 }
 
-                var listaHorarios = await _horarioComercioService.ObtenerHorariosPorComercioAsync(id);
+                var listaHorarios = await _horarioComercioRepository.ObtenerHorariosPorComercioAsync(id);
                 List<HorariosMineDto> Horarios = new List<HorariosMineDto>();
                 if (listaHorarios.Count > 0)
                 {
@@ -318,7 +318,7 @@ namespace AdLocalAPI.Services
                     }
                 }
 
-                var listaHorarios = await _horarioComercioService.ObtenerHorariosPorComercioAsync(comercio.Id);
+                var listaHorarios = await _horarioComercioRepository.ObtenerHorariosPorComercioAsync(comercio.Id);
                 List<HorariosMineDto> Horarios = new List<HorariosMineDto>();
                 if (listaHorarios.Count > 0)
                 {
@@ -554,7 +554,7 @@ namespace AdLocalAPI.Services
 
                 if (dto.Horarios.Count > 0)
                 {
-                    await _horarioComercioService.CrearHorariosAsync(
+                    await _horarioComercioRepository.CrearHorariosAsync(
                         creado.Id,
                         dto.Horarios.ToList()
                     );
@@ -759,14 +759,14 @@ namespace AdLocalAPI.Services
 
                 if (dto.Horarios.Count > 0)
                 {
-                    bool siTiene = await _horarioComercioService.ComercioTieneHorariosAsync(comercio.Id);
+                    bool siTiene = await _horarioComercioRepository.ComercioTieneHorariosAsync(comercio.Id);
                     if (siTiene)
                     {
-                        await _horarioComercioService.ActualizarHorariosAsync(comercio.Id,dto.Horarios.ToList());
+                        await _horarioComercioRepository.ActualizarHorariosAsync(comercio.Id,dto.Horarios.ToList());
                     }
                     else 
                     {                      
-                        await _horarioComercioService.CrearHorariosAsync(comercio.Id,dto.Horarios.ToList());
+                        await _horarioComercioRepository.CrearHorariosAsync(comercio.Id,dto.Horarios.ToList());
                     }
                 }
 
@@ -879,10 +879,10 @@ namespace AdLocalAPI.Services
                             .Eliminar(comercio.Id, img.FotoUrl);
                     }
                 }
-                bool siTiene = await _horarioComercioService.ComercioTieneHorariosAsync(comercio.Id);
+                bool siTiene = await _horarioComercioRepository.ComercioTieneHorariosAsync(comercio.Id);
                 if (siTiene)
                 {
-                    await _horarioComercioService.EliminarHorariosPorComercioAsync(comercio.Id);
+                    await _horarioComercioRepository.EliminarHorariosPorComercioAsync(comercio.Id);
                 }
 
                 await _repository.DeleteAsync(id);
