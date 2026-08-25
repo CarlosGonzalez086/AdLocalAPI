@@ -160,6 +160,12 @@ namespace AdLocalAPI.Services
                             Subtotal =
                                 subtotal,
 
+                            CostoEnvio = configuracion.CompraMinimaEnvioGratis.HasValue && subtotal >= configuracion.CompraMinimaEnvioGratis.Value ? 0 : configuracion.CostoEnvio,
+
+                            TotalDomicilio = subtotal + (configuracion.CompraMinimaEnvioGratis.HasValue && subtotal >= configuracion.CompraMinimaEnvioGratis.Value ? 0 : configuracion.CostoEnvio),
+
+                            CompraMinimaEnvioGratis = configuracion.CompraMinimaEnvioGratis,
+
                             AceptaEfectivo =
                                 configuracion.AceptaEfectivo,
 
@@ -658,6 +664,12 @@ namespace AdLocalAPI.Services
                         subtotal -
                         montoComision;
 
+                    var costoEnvio = configuracionCliente.TipoEntrega == TipoEntregaPedido.Domicilio
+                        ? (configuracionPago.CompraMinimaEnvioGratis.HasValue && subtotal >= configuracionPago.CompraMinimaEnvioGratis.Value ? 0 : configuracionPago.CostoEnvio)
+                        : 0;
+
+                    montoComercio += costoEnvio;
+
                     // ==========================================
                     // CREAR PEDIDO
                     // ==========================================
@@ -699,8 +711,10 @@ namespace AdLocalAPI.Services
                             Subtotal =
                                 subtotal,
 
+                            CostoEnvio = costoEnvio,
+
                             Total =
-                                subtotal,
+                                subtotal + costoEnvio,
 
                             PorcentajeComision =
                                 porcentajeComision,
@@ -859,7 +873,7 @@ namespace AdLocalAPI.Services
                                 comercio.Nombre,
 
                             Total =
-                                subtotal,
+                                pedido.Total,
 
                             Estado =
                                 (int)pedido.Estado,
@@ -879,7 +893,7 @@ namespace AdLocalAPI.Services
                     );
 
                     response.TotalGeneral +=
-                        subtotal;
+                        pedido.Total;
                 }
 
                 // ==========================================

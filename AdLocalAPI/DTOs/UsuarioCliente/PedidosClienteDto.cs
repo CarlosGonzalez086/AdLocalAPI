@@ -9,6 +9,8 @@ namespace AdLocalAPI.DTOs.UsuarioCliente
         public string Comercio { get; set; } = string.Empty;
         public string? ComercioLogoUrl { get; set; }
         public decimal Total { get; set; }
+        public decimal Subtotal { get; set; }
+        public decimal CostoEnvio { get; set; }
         public EstadoPedido Estado { get; set; }
         public EstadoPagoPedido EstadoPago { get; set; }
         public MetodoPagoPedido MetodoPago { get; set; }

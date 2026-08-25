@@ -89,6 +89,9 @@ namespace AdLocalAPI.DTOs.UsuarioCliente.Checkout
         public string? LogoUrl { get; set; }
 
         public decimal Subtotal { get; set; }
+        public decimal CostoEnvio { get; set; }
+        public decimal TotalDomicilio { get; set; }
+        public decimal? CompraMinimaEnvioGratis { get; set; }
 
         public bool AceptaEfectivo { get; set; }
 

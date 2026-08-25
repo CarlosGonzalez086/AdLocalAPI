@@ -58,6 +58,10 @@ namespace AdLocalAPI.Models
 
         [Required]
         [Column(TypeName = "numeric(18,2)")]
+        public decimal CostoEnvio { get; set; }
+
+        [Required]
+        [Column(TypeName = "numeric(18,2)")]
         public decimal Total { get; set; }
 
         // ==========================================
