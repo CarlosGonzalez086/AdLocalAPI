@@ -9,6 +9,8 @@
             public bool AceptaTransferencia { get; set; } = false;
 
             public string? InstruccionesTransferencia { get; set; }
+            public decimal CostoEnvio { get; set; }
+            public decimal? CompraMinimaEnvioGratis { get; set; }
 
             public bool Activo { get; set; } = true;
         }
@@ -24,6 +26,8 @@
             public bool AceptaTransferencia { get; set; }
 
             public string? InstruccionesTransferencia { get; set; }
+            public decimal CostoEnvio { get; set; }
+            public decimal? CompraMinimaEnvioGratis { get; set; }
 
             public bool Activo { get; set; }
 

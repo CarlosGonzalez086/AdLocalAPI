@@ -25,6 +25,12 @@ namespace AdLocalAPI.Models
         [MaxLength(300)]
         public string? InstruccionesTransferencia { get; set; }
 
+        [Column(TypeName = "numeric(18,2)")]
+        public decimal CostoEnvio { get; set; } = 0;
+
+        [Column(TypeName = "numeric(18,2)")]
+        public decimal? CompraMinimaEnvioGratis { get; set; }
+
         [Required]
         public bool Activo { get; set; } = true;
 

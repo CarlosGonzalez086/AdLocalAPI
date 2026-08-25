@@ -159,6 +159,8 @@ namespace AdLocalAPI.Repositories
                     ClienteEmail = x.ClienteEmail,
                     TelefonoEntrega = x.TelefonoEntrega,
                     Total = x.Total,
+                    Subtotal = x.Subtotal,
+                    CostoEnvio = x.CostoEnvio,
                     Estado = x.Estado,
                     EstadoPago = x.EstadoPago,
                     MetodoPago = x.MetodoPago,

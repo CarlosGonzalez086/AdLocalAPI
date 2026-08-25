@@ -45,6 +45,8 @@ namespace AdLocalAPI.DTOs
 
     public class PedidoComercioDetalleDto : PedidoComercioListadoDto
     {
+        public decimal Subtotal { get; set; }
+        public decimal CostoEnvio { get; set; }
         public string? ClienteEmail { get; set; }
         public string? TelefonoEntrega { get; set; }
         public string? Direccion { get; set; }

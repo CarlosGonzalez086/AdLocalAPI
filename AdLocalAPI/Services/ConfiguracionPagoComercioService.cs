@@ -118,6 +118,9 @@ namespace AdLocalAPI.Services
                     );
                 }
 
+                if (dto.CostoEnvio < 0 || dto.CompraMinimaEnvioGratis < 0)
+                    return ApiResponse<ConfiguracionPagoComercioResponseDto>.Error("400", "La tarifa de envío no puede ser negativa.");
+
                 var configuracion =
                     await _repository.ObtenerPorComercioAsync(
                         idComercio
@@ -147,6 +150,9 @@ namespace AdLocalAPI.Services
                                     ? null
                                     : dto.InstruccionesTransferencia.Trim(),
 
+                            CostoEnvio = dto.CostoEnvio,
+                            CompraMinimaEnvioGratis = dto.CompraMinimaEnvioGratis,
+
                             Activo =
                                 dto.Activo,
 
@@ -172,6 +178,9 @@ namespace AdLocalAPI.Services
                         )
                             ? null
                             : dto.InstruccionesTransferencia.Trim();
+
+                    configuracion.CostoEnvio = dto.CostoEnvio;
+                    configuracion.CompraMinimaEnvioGratis = dto.CompraMinimaEnvioGratis;
 
                     configuracion.Activo =
                         dto.Activo;
@@ -221,6 +230,9 @@ namespace AdLocalAPI.Services
 
                 InstruccionesTransferencia =
                     entity.InstruccionesTransferencia,
+
+                CostoEnvio = entity.CostoEnvio,
+                CompraMinimaEnvioGratis = entity.CompraMinimaEnvioGratis,
 
                 Activo =
                     entity.Activo,
