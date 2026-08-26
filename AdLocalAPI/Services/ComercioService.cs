@@ -9,8 +9,7 @@ using AdLocalAPI.Models;
 using AdLocalAPI.Repositories;
 using AdLocalAPI.Utils;
 using Microsoft.EntityFrameworkCore;
-using NetTopologySuite.Geometries;
-using System.Linq;
+
 
 namespace AdLocalAPI.Services
 {
