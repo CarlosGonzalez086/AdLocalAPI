@@ -39,24 +39,12 @@ namespace AdLocalAPI.Services
             _usoCodigoReferidoRepository = usoCodigoReferidoRepository;
         }
 
-        public async Task<ApiResponse<object>> GetAllUsuarios(int page,
+        public async Task<ApiResponse<PagedResponse<Models.Usuario>>> GetAllUsuarios(int page,
             int pageSize,
             string orderBy,
             string search)
-        {
-            try
-            {
-                var result = await _repository.GetAllAsync(page, pageSize, orderBy, search);
-
-                return ApiResponse<object>.Success(
-                    result,
-                    "Listado de usuarios obtenido correctamente"
-                );
-            }
-            catch (Exception ex)
-            {
-                return ApiResponse<object>.Error("500", ex.Message);
-            }
+        {        
+                return await _repository.GetAllAsync(page, pageSize, orderBy, search);
         }
         public async Task<ApiResponse<object>> GetUsuarioById(int id)
         {

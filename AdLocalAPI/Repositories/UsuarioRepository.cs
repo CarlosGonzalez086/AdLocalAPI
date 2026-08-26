@@ -1,7 +1,9 @@
 ﻿using AdLocalAPI.Data;
+using AdLocalAPI.DTOs;
 using AdLocalAPI.Models;
 using Amazon.S3;
 using Microsoft.EntityFrameworkCore;
+using NetTopologySuite.Index.HPRtree;
 
 namespace AdLocalAPI.Repositories
 {
@@ -34,7 +36,7 @@ namespace AdLocalAPI.Repositories
                 .FirstOrDefaultAsync(u => u.Email == correo);
         }
 
-        public async Task<object> GetAllAsync(
+        public async Task<ApiResponse<PagedResponse<Models.Usuario>>> GetAllAsync(
             int page,
             int pageSize,
             string orderBy,
@@ -115,19 +117,34 @@ namespace AdLocalAPI.Repositories
                 _ => query.OrderByDescending(x => x.Usuario.FechaCreacion)
             };
 
-            // 6️⃣ Paginación
-            var data = await query
+
+            var totalItems = await query.CountAsync();
+            var totalPages = (int)Math.Ceiling(totalItems / (double)pageSize);
+
+            var items = await query
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
+                .Select(x => new Models.Usuario
+                {
+                    Id = x.Usuario.Id,
+                    Nombre = x.Usuario.Nombre,
+                    Email = x.Usuario.Email,
+                    FechaCreacion = x.Usuario.FechaCreacion
+                })
                 .ToListAsync();
 
-            return new
+
+
+            var pagedResponse = new PagedResponse<Models.Usuario>
             {
-                totalRecords,
-                page,
-                pageSize,
-                data
+                Page = page,
+                PageSize = pageSize,
+                TotalPages = totalPages,
+                TotalItems = totalItems,
+                Items = items
             };
+
+            return ApiResponse<PagedResponse<Models.Usuario>>.Success(pagedResponse, "Listado usuarios");
         }
 
 
