@@ -13,7 +13,6 @@ using AdLocalAPI.Services;
 using AdLocalAPI.Services.Interfaces;
 using AdLocalAPI.Utils;
 using AdLocalAPI.Validators;
-using Amazon;
 using Amazon.Runtime;
 using Amazon.S3;
 using FluentValidation;
@@ -22,7 +21,6 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.IdentityModel.Tokens;
-using Stripe;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
