@@ -79,6 +79,9 @@ namespace AdLocalAPI.Repositories
                     u.Email,
                     u.FechaCreacion,
                     u.FotoUrl,
+                    u.EmailVerificado,
+                    u.UltimoAcceso,
+                    u.Activo,
                 },
 
                 Suscripcion = u.Suscripciones
@@ -129,7 +132,11 @@ namespace AdLocalAPI.Repositories
                     Id = x.Usuario.Id,
                     Nombre = x.Usuario.Nombre,
                     Email = x.Usuario.Email,
-                    FechaCreacion = x.Usuario.FechaCreacion
+                    FechaCreacion = x.Usuario.FechaCreacion,
+                    UltimoAcceso = x.Usuario.UltimoAcceso,
+                    EmailVerificado = x.Usuario.EmailVerificado,
+                    Activo = x.Usuario.Activo,
+                    FotoUrl = x.Usuario.FotoUrl,
                 })
                 .ToListAsync();
 
