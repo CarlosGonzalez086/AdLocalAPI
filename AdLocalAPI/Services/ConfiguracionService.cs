@@ -1,8 +1,9 @@
 ﻿using AdLocalAPI.Constants;
+using AdLocalAPI.Dictionaries;
 using AdLocalAPI.DTOs;
 using AdLocalAPI.Interfaces;
 using AdLocalAPI.Models;
-using AdLocalAPI.Dictionaries;
+using AdLocalAPI.Utils;
 
 namespace AdLocalAPI.Services
 {
@@ -210,6 +211,118 @@ namespace AdLocalAPI.Services
                 .Success(
                     resultado,
                     "Configuración de comisión registrada correctamente."
+                );
+        }
+        public async Task<ApiResponse<List<ConfiguracionSistema>>>RegistrarEmailAsync(EmailConfiguracionDto dto)
+        {
+            if (dto == null)
+            {
+                return ApiResponse<List<ConfiguracionSistema>>
+                    .Error(
+                        "400",
+                        "La configuración de correo es requerida."
+                    );
+            }
+
+            if (string.IsNullOrWhiteSpace(dto.Host))
+            {
+                return ApiResponse<List<ConfiguracionSistema>>
+                    .Error(
+                        "400",
+                        "El servidor SMTP es requerido."
+                    );
+            }
+
+            if (dto.Port <= 0 || dto.Port > 65535)
+            {
+                return ApiResponse<List<ConfiguracionSistema>>
+                    .Error(
+                        "400",
+                        "El puerto SMTP no es válido."
+                    );
+            }
+
+            if (string.IsNullOrWhiteSpace(dto.From))
+            {
+                return ApiResponse<List<ConfiguracionSistema>>
+                    .Error(
+                        "400",
+                        "El correo remitente es requerido."
+                    );
+            }
+
+            var resultado =
+                new List<ConfiguracionSistema>();
+
+            var acciones = new[]
+            {
+                new ConfiguracionSistemaDto
+                {
+                    Key = ConfiguracionKeys.EmailHost,
+                    Val = dto.Host.Trim()
+                },
+
+                new ConfiguracionSistemaDto
+                {
+                    Key = ConfiguracionKeys.EmailPort,
+                    Val = dto.Port.ToString(
+                        System.Globalization.CultureInfo.InvariantCulture
+                    )
+                },
+
+                new ConfiguracionSistemaDto
+                {
+                    Key = ConfiguracionKeys.EmailUser,
+                    Val = dto.User?.Trim() ?? string.Empty
+                },
+
+                new ConfiguracionSistemaDto
+                {
+                    Key = ConfiguracionKeys.EmailKey,
+                    Val = dto.Key ?? string.Empty
+                },
+
+                new ConfiguracionSistemaDto
+                {
+                    Key = ConfiguracionKeys.EmailFrom,
+                    Val = dto.From.Trim()
+                },
+
+                new ConfiguracionSistemaDto
+                {
+                    Key = ConfiguracionKeys.EmailFromNombre,
+                    Val = dto.FromNombre?.Trim() ?? string.Empty
+                }
+            };
+
+            foreach (var item in acciones)
+            {
+                var res =
+                    await CrearOActualizarAsync(
+                        item
+                    );
+
+                if (res.Codigo != "200")
+                {
+                    return ApiResponse<List<ConfiguracionSistema>>
+                        .Error(
+                            res.Codigo,
+                            res.Mensaje
+                        );
+                }
+
+                if (res.Respuesta != null)
+                {
+                    resultado.Add(
+                        res.Respuesta
+                    );
+                }
+            }
+
+            return ApiResponse<List<ConfiguracionSistema>>
+                .Success(
+                    resultado,
+                    "Configuración de correo registrada correctamente."
                 );
         }
     }

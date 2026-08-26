@@ -1,5 +1,6 @@
 ﻿using AdLocalAPI.DTOs;
 using AdLocalAPI.Interfaces;
+using AdLocalAPI.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -78,6 +79,19 @@ namespace AdLocalAPI.Controllers
         {
             var response =
                 await _service.RegistrarComisionMarketplaceAsync(dto);
+
+            return response.Codigo == "200"
+                ? Ok(response)
+                : BadRequest(response);
+        }
+        // ==========================================
+        // CORREO
+        // ==========================================
+
+        [HttpPost("correo")]
+        public async Task<IActionResult> GuardarCorreo([FromBody] EmailConfiguracionDto dto)
+        {
+            var response = await _service.RegistrarEmailAsync(dto);
 
             return response.Codigo == "200"
                 ? Ok(response)

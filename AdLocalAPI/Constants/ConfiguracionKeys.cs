@@ -20,5 +20,23 @@
 
         public const string MarketplaceCommissionEnabled =
             "MARKETPLACE_COMMISSION_ENABLED";
+        // EMAIL
+        public const string EmailHost =
+            "EMAIL_HOST";
+
+        public const string EmailPort =
+            "EMAIL_PORT";
+
+        public const string EmailUser =
+            "EMAIL_USER";
+
+        public const string EmailKey =
+            "EMAIL_KEY";
+
+        public const string EmailFrom =
+            "EMAIL_FROM";
+
+        public const string EmailFromNombre =
+            "EMAIL_FROM_NOMBRE";
     }
 }

@@ -13,4 +13,18 @@
         public string FromEmail { get; set; }
         public string FromName { get; set; }
     }
+    public class EmailConfiguracionDto
+    {
+        public string Host { get; set; } = string.Empty;
+
+        public int Port { get; set; }
+
+        public string User { get; set; } = string.Empty;
+
+        public string Key { get; set; } = string.Empty;
+
+        public string From { get; set; } = string.Empty;
+
+        public string FromNombre { get; set; } = string.Empty;
+    }
 }
