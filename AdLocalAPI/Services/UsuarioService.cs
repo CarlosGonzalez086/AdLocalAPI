@@ -844,7 +844,7 @@ namespace AdLocalAPI.Services
                 await _repository.UpdateAsync(usuario);
 
                 bool esProduccion = _env.IsProduction();
-                var link = UrlHelper.GenerarLinkCambioPassword(token, esProduccion);
+                var link = UrlHelper.GenerarLinkCambioPassword(token, esProduccion, "user");
                 Console.WriteLine(link);
 
                 var html = TemplatesEmail.PlantillaCorreoCambioPasswordCoffee(codigo, link);

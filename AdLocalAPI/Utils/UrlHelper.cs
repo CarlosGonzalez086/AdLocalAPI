@@ -2,19 +2,19 @@
 {
     public class UrlHelper
     {
-        public static string GenerarLinkCambioPassword(string token, bool esProduccion)
+        public static string GenerarLinkCambioPassword(string token, bool esProduccion, string userType)
         {
             var baseUrl = esProduccion
-                ? "https://ad-local-gamma.vercel.app"
-                : "http://localhost:5173";
+                ? "https://adlocal.jcarlosgonzalez086.workers.dev/usuario/"
+                : "http://localhost:5173/usuario";
 
-            return $"{baseUrl}/cambiar-contrasena/{token}";
+            return $"{baseUrl}/restablecer-contrasena/{token}/{userType}";
         }
         public static string GenerarLinkNuevoColaborador(string token, bool esProduccion)
         {
             var baseUrl = esProduccion
-                ? "https://ad-local-gamma.vercel.app"
-                : "http://localhost:5173";
+                ? "https://adlocal.jcarlosgonzalez086.workers.dev/usuario/"
+                : "http://localhost:5173/usuario";
 
             return $"{baseUrl}/nuevo-colaborador/{token}";
         }
