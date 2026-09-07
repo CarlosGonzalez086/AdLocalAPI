@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace AdLocalAPI.Models
@@ -13,8 +13,8 @@ namespace AdLocalAPI.Models
         [Required]
         [Column("estado")]
         [StringLength(100)]
-        public string EstadoNombre { get; set; }
-        public ICollection<EstadoMunicipio> EstadosMunicipios { get; set; }
+        public string EstadoNombre { get; set; } = string.Empty;
+        public ICollection<EstadoMunicipio> EstadosMunicipios { get; set; } = new List<EstadoMunicipio>();
 
     }
 }

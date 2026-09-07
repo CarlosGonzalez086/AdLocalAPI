@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace AdLocalAPI.Models
 {
@@ -36,6 +36,8 @@ namespace AdLocalAPI.Models
 
         public DateTime? UltimoAcceso { get; set; }
 
+        public DateTime? TokensRevocadosAntesDe { get; set; }
+
         public long? ComercioId { get; set; }
 
         [MaxLength(500)]
@@ -51,6 +53,10 @@ namespace AdLocalAPI.Models
 
         [MaxLength(100)]
         public string? Codigo { get; set; }
+
+        public DateTime? CodigoExpiracion { get; set; }
+
+        public int IntentosCodigo { get; set; } = 0;
 
         [MaxLength(50)]
         public string? CodigoReferido { get; set; }

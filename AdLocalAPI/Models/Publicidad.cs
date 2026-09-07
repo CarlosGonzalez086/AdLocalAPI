@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace AdLocalAPI.Models
 {
@@ -7,13 +7,13 @@ namespace AdLocalAPI.Models
         public int Id { get; set; }
 
         [Required, MaxLength(150)]
-        public string Titulo { get; set; }
+        public string Titulo { get; set; } = string.Empty;
 
         [Required]
-        public string Descripcion { get; set; }
+        public string Descripcion { get; set; } = string.Empty;
 
         [MaxLength(300)]
-        public string ImagenUrl { get; set; }
+        public string? ImagenUrl { get; set; }
 
         [Required]
         public DateTime FechaInicio { get; set; }
@@ -26,6 +26,6 @@ namespace AdLocalAPI.Models
 
         // 🔐 Dueño
         public long UsuarioId { get; set; }
-        public Usuario Usuario { get; set; }
+        public Usuario? Usuario { get; set; }
     }
 }

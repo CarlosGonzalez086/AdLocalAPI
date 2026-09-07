@@ -1,18 +1,17 @@
-﻿using AdLocalAPI.DTOs;
-using AdLocalAPI.Services;
-using Microsoft.AspNetCore.Authorization;
+using System.Threading.Tasks;
+using AdLocalAPI.DTOs;
+using AdLocalAPI.Interfaces.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AdLocalAPI.Controllers
 {
-
     [ApiController]
     [Route("api/[controller]")]
-    public class CalificacionesComentariosController : ControllerBase
+    public class CalificacionesComentariosController : ApiControllerBase
     {
-        private readonly CalificacionComentarioService _service;
+        private readonly ICalificacionComentarioService _service;
 
-        public CalificacionesComentariosController(CalificacionComentarioService service)
+        public CalificacionesComentariosController(ICalificacionComentarioService service)
         {
             _service = service;
         }
@@ -21,7 +20,7 @@ namespace AdLocalAPI.Controllers
         public async Task<IActionResult> Crear([FromBody] CalificacionComentarioCreateDto dto)
         {
             var response = await _service.CrearComentario(dto);
-            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+            return Responder(response);
         }
 
         [HttpGet]
@@ -33,7 +32,7 @@ namespace AdLocalAPI.Controllers
         )
         {
             var response = await _service.ObtenerComentarios(idComercio, page, pageSize, orderBy);
-            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+            return Responder(response);
         }
     }
 }

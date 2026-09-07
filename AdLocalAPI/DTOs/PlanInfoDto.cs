@@ -1,11 +1,11 @@
-﻿namespace AdLocalAPI.DTOs
+namespace AdLocalAPI.DTOs
 {
     public class PlanInfoDto
     {
-        public string Nombre { get; set; }
+        public string Nombre { get; set; } = string.Empty;
         public decimal Precio { get; set; }
         public int DuracionDias { get; set; }
-        public string Tipo { get; set; }
+        public string Tipo { get; set; } = string.Empty;
 
         public int MaxNegocios { get; set; }
         public int MaxProductos { get; set; }

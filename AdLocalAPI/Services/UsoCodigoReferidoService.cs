@@ -1,16 +1,17 @@
-﻿using AdLocalAPI.Helpers;
+using AdLocalAPI.Helpers;
+using AdLocalAPI.Interfaces.Services;
 using AdLocalAPI.Models;
-using AdLocalAPI.Repositories;
+using AdLocalAPI.Repositories.Interfaces;
 
 namespace AdLocalAPI.Services
 {
-    public class UsoCodigoReferidoService
+    public class UsoCodigoReferidoService : IUsoCodigoReferidoService
     {
-        private readonly UsoCodigoReferidoRepository _repository;
+        private readonly IUsoCodigoReferidoRepository _repository;
         private readonly JwtContext _jwt;
 
         public UsoCodigoReferidoService(
-            UsoCodigoReferidoRepository repository,
+            IUsoCodigoReferidoRepository repository,
             JwtContext jwt)
         {
             _repository = repository;

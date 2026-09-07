@@ -1,4 +1,4 @@
-﻿using AdLocalAPI.DTOs;
+using AdLocalAPI.DTOs;
 using AdLocalAPI.Helpers;
 using AdLocalAPI.Interfaces;
 using AdLocalAPI.Interfaces.Tarjetas;
@@ -36,6 +36,10 @@ namespace AdLocalAPI.Services
                     return ApiResponse<object>.Error("400", "No puedes registrar más de 3 tarjetas");
                 }
                 var user = await _UserRepository.GetByIdAsync(idUser);
+                if (user == null)
+                {
+                    return ApiResponse<object>.Error("404", "Usuario no encontrado");
+                }
                 if (string.IsNullOrEmpty(user.StripeCustomerId))
                 {
                     var customerId = await _stripe.CreateCustomer(user.Email);
@@ -83,6 +87,9 @@ namespace AdLocalAPI.Services
             {
                 long idUser = _jwtContext.GetUserId();
                 var user = await _UserRepository.GetByIdAsync(idUser);
+                if (user == null || string.IsNullOrEmpty(user.StripeCustomerId))
+                    return ApiResponse<object>.Error("404", "Usuario o cliente de pago no encontrado");
+
                 var tarjeta = await _repository.GetById(tarjetaId, idUser);
 
                 if (tarjeta == null)

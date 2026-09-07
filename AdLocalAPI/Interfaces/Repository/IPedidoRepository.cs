@@ -1,4 +1,4 @@
-﻿using AdLocalAPI.DTOs.UsuarioCliente.Checkout;
+using AdLocalAPI.DTOs.UsuarioCliente.Checkout;
 using AdLocalAPI.Models;
 
 using AdLocalAPI.DTOs;
@@ -47,10 +47,23 @@ namespace AdLocalAPI.Repositories.Interfaces
                 string key
             );
 
+        Task<CheckoutIdempotencia?>
+            ObtenerIdempotenciaAsync(
+                long idUsuario,
+                string key
+            );
+
+        Task RegistrarIdempotenciaInicioAsync(
+            CheckoutIdempotencia idempotencia
+        );
+
         Task GuardarCheckoutAsync(
             List<Pedido> pedidos,
-            List<ProductosServicios> productosActualizar,
-            Carrito carrito
+            List<(long Id, int Cantidad, string Nombre)> productosActualizarStock,
+            Carrito carrito,
+            CheckoutIdempotencia? idempotencia = null,
+            string? responseJson = null,
+            CancellationToken cancellationToken = default
         );
 
         Task<Pedido?> ObtenerPedidoClienteAsync(

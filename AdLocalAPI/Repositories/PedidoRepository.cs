@@ -1,4 +1,4 @@
-﻿using AdLocalAPI.Data;
+using AdLocalAPI.Data;
 using AdLocalAPI.DTOs.UsuarioCliente.Checkout;
 using AdLocalAPI.Models;
 using AdLocalAPI.Repositories.Interfaces;
@@ -200,84 +200,147 @@ namespace AdLocalAPI.Repositories
                 );
         }
 
+        public async Task<CheckoutIdempotencia?> ObtenerIdempotenciaAsync(
+            long idUsuario,
+            string key)
+        {
+            return await _context.CheckoutIdempotencias
+                .FirstOrDefaultAsync(x => x.IdUsuario == idUsuario && x.IdempotencyKey == key);
+        }
+
+        public async Task RegistrarIdempotenciaInicioAsync(
+            CheckoutIdempotencia idempotencia)
+        {
+            _context.CheckoutIdempotencias.Add(idempotencia);
+            await _context.SaveChangesAsync();
+        }
+
         public async Task GuardarCheckoutAsync(
             List<Pedido> pedidos,
-            List<ProductosServicios> productosActualizar,
-            Carrito carrito)
+            List<(long Id, int Cantidad, string Nombre)> productosActualizarStock,
+            Carrito carrito,
+            CheckoutIdempotencia? idempotencia = null,
+            string? responseJson = null,
+            CancellationToken cancellationToken = default)
         {
             await using var transaction =
-                await _context.Database.BeginTransactionAsync();
+                await _context.Database.BeginTransactionAsync(cancellationToken);
 
             try
             {
                 // ==========================================
-                // PEDIDOS
+                // 1. RE-VALIDAR PRECIOS Y DISPONIBILIDAD DENTRO DE LA TRANSACCIÓN
                 // ==========================================
+                var idsProductos = pedidos
+                    .SelectMany(p => p.Detalles)
+                    .Where(d => d.IdProductoServicio.HasValue)
+                    .Select(d => d.IdProductoServicio!.Value)
+                    .Distinct()
+                    .ToList();
 
-                await _context.Pedidos
-                    .AddRangeAsync(pedidos);
+                var productosEnDb = await _context.ProductosServicios
+                    .AsNoTracking()
+                    .Where(p => idsProductos.Contains(p.Id))
+                    .ToDictionaryAsync(p => p.Id);
 
-                // ==========================================
-                // STOCK
-                // ==========================================
-
-                if (productosActualizar.Count > 0)
+                foreach (var pedido in pedidos)
                 {
-                    _context.ProductosServicios
-                        .UpdateRange(
-                            productosActualizar
-                        );
+                    foreach (var detalle in pedido.Detalles)
+                    {
+                        if (!detalle.IdProductoServicio.HasValue || !productosEnDb.TryGetValue(detalle.IdProductoServicio.Value, out var prodDb))
+                        {
+                            throw new InvalidOperationException(
+                                $"El producto '{detalle.Nombre}' ya no existe en el catálogo."
+                            );
+                        }
+
+                        if (!prodDb.Activo || prodDb.Eliminado || !prodDb.Visible || !prodDb.Disponible)
+                        {
+                            throw new InvalidOperationException(
+                                $"El producto '{prodDb.Nombre}' ya no se encuentra disponible para compra."
+                            );
+                        }
+
+                        if (!prodDb.Precio.HasValue || prodDb.Precio.Value != detalle.PrecioUnitario)
+                        {
+                            throw new InvalidOperationException(
+                                $"El precio de '{prodDb.Nombre}' ha cambiado. Por favor actualiza tu carrito antes de continuar."
+                            );
+                        }
+                    }
                 }
 
                 // ==========================================
-                // CERRAR DETALLES DEL CARRITO
+                // 2. ACTUALIZACIÓN ATÓMICA DE STOCK CONTRA CONCURRENCIA
                 // ==========================================
+                foreach (var itemStock in productosActualizarStock)
+                {
+                    var filasAfectadas = await _context.Database.ExecuteSqlInterpolatedAsync(
+                        $"UPDATE \"ProductosServicios\" SET \"stock\" = \"stock\" - {itemStock.Cantidad}, \"fecha_actualizacion\" = {DateTime.UtcNow} WHERE \"id\" = {itemStock.Id} AND \"maneja_stock\" = true AND \"stock\" >= {itemStock.Cantidad};",
+                        cancellationToken
+                    );
 
+                    if (filasAfectadas == 0)
+                    {
+                        throw new InvalidOperationException(
+                            $"Stock insuficiente para el producto '{itemStock.Nombre}'. Por favor actualiza tu carrito."
+                        );
+                    }
+                }
+
+                // ==========================================
+                // 3. GUARDAR PEDIDOS (con Detalles e Historial)
+                // ==========================================
+                await _context.Pedidos
+                    .AddRangeAsync(pedidos, cancellationToken);
+
+                // ==========================================
+                // 4. CERRAR DETALLES DEL CARRITO
+                // ==========================================
                 var detallesCarrito =
                     await _context.CarritoDetalles
                         .Where(x =>
                             x.IdCarrito == carrito.Id &&
                             x.Activo
                         )
-                        .ToListAsync();
+                        .ToListAsync(cancellationToken);
 
                 foreach (var detalle in detallesCarrito)
                 {
                     detalle.Activo = false;
-
-                    detalle.FechaActualizacion =
-                        DateTime.UtcNow;
+                    detalle.FechaActualizacion = DateTime.UtcNow;
                 }
 
                 if (detallesCarrito.Count > 0)
                 {
                     _context.CarritoDetalles
-                        .UpdateRange(
-                            detallesCarrito
-                        );
+                        .UpdateRange(detallesCarrito);
                 }
 
                 // ==========================================
-                // CERRAR CARRITO
+                // 5. CERRAR CARRITO
                 // ==========================================
-
                 carrito.Activo = false;
+                carrito.FechaActualizacion = DateTime.UtcNow;
+                _context.Carritos.Update(carrito);
 
-                carrito.FechaActualizacion =
-                    DateTime.UtcNow;
+                // ==========================================
+                // 6. IDEMPOTENCIA (Actualizar a completado)
+                // ==========================================
+                if (idempotencia != null)
+                {
+                    idempotencia.Status = "completed";
+                    idempotencia.ResponseJson = responseJson;
+                    idempotencia.FechaCompletado = DateTime.UtcNow;
+                    _context.CheckoutIdempotencias.Update(idempotencia);
+                }
 
-                _context.Carritos.Update(
-                    carrito
-                );
-
-                await _context.SaveChangesAsync();
-
-                await transaction.CommitAsync();
+                await _context.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
             }
             catch
             {
-                await transaction.RollbackAsync();
-
+                await transaction.RollbackAsync(cancellationToken);
                 throw;
             }
         }

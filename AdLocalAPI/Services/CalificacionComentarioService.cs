@@ -1,14 +1,15 @@
-﻿using AdLocalAPI.DTOs;
+using AdLocalAPI.DTOs;
+using AdLocalAPI.Interfaces.Services;
 using AdLocalAPI.Models;
-using AdLocalAPI.Repositories;
+using AdLocalAPI.Repositories.Interfaces;
 
 namespace AdLocalAPI.Services
 {
-    public class CalificacionComentarioService
+    public class CalificacionComentarioService : ICalificacionComentarioService
     {
-        private readonly CalificacionComentarioRepository _repository;
+        private readonly ICalificacionComentarioRepository _repository;
 
-        public CalificacionComentarioService(CalificacionComentarioRepository repository)
+        public CalificacionComentarioService(ICalificacionComentarioRepository repository)
         {
             _repository = repository;
         }

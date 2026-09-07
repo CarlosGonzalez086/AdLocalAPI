@@ -1,4 +1,4 @@
-﻿using AdLocalAPI.Models;
+using AdLocalAPI.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 
@@ -60,6 +60,9 @@ namespace AdLocalAPI.Data
         public DbSet<Cita> Citas { get; set; }
         public DbSet<HorarioCitaServicio> HorariosCitaServicio { get; set; }
         public DbSet<Cotizacion> Cotizaciones { get; set; }
+        public DbSet<StripeWebhookEvent> StripeWebhookEvents { get; set; }
+        public DbSet<CheckoutIdempotencia> CheckoutIdempotencias { get; set; }
+        public DbSet<RefreshToken> RefreshTokens { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -356,10 +359,10 @@ namespace AdLocalAPI.Data
                 entity.HasIndex(e => e.UsuarioReferidoId)
                     .IsUnique();
 
-                entity.HasCheckConstraint(
+                entity.ToTable(t => t.HasCheckConstraint(
                     "CK_NoAutoReferido",
                     "\"UsuarioReferidorId\" <> \"UsuarioReferidoId\""
-                );
+                ));
 
                 entity.Property(e => e.CodigoReferido)
                     .HasMaxLength(50)
@@ -769,6 +772,58 @@ namespace AdLocalAPI.Data
                     .HasForeignKey<ConfiguracionPagoComercio>(
                         x => x.IdComercio
                     )
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            /* =========================
+               STRIPE WEBHOOK EVENTS & UNIQUE INDEXES
+            ========================== */
+
+            modelBuilder.Entity<StripeWebhookEvent>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                entity.HasIndex(x => x.StripeEventId)
+                    .IsUnique();
+                entity.HasIndex(x => x.EventType);
+                entity.HasIndex(x => x.ReceivedAt);
+            });
+
+            modelBuilder.Entity<Suscripcion>(entity =>
+            {
+                entity.HasIndex(x => x.StripeSubscriptionId)
+                    .IsUnique()
+                    .HasFilter("\"StripeSubscriptionId\" IS NOT NULL AND \"StripeSubscriptionId\" <> ''");
+
+                entity.HasIndex(x => x.StripeCheckoutSessionId)
+                    .IsUnique()
+                    .HasFilter("\"StripeCheckoutSessionId\" IS NOT NULL AND \"StripeCheckoutSessionId\" <> ''");
+            });
+
+            modelBuilder.Entity<Usuario>(entity =>
+            {
+                entity.HasIndex(x => x.StripeCustomerId)
+                    .IsUnique()
+                    .HasFilter("\"stripecustomerid\" IS NOT NULL AND \"stripecustomerid\" <> ''");
+            });
+
+            modelBuilder.Entity<CheckoutIdempotencia>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                entity.HasIndex(x => new { x.IdUsuario, x.IdempotencyKey })
+                    .IsUnique();
+                entity.HasIndex(x => x.FechaCreacion);
+            });
+
+            modelBuilder.Entity<RefreshToken>(entity =>
+            {
+                entity.HasKey(x => x.Id);
+                entity.HasIndex(x => x.TokenHash)
+                    .IsUnique();
+                entity.HasIndex(x => x.UsuarioId);
+                entity.HasIndex(x => x.ExpiresAt);
+                entity.HasOne(x => x.Usuario)
+                    .WithMany()
+                    .HasForeignKey(x => x.UsuarioId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
         }

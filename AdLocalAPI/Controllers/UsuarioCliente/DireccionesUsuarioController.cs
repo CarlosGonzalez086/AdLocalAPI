@@ -1,4 +1,6 @@
-﻿using AdLocalAPI.DTOs.Direcciones;
+using System;
+using System.Threading.Tasks;
+using AdLocalAPI.DTOs.Direcciones;
 using AdLocalAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -8,13 +10,11 @@ namespace AdLocalAPI.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Roles = "Cliente")]
-    public class DireccionesUsuarioController
-        : ControllerBase
+    public class DireccionesUsuarioController : ApiControllerBase
     {
         private readonly IDireccionUsuarioService _service;
 
-        public DireccionesUsuarioController(
-            IDireccionUsuarioService service)
+        public DireccionesUsuarioController(IDireccionUsuarioService service)
         {
             _service = service;
         }
@@ -27,13 +27,8 @@ namespace AdLocalAPI.Controllers
         [HttpGet]
         public async Task<IActionResult> ObtenerTodas()
         {
-            var response =
-                await _service.ObtenerTodas();
-
-            return ProcesarRespuesta(
-                response.Codigo,
-                response
-            );
+            var response = await _service.ObtenerTodas();
+            return Responder(response);
         }
 
         // ============================================================
@@ -42,18 +37,10 @@ namespace AdLocalAPI.Controllers
         // ============================================================
 
         [HttpGet("{uuid:guid}")]
-        public async Task<IActionResult> ObtenerPorUuid(
-            Guid uuid)
+        public async Task<IActionResult> ObtenerPorUuid(Guid uuid)
         {
-            var response =
-                await _service.ObtenerPorUuid(
-                    uuid
-                );
-
-            return ProcesarRespuesta(
-                response.Codigo,
-                response
-            );
+            var response = await _service.ObtenerPorUuid(uuid);
+            return Responder(response);
         }
 
         // ============================================================
@@ -62,19 +49,10 @@ namespace AdLocalAPI.Controllers
         // ============================================================
 
         [HttpPost]
-        public async Task<IActionResult> Crear(
-            [FromBody]
-            DireccionUsuarioDto dto)
+        public async Task<IActionResult> Crear([FromBody] DireccionUsuarioDto dto)
         {
-            var response =
-                await _service.Crear(
-                    dto
-                );
-
-            return ProcesarRespuesta(
-                response.Codigo,
-                response
-            );
+            var response = await _service.Crear(dto);
+            return Responder(response);
         }
 
         // ============================================================
@@ -83,21 +61,10 @@ namespace AdLocalAPI.Controllers
         // ============================================================
 
         [HttpPut("{uuid:guid}")]
-        public async Task<IActionResult> Actualizar(
-            Guid uuid,
-            [FromBody]
-            DireccionUsuarioDto dto)
+        public async Task<IActionResult> Actualizar(Guid uuid, [FromBody] DireccionUsuarioDto dto)
         {
-            var response =
-                await _service.Actualizar(
-                    uuid,
-                    dto
-                );
-
-            return ProcesarRespuesta(
-                response.Codigo,
-                response
-            );
+            var response = await _service.Actualizar(uuid, dto);
+            return Responder(response);
         }
 
         // ============================================================
@@ -106,18 +73,10 @@ namespace AdLocalAPI.Controllers
         // ============================================================
 
         [HttpDelete("{uuid:guid}")]
-        public async Task<IActionResult> Eliminar(
-            Guid uuid)
+        public async Task<IActionResult> Eliminar(Guid uuid)
         {
-            var response =
-                await _service.Eliminar(
-                    uuid
-                );
-
-            return ProcesarRespuesta(
-                response.Codigo,
-                response
-            );
+            var response = await _service.Eliminar(uuid);
+            return Responder(response);
         }
 
         // ============================================================
@@ -126,56 +85,10 @@ namespace AdLocalAPI.Controllers
         // ============================================================
 
         [HttpPut("{uuid:guid}/predeterminada")]
-        public async Task<IActionResult>
-            EstablecerPredeterminada(
-                Guid uuid)
+        public async Task<IActionResult> EstablecerPredeterminada(Guid uuid)
         {
-            var response =
-                await _service
-                    .EstablecerPredeterminada(
-                        uuid
-                    );
-
-            return ProcesarRespuesta(
-                response.Codigo,
-                response
-            );
-        }
-
-        // ============================================================
-        // RESPUESTAS HTTP
-        // ============================================================
-
-        private IActionResult ProcesarRespuesta(
-            string codigo,
-            object response)
-        {
-            return codigo switch
-            {
-                "200" =>
-                    Ok(response),
-
-                "401" =>
-                    Unauthorized(response),
-
-                "403" =>
-                    StatusCode(
-                        StatusCodes.Status403Forbidden,
-                        response
-                    ),
-
-                "404" =>
-                    NotFound(response),
-
-                "500" =>
-                    StatusCode(
-                        StatusCodes.Status500InternalServerError,
-                        response
-                    ),
-
-                _ =>
-                    BadRequest(response)
-            };
+            var response = await _service.EstablecerPredeterminada(uuid);
+            return Responder(response);
         }
     }
 }

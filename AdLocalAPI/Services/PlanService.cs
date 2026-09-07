@@ -1,14 +1,15 @@
-﻿using AdLocalAPI.DTOs;
+using AdLocalAPI.DTOs;
+using AdLocalAPI.Interfaces.Services;
 using AdLocalAPI.Models;
-using AdLocalAPI.Repositories;
+using AdLocalAPI.Repositories.Interfaces;
 
 namespace AdLocalAPI.Services
 {
-    public class PlanService
+    public class PlanService : IPlanService
     {
-        private readonly PlanRepository _repository;
+        private readonly IPlanRepository _repository;
 
-        public PlanService(PlanRepository repository)
+        public PlanService(IPlanRepository repository)
         {
             _repository = repository;
         }

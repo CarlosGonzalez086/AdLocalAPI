@@ -1,11 +1,12 @@
-﻿using AdLocalAPI.Interfaces.Location;
+using System.Threading.Tasks;
+using AdLocalAPI.Interfaces.Location;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AdLocalAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class LocationsController : ControllerBase
+    public class LocationsController : ApiControllerBase
     {
         private readonly ILocationService _service;
 
@@ -18,14 +19,14 @@ namespace AdLocalAPI.Controllers
         public async Task<IActionResult> GetAllStates()
         {
             var response = await _service.GetAllStatesAsync();
-            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+            return Responder(response);
         }
 
         [HttpGet("states/{id}/municipalities")]
         public async Task<IActionResult> GetMunicipalitiesByStateId(int id)
         {
             var response = await _service.GetMunicipalitiesByStateIdAsync(id);
-            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+            return Responder(response);
         }
     }
 }

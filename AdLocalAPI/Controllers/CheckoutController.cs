@@ -1,16 +1,19 @@
-﻿using AdLocalAPI.DTOs;
+using AdLocalAPI.DTOs;
+using AdLocalAPI.Interfaces;
 using AdLocalAPI.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
+using AdLocalAPI.Controllers;
+
 [Authorize]
 [ApiController]
 [Route("api/checkout")]
-public class CheckoutController : ControllerBase
+public class CheckoutController : ApiControllerBase
 {
-    private readonly ISuscriptionServiceV1 _service;
+    private readonly ISuscripcionService _service;
 
-    public CheckoutController(ISuscriptionServiceV1 service)
+    public CheckoutController(ISuscripcionService service)
     {
         _service = service;
     }
@@ -20,7 +23,7 @@ public class CheckoutController : ControllerBase
     public async Task<IActionResult> Suscribirse([FromBody] CheckoutRequestDto dto)
     {
         if (string.IsNullOrEmpty(dto.StripePaymentMethodId))
-            return BadRequest(ApiResponse<string>.Error("400", "Tarjeta requerida"));
+            return Responder(ApiResponse<string>.BadRequest("Tarjeta requerida"));
 
         var result = await _service.SuscribirseConTarjeta(
             dto.PlanId,
@@ -28,7 +31,7 @@ public class CheckoutController : ControllerBase
             dto.autoRenew
         );
 
-        return result.Codigo == "200" ? Ok(result) : BadRequest(result);
+        return Responder(result);
     }
 
 
@@ -36,13 +39,13 @@ public class CheckoutController : ControllerBase
     public async Task<IActionResult> CrearCheckout([FromBody] CheckoutRequestDto dto)
     {
         var result = await _service.CrearCheckoutSuscripcion(dto.PlanId);
-        return result.Codigo == "200" ? Ok(result) : BadRequest(result);
+        return Responder(result);
     }
 
     [HttpPost("cancelar")]
     public async Task<IActionResult> Cancelar()
     {
         var result = await _service.CancelarPlan();
-        return result.Codigo == "200" ? Ok(result) : BadRequest(result);
+        return Responder(result);
     }
 }

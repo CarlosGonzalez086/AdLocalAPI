@@ -1,17 +1,17 @@
-﻿using AdLocalAPI.Services;
+using System.Threading.Tasks;
+using AdLocalAPI.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AdLocalAPI.Controllers
 {
-
     [ApiController]
     [Route("api/[controller]")]
-    public class ComercioVisitasController : ControllerBase
+    public class ComercioVisitasController : ApiControllerBase
     {
-        private readonly ComercioVisitaService _service;
+        private readonly IComercioVisitaService _service;
 
-        public ComercioVisitasController(ComercioVisitaService service)
+        public ComercioVisitasController(IComercioVisitaService service)
         {
             _service = service;
         }
@@ -21,7 +21,7 @@ namespace AdLocalAPI.Controllers
         {
             var ip = HttpContext.Connection.RemoteIpAddress?.ToString();
             var response = await _service.RegistrarVisita(comercioId, ip);
-            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+            return Responder(response);
         }
 
         [Authorize]
@@ -29,7 +29,7 @@ namespace AdLocalAPI.Controllers
         public async Task<IActionResult> GetStats(long comercioId)
         {
             var response = await _service.GetStats(comercioId);
-            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+            return Responder(response);
         }
     }
 }

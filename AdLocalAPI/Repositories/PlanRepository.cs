@@ -1,11 +1,13 @@
-﻿using AdLocalAPI.Data;
+using AdLocalAPI.Data;
 using AdLocalAPI.Models;
 using Microsoft.EntityFrameworkCore;
 
 
+using AdLocalAPI.Repositories.Interfaces;
+
 namespace AdLocalAPI.Repositories
 {
-    public class PlanRepository
+    public class PlanRepository : IPlanRepository
     {
         private readonly AppDbContext _context;
 
@@ -91,30 +93,14 @@ namespace AdLocalAPI.Repositories
 
         public async Task<Models.Plan> CreateAsync(Models.Plan plan)
         {
-            try
-            {
-                _context.Plans.Add(plan);
-                await _context.SaveChangesAsync();
-            }
-            catch (Exception ex) 
-            {
-                Console.WriteLine(ex);
-                return null;
-            }
+            _context.Plans.Add(plan);
+            await _context.SaveChangesAsync();
             return plan;
         }
         public async Task<Models.Plan> UpdateAsync(Models.Plan plan)
         {
-            try
-            {
-                _context.Plans.Update(plan);
-                await _context.SaveChangesAsync();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex);
-                return plan;
-            }
+            _context.Plans.Update(plan);
+            await _context.SaveChangesAsync();
             return plan;
         }
         public async Task<bool> DeleteAsync(int id)
@@ -135,7 +121,7 @@ namespace AdLocalAPI.Repositories
             }
             return true;
         }
-        public async Task<Plan> GetByTipoAsync(string tipo)
+        public async Task<Plan?> GetByTipoAsync(string tipo)
         {
             return await _context.Plans
                 .AsNoTracking()
@@ -145,7 +131,7 @@ namespace AdLocalAPI.Repositories
                 );
         }
 
-        public async Task<Plan> GetByStripePriceIdAsync(string priceId)
+        public async Task<Plan?> GetByStripePriceIdAsync(string priceId)
         {
             return await _context.Plans
                 .AsNoTracking()

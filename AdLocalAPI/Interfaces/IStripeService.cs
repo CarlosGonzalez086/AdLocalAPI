@@ -1,4 +1,5 @@
-﻿using Stripe;
+using AdLocalAPI.Models;
+using Stripe;
 
 namespace AdLocalAPI.Interfaces
 {
@@ -19,5 +20,6 @@ namespace AdLocalAPI.Interfaces
         Task CancelSubscription(string subscriptionId, bool atPeriodEnd = true);
         Task ChangePlan(string subscriptionId, string subscriptionItemId, string newPriceId);
         Task<string> CrearSetupIntent(string stripeCustomerId);
+        Task<ApiResponse<object>> CrearSetupIntentParaUsuarioAsync(long userId);
     }
 }

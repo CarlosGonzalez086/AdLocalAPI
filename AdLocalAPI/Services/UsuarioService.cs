@@ -2,6 +2,7 @@ using AdLocalAPI.DTOs;
 using AdLocalAPI.Helpers;
 using AdLocalAPI.Models;
 using AdLocalAPI.Repositories;
+using AdLocalAPI.Repositories.Interfaces;
 using AdLocalAPI.Utils;
 using Microsoft.IdentityModel.Tokens;
 using Stripe;
@@ -12,22 +13,27 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using AdLocalAPI.Services.Interfaces;
 
+using AdLocalAPI.Interfaces.Services;
+using Microsoft.AspNetCore.Http;
+
 namespace AdLocalAPI.Services
 {
-    public class UsuarioService : IUsuarioService
+    public partial class UsuarioService : IUsuarioService
     {
-        private readonly UsuarioRepository _repository;
+        private readonly IUsuarioRepository _repository;
         private readonly IConfiguration _config;
         private readonly JwtContext _jwtContext;
-        private readonly ComercioRepository _comercioRepository;
-        private readonly EmailService _emailService;
+        private readonly IComercioRepository _comercioRepository;
+        private readonly IEmailService _emailService;
         private readonly IWebHostEnvironment _env;
-        private readonly SuscripcionRepository _suscripcionRepository;
-        private readonly PlanRepository _planRepo;
-        private readonly UsoCodigoReferidoRepository _usoCodigoReferidoRepository;
+        private readonly ISuscripcionRepository _suscripcionRepository;
+        private readonly IPlanRepository _planRepo;
+        private readonly IUsoCodigoReferidoRepository _usoCodigoReferidoRepository;
+        private readonly IRefreshTokenService _refreshTokenService;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public UsuarioService(UsuarioRepository repository, IConfiguration config, JwtContext jwtContext,ComercioRepository comercioRepository, EmailService emailService, IWebHostEnvironment env, SuscripcionRepository suscripcionRepository,
-            PlanRepository planRepo, UsoCodigoReferidoRepository usoCodigoReferidoRepository)
+        public UsuarioService(IUsuarioRepository repository, IConfiguration config, JwtContext jwtContext, IComercioRepository comercioRepository, IEmailService emailService, IWebHostEnvironment env, ISuscripcionRepository suscripcionRepository,
+            IPlanRepository planRepo, IUsoCodigoReferidoRepository usoCodigoReferidoRepository, IRefreshTokenService refreshTokenService, IHttpContextAccessor httpContextAccessor)
         {
             _repository = repository;
             _config = config;
@@ -38,6 +44,8 @@ namespace AdLocalAPI.Services
             _suscripcionRepository = suscripcionRepository;
             _planRepo = planRepo;
             _usoCodigoReferidoRepository = usoCodigoReferidoRepository;
+            _refreshTokenService = refreshTokenService;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         public async Task<ApiResponse<PagedResponse<Models.Usuario>>> GetAllUsuarios(int page,
@@ -66,8 +74,9 @@ namespace AdLocalAPI.Services
                 return ApiResponse<object>.Error("500", ex.Message);
             }
         }
-        public async Task<ApiResponse<object>> CrearUsuarioCliente(UsuarioRegistroDto dto)
+        public async Task<ApiResponse<object>> CrearUsuarioCliente(UsuarioRegistroDto dto, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (string.IsNullOrEmpty(dto.Nombre))
                 return ApiResponse<object>.Error("400", "El nombre es obligatorio");
 
@@ -107,6 +116,8 @@ namespace AdLocalAPI.Services
             }
 
 
+            var codigoVerificacion = ServicesGenerals.GenerarCodigoAlfanumerico(6);
+
             var usuario = new Usuario
             {
                 Nombre = dto.Nombre,
@@ -115,7 +126,11 @@ namespace AdLocalAPI.Services
                 ComercioId = dto.ComercioId,
                 CodigoReferido = codigoRef,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-                FechaCreacion = DateTime.UtcNow
+                FechaCreacion = DateTime.UtcNow,
+                EmailVerificado = false,
+                Codigo = codigoVerificacion,
+                CodigoExpiracion = DateTime.UtcNow.AddHours(24),
+                IntentosCodigo = 0
             };
 
             var creado = await _repository.CreateAsync(usuario);
@@ -123,7 +138,10 @@ namespace AdLocalAPI.Services
             if (!string.IsNullOrEmpty(dto.CodigoReferenciado))
             {
                 var usuarioReferido = await _repository.GetByCodigoReferidoAsync(dto.CodigoReferenciado);
-                await _usoCodigoReferidoRepository.InsertarAsync(usuarioReferido.Id,creado.Id,dto.CodigoReferenciado);
+                if (usuarioReferido != null)
+                {
+                    await _usoCodigoReferidoRepository.InsertarAsync(usuarioReferido.Id, creado.Id, dto.CodigoReferenciado);
+                }
             }
 
             var planFree = await _planRepo.GetByTipoAsync("FREE");
@@ -157,10 +175,17 @@ namespace AdLocalAPI.Services
                     "¡Bienvenido a AdLocal! Tu comercio en la red local",
                     htmlBienvenida
                 );
+
+                var htmlVerificacion = TemplatesEmail.PlantillaVerificacionCorreo(creado.Nombre, codigoVerificacion);
+                await _emailService.EnviarCorreoAsync(
+                    creado.Email,
+                    "Confirma tu correo electrónico - AdLocal",
+                    htmlVerificacion
+                );
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[EMAIL_WARNING] No se pudo enviar correo de bienvenida comercio: {ex.Message}");
+                Console.WriteLine($"[EMAIL_WARNING] No se pudo enviar correo de bienvenida/verificación comercio: {ex.Message}");
             }
 
             return ApiResponse<object>.Success(
@@ -222,12 +247,56 @@ namespace AdLocalAPI.Services
             if (usuario == null)
                 return ApiResponse<object>.Error("404", "Usuario no encontrado");
 
+            bool emailCambiado = !string.IsNullOrWhiteSpace(dto.Email) && !dto.Email.Trim().Equals(usuario.Email, StringComparison.OrdinalIgnoreCase);
+
             usuario.Nombre = dto.Nombre;
             usuario.Email = dto.Email;
 
             await _repository.UpdateAsync(usuario);
 
+            if (emailCambiado)
+            {
+                var ip = _httpContextAccessor.HttpContext?.Connection?.RemoteIpAddress?.ToString();
+                await _refreshTokenService.RevocarTodosPorUsuarioAsync(usuario.Id, "Correo electrónico modificado", ip);
+            }
+
             return ApiResponse<object>.Success(null, "Usuario actualizado correctamente");
+        }
+
+        public async Task<ApiResponse<object>> CambiarEstadoUsuario(long id, bool activo, string? motivo = null)
+        {
+            var usuario = await _repository.GetByIdAsync(id);
+            if (usuario == null)
+                return ApiResponse<object>.Error("404", "Usuario no encontrado");
+
+            usuario.Activo = activo;
+            await _repository.UpdateAsync(usuario);
+
+            if (!activo)
+            {
+                var ip = _httpContextAccessor.HttpContext?.Connection?.RemoteIpAddress?.ToString();
+                await _refreshTokenService.RevocarTodosPorUsuarioAsync(id, motivo ?? "Usuario bloqueado o suspendido por administrador", ip);
+            }
+
+            return ApiResponse<object>.Success(null, activo ? "Usuario activado correctamente" : "Usuario bloqueado y sesiones invalidadas correctamente");
+        }
+
+        public async Task<ApiResponse<object>> CambiarRolUsuario(long id, string nuevoRol)
+        {
+            if (string.IsNullOrWhiteSpace(nuevoRol))
+                return ApiResponse<object>.Error("400", "El rol es requerido");
+
+            var usuario = await _repository.GetByIdAsync(id);
+            if (usuario == null)
+                return ApiResponse<object>.Error("404", "Usuario no encontrado");
+
+            usuario.Rol = nuevoRol.Trim();
+            await _repository.UpdateAsync(usuario);
+
+            var ip = _httpContextAccessor.HttpContext?.Connection?.RemoteIpAddress?.ToString();
+            await _refreshTokenService.RevocarTodosPorUsuarioAsync(id, $"Rol modificado a {nuevoRol}", ip);
+
+            return ApiResponse<object>.Success(null, $"Rol actualizado a {nuevoRol} y sesiones anteriores invalidadas.");
         }
         public async Task<ApiResponse<UsuarioInfoDto>> ObtenerInfoUsuario()
         {
@@ -262,6 +331,9 @@ namespace AdLocalAPI.Services
 
                 await _repository.DeleteAsync(id);
 
+                var ip = _httpContextAccessor.HttpContext?.Connection?.RemoteIpAddress?.ToString();
+                await _refreshTokenService.RevocarTodosPorUsuarioAsync(id, "Usuario eliminado", ip);
+
                 return ApiResponse<object>.Success(
                     null,
                     "Usuario eliminado correctamente"
@@ -272,524 +344,21 @@ namespace AdLocalAPI.Services
                 return ApiResponse<object>.Error("500", ex.Message);
             }
         }
-        public async Task<ApiResponse<object>> Login(string email, string password)
-        {
 
-            var usuario = await _repository.GetByCorreoAsync(email);
-
-            if (usuario.Rol == "Colaborador")
-            {
-                var usuarioManager = await _repository.GetByIdComercioAsync((long)usuario.ComercioId);
-                var planActivo = await _suscripcionRepository.GetActivaByUsuarioAsync(usuarioManager.Id);
-
-                if (planActivo == null || planActivo.Plan == null)
-                {
-                    return ApiResponse<object>.Error(
-                        "403",
-                        "El comercio no cuenta con una suscripción activa para registrar colaboradores."
-                    );
-                }
-
-                if (planActivo.CurrentPeriodEnd <= DateTime.UtcNow)
-                {
-                    return ApiResponse<object>.Error(
-                        "403",
-                        "El comercio que te dio de alta debe renovar su suscripción para agregar colaboradores."
-                    );
-                }
-            }
-
-
-            if (usuario == null)
-                return ApiResponse<object>.Error("401", "Credenciales inválidas");
-
-
-            bool valid = BCrypt.Net.BCrypt.Verify(password, usuario.PasswordHash);
-
-            if (!valid)
-                return ApiResponse<object>.Error("401", "Credenciales inválidas");
-
-            var token = await GenerateJwtToken(usuario);
-
-            object respuesta;
-
-            if (usuario.Rol == "Admin")
-            {
-                respuesta = new
-                {
-                    usuario.Id,
-                    usuario.Nombre,
-                    usuario.Email,
-                    usuario.Rol,
-                    Token = token
-                };
-            }
-            else if (usuario.Rol == "Comercio")
-            {
-                respuesta = new
-                {
-                    usuario.Id,
-                    usuario.Nombre,
-                    usuario.Email,
-                    usuario.Rol,
-                    usuario.ComercioId,
-                    Token = token
-                };
-            }
-            else if (usuario.Rol == "Colaborador")
-            {
-                respuesta = new
-                {
-                    usuario.Id,
-                    usuario.Nombre,
-                    usuario.Email,
-                    usuario.Rol,
-                    usuario.ComercioId,
-                    Token = token
-                };
-            }
-            else
-            {
-                return ApiResponse<object>.Error("403", "Rol no autorizado");
-            }
-
-            return ApiResponse<object>.Success(
-                respuesta,
-                "Inicio de sesión exitoso"
-            );
-        }
-        public async Task<string> GenerateJwtToken(Usuario usuario)
-        {
-            var jwtKey = _config["Jwt:Key"];
-
-            if (string.IsNullOrWhiteSpace(jwtKey))
-            {
-                throw new InvalidOperationException(
-                    "No se encontró la configuración Jwt:Key."
-                );
-            }
-
-            var key = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(jwtKey)
-            );
-
-            var creds = new SigningCredentials(
-                key,
-                SecurityAlgorithms.HmacSha256
-            );
-
-            var claims = new List<Claim>
-    {
-        new Claim(
-            JwtRegisteredClaimNames.Sub,
-            usuario.Email
-        ),
-
-        new Claim(
-            JwtRegisteredClaimNames.Email,
-            usuario.Email
-        ),
-
-        new Claim(
-            JwtRegisteredClaimNames.Jti,
-            Guid.NewGuid().ToString()
-        ),
-
-        new Claim(
-            "id",
-            usuario.Id.ToString()
-        ),
-
-        new Claim(
-            "nombre",
-            usuario.Nombre
-        ),
-
-        new Claim(
-            "rol",
-            usuario.Rol
-        ),
-
-        new Claim(
-            ClaimTypes.Role,
-            usuario.Rol
-        )
-    };
-
-            if (
-                usuario.Rol.Equals(
-                    "Comercio",
-                    StringComparison.OrdinalIgnoreCase
-                )
-            )
-            {
-                var comercio =
-                    await _comercioRepository
-                        .GetComercioByUser(usuario.Id);
-
-                claims.Add(
-                    new Claim(
-                        "comercioId",
-                        comercio?.Id.ToString() ?? "0"
-                    )
-                );
-
-                claims.Add(
-                    new Claim(
-                        "RedeemRewards",
-                        usuario.RedeemRewards
-                            ? "true"
-                            : "false"
-                    )
-                );
-
-                claims.Add(
-                    new Claim(
-                        "RedeemMonthFree",
-                        usuario.RedeemMonthFree
-                            ? "true"
-                            : "false"
-                    )
-                );
-
-                claims.Add(
-                    new Claim(
-                        "codigoReferido",
-                        usuario.CodigoReferido ?? ""
-                    )
-                );
-
-                claims.Add(
-                    new Claim(
-                        "fotoUrl",
-                        usuario.FotoUrl ?? ""
-                    )
-                );
-
-                var suscripcion =
-                    await _suscripcionRepository
-                        .GetActivaByUsuarioAsync(
-                            usuario.Id
-                        );
-
-                if (
-                    suscripcion != null &&
-                    suscripcion.Plan != null
-                )
-                {
-                    var plan = suscripcion.Plan;
-
-                    claims.Add(
-                        new Claim(
-                            "planId",
-                            plan.Id.ToString()
-                        )
-                    );
-
-                    claims.Add(
-                        new Claim(
-                            "planTipo",
-                            plan.Tipo ?? "FREE"
-                        )
-                    );
-
-                    claims.Add(
-                        new Claim(
-                            "nivelVisibilidad",
-                            plan.NivelVisibilidad.ToString()
-                        )
-                    );
-
-                    claims.Add(
-                        new Claim(
-                            "estado",
-                            suscripcion.Status ?? ""
-                        )
-                    );
-
-                    claims.Add(
-                        new Claim(
-                            "maxNegocios",
-                            plan.MaxNegocios.ToString()
-                        )
-                    );
-
-                    claims.Add(
-                        new Claim(
-                            "maxProductos",
-                            plan.MaxProductos.ToString()
-                        )
-                    );
-
-                    claims.Add(
-                        new Claim(
-                            "maxFotos",
-                            plan.MaxFotos.ToString()
-                        )
-                    );
-
-                    claims.Add(
-                        new Claim(
-                            "permiteCatalogo",
-                            plan.PermiteCatalogo.ToString()
-                        )
-                    );
-
-                    claims.Add(
-                        new Claim(
-                            "tieneAnalytics",
-                            plan.TieneAnalytics.ToString()
-                        )
-                    );
-
-                    claims.Add(
-                        new Claim(
-                            "badge",
-                            plan.TieneBadge
-                                ? plan.BadgeTexto ?? ""
-                                : ""
-                        )
-                    );
-                }
-                else
-                {
-                    claims.Add(
-                        new Claim(
-                            "planTipo",
-                            "FREE"
-                        )
-                    );
-
-                    claims.Add(
-                        new Claim(
-                            "nivelVisibilidad",
-                            "0"
-                        )
-                    );
-                }
-            }
-            else if (
-                usuario.Rol.Equals(
-                    "Colaborador",
-                    StringComparison.OrdinalIgnoreCase
-                )
-            )
-            {
-                if (usuario.ComercioId.HasValue)
-                {
-                    var comercio =
-                        await _comercioRepository
-                            .GetByIdAsync(
-                                usuario.ComercioId.Value
-                            );
-
-                    claims.Add(
-                        new Claim(
-                            "comercioId",
-                            comercio?.Id.ToString() ?? "0"
-                        )
-                    );
-
-                    var usuarioManager =
-                        await _repository
-                            .GetByIdComercioAsync(
-                                usuario.ComercioId.Value
-                            );
-
-                    if (usuarioManager != null)
-                    {
-                        var planActivo =
-                            await _suscripcionRepository
-                                .GetActivaByUsuarioAsync(
-                                    usuarioManager.Id
-                                );
-
-                        if (
-                            planActivo != null &&
-                            planActivo.Plan != null
-                        )
-                        {
-                            var plan =
-                                planActivo.Plan;
-
-                            claims.Add(
-                                new Claim(
-                                    "planId",
-                                    plan.Id.ToString()
-                                )
-                            );
-
-                            claims.Add(
-                                new Claim(
-                                    "planTipo",
-                                    plan.Tipo ?? "FREE"
-                                )
-                            );
-
-                            claims.Add(
-                                new Claim(
-                                    "nivelVisibilidad",
-                                    plan.NivelVisibilidad.ToString()
-                                )
-                            );
-
-                            claims.Add(
-                                new Claim(
-                                    "estado",
-                                    planActivo.Status ?? ""
-                                )
-                            );
-
-                            claims.Add(
-                                new Claim(
-                                    "maxProductos",
-                                    plan.MaxProductos.ToString()
-                                )
-                            );
-
-                            claims.Add(
-                                new Claim(
-                                    "maxFotos",
-                                    plan.MaxFotos.ToString()
-                                )
-                            );
-
-                            claims.Add(
-                                new Claim(
-                                    "permiteCatalogo",
-                                    plan.PermiteCatalogo.ToString()
-                                )
-                            );
-
-                            claims.Add(
-                                new Claim(
-                                    "tieneAnalytics",
-                                    plan.TieneAnalytics.ToString()
-                                )
-                            );
-
-                            claims.Add(
-                                new Claim(
-                                    "badge",
-                                    plan.TieneBadge
-                                        ? plan.BadgeTexto ?? ""
-                                        : ""
-                                )
-                            );
-                        }
-                    }
-                }
-
-                claims.Add(
-                    new Claim(
-                        "fotoUrl",
-                        usuario.FotoUrl ?? ""
-                    )
-                );
-            }
-            else if (
-                usuario.Rol.Equals(
-                    "Cliente",
-                    StringComparison.OrdinalIgnoreCase
-                )
-            )
-            {
-                claims.Add(
-                    new Claim(
-                        "fotoUrl",
-                        usuario.FotoUrl ?? ""
-                    )
-                );
-            }
-
-            var token = new JwtSecurityToken(
-                issuer: _config["Jwt:Issuer"],
-                audience: null,
-                claims: claims,
-                notBefore: DateTime.UtcNow,
-                expires: DateTime.UtcNow.AddDays(30),
-                signingCredentials: creds
-            );
-
-            return new JwtSecurityTokenHandler()
-                .WriteToken(token);
-        }
-        public async Task<UpdateJwtResult> ActualizarJwtAsync(string email, bool updateJWT)
-        {
-            var usuario = await _repository.GetByCorreoAsync(email);
-
-            if (usuario == null)
-            {
-                return new UpdateJwtResult
-                {
-                    Success = false,
-                    Message = "Usuario no encontrado"
-                };
-            }
-
-            string? token = null;
-
-            if (updateJWT)
-            {
-                token =  await GenerateJwtToken(usuario);
-            }
-
-            return new UpdateJwtResult
-            {
-                Success = true,
-                Message = updateJWT
-                    ? "JWT actualizado correctamente"
-                    : "JWT no actualizado",
-                Token = token,
-                Usuario = usuario
-            };
-        }
-        public async Task<ApiResponse<object>> CambiarPassword(ChangePasswordDto dto)
-        {
-            long userId = _jwtContext.GetUserId();
-
-            var usuario = await _repository.GetByIdAsync(userId);
-            if (usuario == null)
-                return ApiResponse<object>.Error("404", "Usuario no encontrado");
-
-
-            bool passwordCorrecto = BCrypt.Net.BCrypt.Verify(
-                dto.PasswordActual,
-                usuario.PasswordHash
-            );
-
-            if (!passwordCorrecto)
-                return ApiResponse<object>.Error(
-                    "400",
-                    "La contraseña actual es incorrecta"
-                );
-
-            if (dto.PasswordNueva.Length < 8)
-                return ApiResponse<object>.Error(
-                    "400",
-                    "La nueva contraseña debe tener al menos 8 caracteres"
-                );
-
-            usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.PasswordNueva);
-
-            await _repository.UpdateAsync(usuario);
-
-            return ApiResponse<object>.Success(
-                null,
-                "Contraseña actualizada correctamente"
-            );
-        }
         public async Task<ApiResponse<string>> UploadPhotoAsync(UploadPhotoDto dto)
         {
             long id = _jwtContext.GetUserId();
             var usuario = await _repository.GetByIdAsync(id);
+            if (usuario == null)
+                return ApiResponse<string>.Error("404", "Usuario no encontrado");
+
             if (string.IsNullOrEmpty(dto.Base64))
                 return ApiResponse<string>.Error("400", "No se recibió la imagen");
 
             var tiposPermitidos = new List<string> { "image/jpeg", "image/jpg", "image/png", "image/webp" };
 
             string base64Data = dto.Base64;
-            string tipoImagen = null;
+            string? tipoImagen = null;
 
             if (base64Data.StartsWith("data:"))
             {
@@ -841,196 +410,5 @@ namespace AdLocalAPI.Services
                 return ApiResponse<string>.Error("500", ex.Message);
             }
         }
-        public async Task<ApiResponse<object>> ForgetPassword(string email)
-        {
-            try
-            {
-                var usuario = await _repository.GetByCorreoAsync(email);
-
-                if (usuario == null)
-                    return ApiResponse<object>.Error("404", "Usuario no encontrado");
-
-                string codigo = ServicesGenerals.GenerarCodigoAlfanumerico(6);
-                string token = Guid.NewGuid().ToString();
-
-                usuario.Codigo = codigo;
-                usuario.Token = token;
-
-                await _repository.UpdateAsync(usuario);
-
-                bool esProduccion = _env.IsProduction();
-                var link = UrlHelper.GenerarLinkCambioPassword(token, esProduccion, "user");
-                Console.WriteLine(link);
-
-                var html = TemplatesEmail.PlantillaRecuperacionPasswordLink(usuario.Nombre, codigo, link);
-                Console.WriteLine(html);
-                await _emailService.EnviarCorreoAsync(
-                    usuario.Email,
-                    "Restablecer contraseña - AdLocal",
-                    html
-                );
-
-                return ApiResponse<object>.Success(
-                    null,
-                    "Correo de recuperación enviado correctamente"
-                );
-            }
-            catch (Exception ex)
-            {
-                return ApiResponse<object>.Error("500", ex.Message);
-            }
-        }
-        public async Task<ApiResponse<object>> NewPassword(NewPasswordDto dto)
-        {
-            var usuario = await _repository.GetByCodeAsync(dto.Codigo);
-            if (usuario == null)
-                return ApiResponse<object>.Error("404", "Usuario no encontrado");
-
-            if (dto.PasswordNueva.Length < 8)
-                return ApiResponse<object>.Error(
-                    "400",
-                    "La nueva contraseña debe tener al menos 8 caracteres"
-                );
-            usuario.Token = null;
-            usuario.Codigo = null;
-            usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.PasswordNueva);
-
-            await _repository.UpdateAsync(usuario);
-
-            try
-            {
-                var htmlConfirmacion = TemplatesEmail.PlantillaConfirmacionCambioPassword(usuario.Nombre);
-                await _emailService.EnviarCorreoAsync(
-                    usuario.Email,
-                    "Tu contraseña ha sido actualizada - AdLocal",
-                    htmlConfirmacion
-                );
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[EMAIL_WARNING] No se pudo enviar confirmación de contraseña: {ex.Message}");
-            }
-
-            return ApiResponse<object>.Success(
-                null,
-                "Contraseña actualizada correctamente"
-            );
-        }
-        public async Task<ApiResponse<object>> CheckToken(string token)
-        {
-            var usuario = await _repository.GetByTokenAsync(token);
-
-            if (usuario == null)
-            {
-                return ApiResponse<object>.Error(
-                    "404",
-                    "El enlace de recuperación no es válido o ya ha expirado. Solicita uno nuevo."
-                );
-            }
-
-            return ApiResponse<object>.Success(
-                null,
-                "El token es válido. Puedes continuar con el cambio de contraseña."
-            );
-        }
-
-        private ClaimsPrincipal? ObtenerPrincipalDeTokenExpirado(string token)
-        {
-            var jwtKey = _config["Jwt:Key"]
-                ?? _config["JWT:Key"]
-                ?? Environment.GetEnvironmentVariable("JWT__Key");
-
-            if (string.IsNullOrWhiteSpace(jwtKey))
-            {
-                return null;
-            }
-
-            var jwtIssuer = _config["Jwt:Issuer"]
-                ?? _config["JWT:Issuer"]
-                ?? Environment.GetEnvironmentVariable("JWT__Issuer")
-                ?? "AdLocalAPI";
-
-            var tokenValidationParameters = new TokenValidationParameters
-            {
-                ValidateIssuer = true,
-                ValidIssuer = jwtIssuer,
-                ValidateAudience = false,
-                ValidateIssuerSigningKey = true,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-                ValidateLifetime = false // Permite que el token haya expirado
-            };
-
-            var tokenHandler = new JwtSecurityTokenHandler();
-
-            try
-            {
-                var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out var securityToken);
-
-                if (securityToken is not JwtSecurityToken jwtSecurityToken ||
-                    !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
-                {
-                    return null;
-                }
-
-                // Ventana de expiración: máximo 7 días expirado
-                var expClaim = principal.FindFirst(JwtRegisteredClaimNames.Exp)?.Value;
-                if (long.TryParse(expClaim, out var expSeconds))
-                {
-                    var fechaExpiracion = DateTimeOffset.FromUnixTimeSeconds(expSeconds).UtcDateTime;
-                    if (DateTime.UtcNow > fechaExpiracion.AddDays(7))
-                    {
-                        return null; // Expiró hace más de 7 días
-                    }
-                }
-
-                return principal;
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        public async Task<ApiResponse<object>> RenovarTokenAsync(RenovarTokenDto dto)
-        {
-            if (dto == null || string.IsNullOrWhiteSpace(dto.TokenActual))
-                return ApiResponse<object>.Error("400", "El token actual es requerido");
-
-            var principal = ObtenerPrincipalDeTokenExpirado(dto.TokenActual);
-
-            if (principal == null)
-                return ApiResponse<object>.Error("401", "El token proporcionado es inválido o ha expirado hace más de 7 días");
-
-            var userIdClaim = principal.FindFirst("id")?.Value
-                ?? principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                ?? principal.FindFirst("propietario_id")?.Value;
-
-            if (!long.TryParse(userIdClaim, out var userId) || userId <= 0)
-                return ApiResponse<object>.Error("401", "No se pudo identificar al usuario desde el token");
-
-            var usuario = await _repository.GetByIdAsync(userId);
-
-            if (usuario == null || !usuario.Activo)
-                return ApiResponse<object>.Error("404", "El usuario no existe o se encuentra inactivo");
-
-            var nuevoJwt = await GenerateJwtToken(usuario);
-
-            return ApiResponse<object>.Success(
-                new
-                {
-                    token = nuevoJwt,
-                    usuario = new
-                    {
-                        usuario.Id,
-                        usuario.Nombre,
-                        usuario.Email,
-                        usuario.Rol,
-                        usuario.ComercioId
-                    }
-                },
-                "Token renovado correctamente"
-            );
-        }
-
     }
 }

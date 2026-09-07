@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace AdLocalAPI.Models
@@ -16,19 +16,19 @@ namespace AdLocalAPI.Models
 
         [Required]
         [MaxLength(250, ErrorMessage = "El comentario no puede exceder los 250 caracteres.")]
-        public string Comentario { get; set; }
+        public string Comentario { get; set; } = string.Empty;
 
         [Required]
         public long IdComercio { get; set; }
 
         [Required]
         [MaxLength(100)]
-        public string NombrePersona { get; set; }
+        public string NombrePersona { get; set; } = string.Empty;
 
         [Required]
         public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
         // 🔹 Navegación
         [ForeignKey(nameof(IdComercio))]
-        public Comercio Comercio { get; set; }
+        public Comercio? Comercio { get; set; }
     }
 }

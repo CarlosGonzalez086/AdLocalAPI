@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace AdLocalAPI.Models
 {
@@ -7,7 +7,7 @@ namespace AdLocalAPI.Models
         public int Id { get; set; }
 
         [Required]
-        public string Nombre { get; set; } // Free, Básico, Pro, Business
+        public string Nombre { get; set; } = string.Empty; // Free, Básico, Pro, Business
         [Required]
         [MaxLength(100)]
         public string StripePriceId { get; set; } = null!;
@@ -20,7 +20,7 @@ namespace AdLocalAPI.Models
 
         [Required]
         [MaxLength(20)]
-        public string Tipo { get; set; } // FREE | BASIC | PRO | BUSINESS
+        public string Tipo { get; set; } = string.Empty; // FREE | BASIC | PRO | BUSINESS
 
         // Capacidades
         public int MaxNegocios { get; set; }

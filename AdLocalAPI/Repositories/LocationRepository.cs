@@ -1,4 +1,4 @@
-﻿using AdLocalAPI.Data;
+using AdLocalAPI.Data;
 using AdLocalAPI.Interfaces.Location;
 using AdLocalAPI.Models;
 using Microsoft.EntityFrameworkCore;
@@ -19,7 +19,7 @@ namespace AdLocalAPI.Repositories
             return await _context.Estados.ToListAsync();
         }
 
-        public async Task<Estado> GetStateByIdAsync(int id)
+        public async Task<Estado?> GetStateByIdAsync(int id)
         {
             return await _context.Estados.FirstOrDefaultAsync(x => x.Id == id);
         }
@@ -27,15 +27,16 @@ namespace AdLocalAPI.Repositories
         public async Task<List<Municipio>> GetMunicipalitiesByStateIdAsync(int stateId)
         {
             return await _context.EstadosMunicipios
-                .Where(x => x.EstadoId == stateId)
+                .Where(x => x.EstadoId == stateId && x.Municipio != null)
                 .Include(x => x.Municipio)
-                .Select(x => x.Municipio)
+                .Select(x => x.Municipio!)
                 .ToListAsync();
         }
 
-        public async Task<Municipio> GetMunicipalityByIdAsync(int id)
+        public async Task<Municipio?> GetMunicipalityByIdAsync(int id)
         {
             var relStateMunicipality = await _context.EstadosMunicipios.FirstOrDefaultAsync(x => x.MunicipioId == id);
+            if (relStateMunicipality == null) return null;
             return await _context.Municipios.FirstOrDefaultAsync(x => x.Id == relStateMunicipality.MunicipioId);
         }
     }

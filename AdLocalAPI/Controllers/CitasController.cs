@@ -1,5 +1,6 @@
+using System;
+using System.Threading.Tasks;
 using AdLocalAPI.DTOs;
-using AdLocalAPI.Models;
 using AdLocalAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -8,12 +9,11 @@ namespace AdLocalAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class CitasController : ControllerBase
+    public class CitasController : ApiControllerBase
     {
         private readonly ICitaService _service;
 
-        public CitasController(
-            ICitaService service)
+        public CitasController(ICitaService service)
         {
             _service = service;
         }
@@ -28,11 +28,7 @@ namespace AdLocalAPI.Controllers
             Guid productoUuid,
             [FromQuery] DateOnly fecha)
         {
-            var response =
-                await _service.HorariosAsync(
-                    productoUuid,
-                    fecha);
-
+            var response = await _service.HorariosAsync(productoUuid, fecha);
             return Responder(response);
         }
 
@@ -42,12 +38,9 @@ namespace AdLocalAPI.Controllers
 
         [Authorize(Roles = "Cliente")]
         [HttpPost]
-        public async Task<IActionResult> Crear(
-            [FromBody] CrearCitaDto dto)
+        public async Task<IActionResult> Crear([FromBody] CrearCitaDto dto, CancellationToken cancellationToken = default)
         {
-            var response =
-                await _service.CrearAsync(dto);
-
+            var response = await _service.CrearAsync(dto, cancellationToken);
             return Responder(response);
         }
 
@@ -59,9 +52,7 @@ namespace AdLocalAPI.Controllers
         [HttpGet("mias")]
         public async Task<IActionResult> Mias()
         {
-            var response =
-                await _service.MisCitasAsync();
-
+            var response = await _service.MisCitasAsync();
             return Responder(response);
         }
 
@@ -75,11 +66,7 @@ namespace AdLocalAPI.Controllers
             Guid uuid,
             [FromQuery] string? motivo = null)
         {
-            var response =
-                await _service.CancelarClienteAsync(
-                    uuid,
-                    motivo);
-
+            var response = await _service.CancelarClienteAsync(uuid, motivo);
             return Responder(response);
         }
 
@@ -93,11 +80,7 @@ namespace AdLocalAPI.Controllers
             Guid uuid,
             [FromBody] ReprogramarCitaDto dto)
         {
-            var response =
-                await _service.ReprogramarClienteAsync(
-                    uuid,
-                    dto);
-
+            var response = await _service.ReprogramarClienteAsync(uuid, dto);
             return Responder(response);
         }
 
@@ -111,11 +94,7 @@ namespace AdLocalAPI.Controllers
             [FromQuery] long comercioId,
             [FromQuery] DateOnly? fecha = null)
         {
-            var response =
-                await _service.AgendaAsync(
-                    comercioId,
-                    fecha);
-
+            var response = await _service.AgendaAsync(comercioId, fecha);
             return Responder(response);
         }
 
@@ -130,44 +109,8 @@ namespace AdLocalAPI.Controllers
             [FromQuery] long comercioId,
             [FromBody] ActualizarCitaComercioDto dto)
         {
-            var response =
-                await _service.ActualizarAsync(
-                    comercioId,
-                    uuid,
-                    dto);
-
+            var response = await _service.ActualizarAsync(comercioId, uuid, dto);
             return Responder(response);
-        }
-
-        // ==========================================
-        // RESPUESTAS
-        // ==========================================
-
-        private IActionResult Responder<T>(
-            ApiResponse<T> response)
-        {
-            return response.Codigo switch
-            {
-                "200" => Ok(response),
-
-                "400" => BadRequest(response),
-
-                "401" => Unauthorized(response),
-
-                "403" => StatusCode(
-                    StatusCodes.Status403Forbidden,
-                    response),
-
-                "404" => NotFound(response),
-
-                "409" => Conflict(response),
-
-                "500" => StatusCode(
-                    StatusCodes.Status500InternalServerError,
-                    response),
-
-                _ => BadRequest(response)
-            };
         }
     }
 }

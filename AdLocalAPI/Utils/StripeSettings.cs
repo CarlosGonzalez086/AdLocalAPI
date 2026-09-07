@@ -1,8 +1,8 @@
-﻿namespace AdLocalAPI.Utils
+namespace AdLocalAPI.Utils
 {
     public class StripeSettings
     {
-        public string SecretKey { get; private set; }
+        public string SecretKey { get; private set; } = string.Empty;
 
         public void Inicializar(string secretKey)
         {

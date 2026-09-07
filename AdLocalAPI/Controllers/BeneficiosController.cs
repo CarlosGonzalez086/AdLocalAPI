@@ -1,19 +1,18 @@
-﻿using AdLocalAPI.DTOs;
-using AdLocalAPI.Services;
+using System.Threading.Tasks;
+using AdLocalAPI.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Stripe;
 
 namespace AdLocalAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    public class BeneficiosController : ControllerBase
+    public class BeneficiosController : ApiControllerBase
     {
-        private readonly BeneficiosServices _service;
+        private readonly IBeneficiosService _service;
 
-        public BeneficiosController(BeneficiosServices service)
+        public BeneficiosController(IBeneficiosService service)
         {
             _service = service;
         }
@@ -22,7 +21,7 @@ namespace AdLocalAPI.Controllers
         public async Task<IActionResult> ReclamarBeneficio()
         {
             var response = await _service.ReclamarBeneficio();
-            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+            return Responder(response);
         }
     }
 }

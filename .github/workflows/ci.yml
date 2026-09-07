@@ -1,0 +1,30 @@
+name: CI AdLocalAPI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+jobs:
+  build-and-test:
+    name: Build and Test API
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore AdLocalAPI.sln
+
+      - name: Build solution (TreatWarningsAsErrors)
+        run: dotnet build AdLocalAPI.sln --configuration Release --no-restore
+
+      - name: Run test suite (Unit & Integration)
+        run: dotnet test AdLocalAPI.Tests/AdLocalAPI.Tests.csproj --configuration Release --no-build -l "console;verbosity=normal"

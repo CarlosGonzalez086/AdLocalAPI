@@ -1,18 +1,23 @@
-﻿using AdLocalAPI.Constants;
+using AdLocalAPI.Constants;
 using AdLocalAPI.Dictionaries;
 using AdLocalAPI.DTOs;
 using AdLocalAPI.Interfaces;
 using AdLocalAPI.Models;
 using AdLocalAPI.Utils;
 
+using AdLocalAPI.Interfaces.Services;
+
 namespace AdLocalAPI.Services
 {
     public class ConfiguracionService : IConfiguracionService
     {
         private readonly IConfiguracionRepository _repository;
-        public ConfiguracionService(IConfiguracionRepository repository)
+        private readonly IEmailService _emailService;
+
+        public ConfiguracionService(IConfiguracionRepository repository, IEmailService emailService)
         {
             _repository = repository;
+            _emailService = emailService;
         }
         public async Task<ApiResponse<ConfiguracionSistema>> CrearOActualizarAsync(ConfiguracionSistemaDto dto)
         {
@@ -79,7 +84,8 @@ namespace AdLocalAPI.Services
                         res.Mensaje
                     );
 
-                resultado.Add(res.Respuesta);
+                if (res.Respuesta != null)
+                    resultado.Add(res.Respuesta);
             }
 
             return ApiResponse<List<ConfiguracionSistema>>.Success(
@@ -106,7 +112,8 @@ namespace AdLocalAPI.Services
                         res.Mensaje
                     );
 
-                resultado.Add(res.Respuesta);
+                if (res.Respuesta != null)
+                    resultado.Add(res.Respuesta);
             }
 
             return ApiResponse<List<ConfiguracionSistema>>.Success(
@@ -324,6 +331,32 @@ namespace AdLocalAPI.Services
                     resultado,
                     "Configuración de correo registrada correctamente."
                 );
+        }
+
+        public async Task<ApiResponse<object>> ProbarCorreoAsync(string? email)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return ApiResponse<object>.BadRequest("El correo de prueba es requerido.");
+            }
+
+            try
+            {
+                var emailDestino = email.Trim();
+                var htmlPrueba = TemplatesEmail.PlantillaPruebaConfiguracion(emailDestino);
+
+                await _emailService.EnviarCorreoAsync(
+                    emailDestino,
+                    "Prueba de Configuración SMTP - AdLocal",
+                    htmlPrueba
+                );
+
+                return ApiResponse<object>.Success(null, $"Correo de prueba enviado exitosamente a {emailDestino}.");
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<object>.InternalServerError(ex.Message);
+            }
         }
     }
 }

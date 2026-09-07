@@ -357,6 +357,67 @@ namespace AdLocalAPI.Utils
         }
 
         // =========================================================================
+        // 5B. PLANTILLA: VERIFICACIÓN DE CORREO ELECTRÓNICO
+        // =========================================================================
+        public static string PlantillaVerificacionCorreo(string nombre, string codigo, string? linkVerificacion = null)
+        {
+            var nombreLimpio = string.IsNullOrWhiteSpace(nombre) ? "Usuario" : nombre.Trim();
+
+            var botonVerificacion = !string.IsNullOrWhiteSpace(linkVerificacion) ? $@"
+              <!-- Botón Verificación Directa -->
+              <div style='text-align: center; margin: 24px 0;'>
+                <a href='{linkVerificacion}' style='display: inline-block; background-color: {BrandBotanical}; color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none; padding: 14px 38px; border-radius: 12px; box-shadow: 0 4px 14px rgba(0, 168, 90, 0.28);'>
+                  Verificar mi Correo Electrónico
+                </a>
+              </div>" : "";
+
+            var contenido = $@"
+              <p style='margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: {TextPrimary};'>
+                Hola <strong style='color: {BrandPrimaryDark};'>{nombreLimpio}</strong>,
+              </p>
+              <p style='margin: 0 0 24px 0; font-size: 15px; line-height: 1.6; color: {TextSecondary};'>
+                Gracias por registrarte en <strong>AdLocal</strong>. Para confirmar tu cuenta y acceder a todas las funciones de la comunidad, por favor verifica tu dirección de correo electrónico con el siguiente código:
+              </p>
+
+              <!-- Tarjeta de Código -->
+              <table role='presentation' width='100%' border='0' cellspacing='0' cellpadding='0' style='background-color: {SurfaceCream}; border: 1.5px solid {BrandBotanical}; border-radius: 14px; margin-bottom: 24px;'>
+                <tr>
+                  <td align='center' style='padding: 26px 20px;'>
+                    <span style='font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: {BrandBotanicalDark};'>
+                      TU CÓDIGO DE VERIFICACIÓN
+                    </span>
+                    <div style='font-size: 38px; font-weight: 800; letter-spacing: 9px; color: {BrandBotanicalDark}; margin: 12px 0 6px 0; font-family: ""Inter"", monospace;'>
+                      {codigo}
+                    </div>
+                    <span style='font-size: 12px; font-weight: 500; color: {TextMuted};'>
+                      ⏱ Válido únicamente durante <strong>24 horas</strong>
+                    </span>
+                  </td>
+                </tr>
+              </table>
+              {botonVerificacion}
+              <!-- Aviso informativo -->
+              <table role='presentation' width='100%' border='0' cellspacing='0' cellpadding='0' style='background-color: {BackgroundWarm}; border-left: 3px solid {BrandPrimary}; border-radius: 0 8px 8px 0;'>
+                <tr>
+                  <td style='padding: 12px 16px;'>
+                    <p style='margin: 0; font-size: 12px; color: {TextSecondary}; line-height: 1.5;'>
+                      ℹ️ Si no creaste una cuenta en AdLocal, puedes ignorar este mensaje; la cuenta no será activada.
+                    </p>
+                  </td>
+                </tr>
+              </table>";
+
+            return ConstruirLayout(
+                badgeTexto: "VERIFICACIÓN DE CUENTA",
+                badgeBg: BrandBotanicalSubtle,
+                badgeColor: BrandBotanicalDark,
+                titulo: "Confirma tu correo electrónico",
+                contenidoHtml: contenido,
+                notaPie: "Gracias por unirte a AdLocal y apoyar el comercio de tu comunidad local."
+            );
+        }
+
+        // =========================================================================
         // 6. PLANTILLA: BIENVENIDA COLABORADOR
         // =========================================================================
         public static string PlantillaCorreoBienvenidaColaborador(

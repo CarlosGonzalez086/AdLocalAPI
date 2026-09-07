@@ -1,4 +1,4 @@
-﻿using AdLocalAPI.Data;
+using AdLocalAPI.Data;
 using AdLocalAPI.Interfaces.Comercio;
 using AdLocalAPI.Models;
 using Amazon.S3;
@@ -124,8 +124,8 @@ namespace AdLocalAPI.Repositories
             }
             catch (Exception ex) 
             {
-                Console.WriteLine(ex.ToString);
-                return null;
+                Console.WriteLine(ex.ToString());
+                return string.Empty;
             }
 
 

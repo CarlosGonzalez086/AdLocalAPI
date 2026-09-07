@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace AdLocalAPI.Models
@@ -16,8 +16,8 @@ namespace AdLocalAPI.Models
         [Column("municipios_id")]
         public int MunicipioId { get; set; }
         // Navegación
-        public Estado Estado { get; set; }
-        public Municipio Municipio { get; set; }
+        public Estado? Estado { get; set; }
+        public Municipio? Municipio { get; set; }
 
     }
 }

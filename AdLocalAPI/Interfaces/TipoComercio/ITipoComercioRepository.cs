@@ -1,11 +1,11 @@
-﻿using AdLocalAPI.DTOs;
+using AdLocalAPI.DTOs;
 using AdLocalAPI.Models;
 
 namespace AdLocalAPI.Interfaces.TipoComercio
 {
     public interface ITipoComercioRepository
     {
-        Task<Models.TipoComercio> GetById(long id);
+        Task<Models.TipoComercio?> GetById(long id);
         Task<ApiResponse<PagedResponse<TipoComercioDto>>> GetAllPagedAsync(
                     int page = 1,
                     int pageSize = 10,

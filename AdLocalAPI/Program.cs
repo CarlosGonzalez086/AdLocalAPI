@@ -7,10 +7,13 @@ using AdLocalAPI.Interfaces.ProductosServicios;
 using AdLocalAPI.Interfaces.Repository;
 using AdLocalAPI.Interfaces.Tarjetas;
 using AdLocalAPI.Interfaces.TipoComercio;
+using AdLocalAPI.Interfaces.Services;
 using AdLocalAPI.Repositories;
 using AdLocalAPI.Repositories.Interfaces;
+using AdLocalAPI.Middlewares;
 using AdLocalAPI.Services;
 using AdLocalAPI.Services.Interfaces;
+using AdLocalAPI.Filters;
 using AdLocalAPI.Utils;
 using AdLocalAPI.Validators;
 using Amazon.Runtime;
@@ -18,12 +21,15 @@ using Amazon.S3;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Text;
 using System.Threading.RateLimiting;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,10 +46,16 @@ builder.WebHost.UseUrls($"http://*:{port}");
 
 // JWT
 var jwtKey = Environment.GetEnvironmentVariable("JWT__Key")
+    ?? builder.Configuration["Jwt:Key"]
     ?? throw new Exception("❌ JWT__Key no está definido");
 
 var jwtIssuer = Environment.GetEnvironmentVariable("JWT__Issuer")
+    ?? builder.Configuration["Jwt:Issuer"]
     ?? "AdLocalAPI";
+
+var jwtAudience = Environment.GetEnvironmentVariable("JWT__Audience")
+    ?? builder.Configuration["Jwt:Audience"]
+    ?? "AdLocal";
 
 var webhookSecret = Environment.GetEnvironmentVariable("STRIPE_WEBHOOK_SECRET");
 
@@ -77,13 +89,36 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true,
-        ValidateAudience = false,
+        ValidateAudience = true,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
         ValidIssuer = jwtIssuer,
+        ValidAudience = jwtAudience,
         IssuerSigningKey = new SymmetricSecurityKey(
             Encoding.UTF8.GetBytes(jwtKey)
-        )
+        ),
+        ClockSkew = TimeSpan.FromMinutes(1)
+    };
+
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = async context =>
+        {
+            var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+            var userIdClaim = context.Principal?.FindFirst("id")?.Value
+                ?? context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (long.TryParse(userIdClaim, out var userId))
+            {
+                var user = await db.Usuarios.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+                var (isValid, errorMessage) = AdLocalAPI.Helpers.TokenSecurityValidator.ValidarUsuarioYClaims(user, context.Principal);
+                if (!isValid)
+                {
+                    context.Fail(errorMessage!);
+                    return;
+                }
+            }
+        }
     };
 });
 
@@ -154,12 +189,15 @@ builder.Services.AddValidatorsFromAssemblyContaining<ProductosServiciosDtoValida
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<JwtContext>();
 
+builder.Services.AddScoped<IComercioRepository, ComercioRepository>();
 builder.Services.AddScoped<ComercioRepository>();
+builder.Services.AddScoped<IComercioService, ComercioService>();
 builder.Services.AddScoped<ComercioService>();
 builder.Services.AddScoped<CitaService>();
 builder.Services.AddScoped<IRelComercioImagenRepositorio, RelComercioImagenRepositorio>();
 
 
+builder.Services.AddScoped<IUsuarioRepository, UsuarioRepository>();
 builder.Services.AddScoped<UsuarioRepository>();
 builder.Services.AddScoped<UsuarioService>();
 builder.Services.AddScoped<IUsuarioService, UsuarioService>();
@@ -169,13 +207,17 @@ builder.Services.AddScoped<IProductosServiciosService, ProductosServiciosService
 builder.Services.AddScoped<IHorarioComercioRepository, HorarioComercioRepository>();
 
 
+builder.Services.AddScoped<IPlanRepository, PlanRepository>();
 builder.Services.AddScoped<PlanRepository>();
+builder.Services.AddScoped<IPlanService, PlanService>();
 builder.Services.AddScoped<AdLocalAPI.Services.PlanService>();
 
+builder.Services.AddScoped<ISuscripcionRepository, SuscripcionRepository>();
 builder.Services.AddScoped<SuscripcionRepository>();
 builder.Services.AddScoped<SuscripcionService>();
 
 builder.Services.AddScoped<StripeService>();
+builder.Services.AddScoped<IGeoLocationService, GeoLocationService>();
 builder.Services.AddScoped<GeoLocationService>();
 builder.Services.AddScoped<HttpClient>();
 
@@ -193,25 +235,33 @@ builder.Services.AddScoped<ITipoComercioRepository, TipoComercioRepository>();
 builder.Services.AddScoped<ITipoComercioService, TipoComercioService>();
 
 
+builder.Services.AddScoped<ICalificacionComentarioRepository, CalificacionComentarioRepository>();
 builder.Services.AddScoped<CalificacionComentarioRepository>();
+builder.Services.AddScoped<ICalificacionComentarioService, CalificacionComentarioService>();
 builder.Services.AddScoped<CalificacionComentarioService>();
 
 builder.Services.AddSingleton<StripeConfigProvider>();
 builder.Services.AddSingleton<ClavesConfigProvider>();
 
 
+builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<EmailService>();
 
+builder.Services.AddScoped<IComercioVisitaService, ComercioVisitaService>();
 builder.Services.AddScoped<ComercioVisitaService>();
+builder.Services.AddScoped<IComercioVisitaRepository, ComercioVisitaRepository>();
 builder.Services.AddScoped<ComercioVisitaRepository>();
 
+builder.Services.AddScoped<IUsoCodigoReferidoRepository, UsoCodigoReferidoRepository>();
 builder.Services.AddScoped<UsoCodigoReferidoRepository>();
+builder.Services.AddScoped<IUsoCodigoReferidoService, UsoCodigoReferidoService>();
 builder.Services.AddScoped<UsoCodigoReferidoService>();
 
+builder.Services.AddScoped<IBeneficiosService, BeneficiosServices>();
 builder.Services.AddScoped<BeneficiosServices>();
 
-builder.Services.AddScoped<ISuscriptionServiceV1, SuscriptionService>();
-builder.Services.AddScoped<ISuscriptionRepository, SuscriptionRepository>();
+builder.Services.AddScoped<ISuscripcionService, SuscripcionService>();
+builder.Services.AddScoped<IStripeReconciliationService, StripeReconciliationService>();
 
 builder.Services.AddScoped<IClienteService, ClienteService>();
 builder.Services.AddScoped<IClienteRepository, ClienteRepository>();
@@ -235,12 +285,28 @@ builder.Services.AddScoped<IPedidoClienteService, PedidoClienteService>();
 
 builder.Services.AddScoped<IPedidoComercioRepository, PedidoComercioRepository>();
 builder.Services.AddScoped<IPedidoComercioService, PedidoComercioService>();
+builder.Services.AddScoped<INotificacionRepository, NotificacionRepository>();
 builder.Services.AddScoped<INotificacionService, NotificacionService>();
+builder.Services.AddScoped<IComisionRepository, ComisionRepository>();
 builder.Services.AddScoped<IComisionService, ComisionService>();
+builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+builder.Services.AddScoped<AdLocalAPI.Interfaces.Services.IRefreshTokenService, RefreshTokenService>();
 
 builder.Services.AddScoped<ICitaService,CitaService>();
 builder.Services.AddScoped<ICitaRepository,CitaRepository>();
 builder.Services.AddScoped<IHorarioCitaServicioRepository,HorarioCitaServicioRepository>();
+
+builder.Services.AddScoped<ICotizacionRepository, CotizacionRepository>();
+builder.Services.AddScoped<ICotizacionService, CotizacionService>();
+
+builder.Services.AddScoped<ICuentaBancariaAdLocalRepository, CuentaBancariaAdLocalRepository>();
+builder.Services.AddScoped<ICuentaBancariaAdLocalService, CuentaBancariaAdLocalService>();
+
+builder.Services.AddScoped<IPagoComisionRepository, PagoComisionRepository>();
+builder.Services.AddScoped<IPagoComisionService, PagoComisionService>();
+
+builder.Services.AddScoped<IStripeWebhookEventRepository, StripeWebhookEventRepository>();
+builder.Services.AddScoped<IWebhookService, WebhookService>();
 
 
 
@@ -256,7 +322,22 @@ builder.Services.AddSingleton(new Supabase.Client(supabaseUrl, supabaseKey));
 // CONTROLLERS + SWAGGER
 // ======================================================
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<ValidationFilter>();
+});
+
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.InvalidModelStateResponseFactory = context =>
+    {
+        var primerError = context.ModelState.Values
+            .SelectMany(v => v.Errors)
+            .Select(e => !string.IsNullOrEmpty(e.ErrorMessage) ? e.ErrorMessage : e.Exception?.Message)
+            .FirstOrDefault(msg => !string.IsNullOrWhiteSpace(msg)) ?? "Solicitud inválida o malformada.";
+        return new BadRequestObjectResult(AdLocalAPI.Models.ApiResponse.Error("400", primerError));
+    };
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -310,7 +391,7 @@ builder.Services.AddCors(options =>
         policy =>
         {
             policy
-                .WithOrigins(allowedOrigins)
+                .SetIsOriginAllowed(origin => AdLocalAPI.Helpers.CorsSecurityPolicy.IsOriginAllowed(origin, allowedOrigins))
                 .AllowAnyHeader()
                 .AllowAnyMethod()
                 .AllowCredentials();
@@ -412,6 +493,8 @@ app.MapGet("/ping", () => Results.Ok(new
 }));
 
 app.UseCors("AllowFrontend");
+
+app.UseGlobalExceptionHandler();
 
 app.UseRateLimiter();
 

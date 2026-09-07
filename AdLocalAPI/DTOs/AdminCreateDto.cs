@@ -1,9 +1,9 @@
-﻿namespace AdLocalAPI.DTOs
+namespace AdLocalAPI.DTOs
 {
     public class AdminCreateDto
     {
-        public string Nombre { get; set; }
-        public string Email { get; set; }
-        public string Password { get; set; }
+        public string Nombre { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
     }
 }
