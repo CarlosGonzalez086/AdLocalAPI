@@ -1,4 +1,4 @@
-﻿using AdLocalAPI.DTOs;
+using AdLocalAPI.DTOs;
 using AdLocalAPI.Models;
 using AdLocalAPI.Repositories.Interfaces;
 using AdLocalAPI.Services.Interfaces;
@@ -489,6 +489,11 @@ namespace AdLocalAPI.Services
             );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        public async Task<ApiResponse<object>> RenovarTokenAsync(RenovarTokenDto dto)
+        {
+            return await _usuarioService.RenovarTokenAsync(dto);
         }
     }
 }

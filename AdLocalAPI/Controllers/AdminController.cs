@@ -1,7 +1,8 @@
-﻿using AdLocalAPI.DTOs;
-using AdLocalAPI.Services;
+using AdLocalAPI.DTOs;
+using AdLocalAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace AdLocalAPI.Controllers
 {
@@ -9,11 +10,27 @@ namespace AdLocalAPI.Controllers
     [Route("api/[controller]")]
     public class AdminController : ControllerBase
     {
-        private readonly UsuarioService _service;
+        private readonly IUsuarioService _service;
 
-        public AdminController(UsuarioService service)
+        public AdminController(IUsuarioService service)
         {
             _service = service;
+        }
+
+        [AllowAnonymous]
+        [EnableRateLimiting("auth")]
+        [HttpPost("renovar-token")]
+        public async Task<IActionResult> RenovarToken([FromBody] RenovarTokenDto dto)
+        {
+            var response = await _service.RenovarTokenAsync(dto);
+
+            return response.Codigo switch
+            {
+                "200" => Ok(response),
+                "401" => Unauthorized(response),
+                "404" => NotFound(response),
+                _ => BadRequest(response)
+            };
         }
 
         [HttpPost("crear")]
