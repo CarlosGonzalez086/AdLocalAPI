@@ -149,6 +149,20 @@ namespace AdLocalAPI.Services
                 CreatedAt = DateTime.UtcNow
             });
 
+            try
+            {
+                var htmlBienvenida = TemplatesEmail.PlantillaBienvenidaComercio(creado.Nombre, creado.Nombre);
+                await _emailService.EnviarCorreoAsync(
+                    creado.Email,
+                    "¡Bienvenido a AdLocal! Tu comercio en la red local",
+                    htmlBienvenida
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[EMAIL_WARNING] No se pudo enviar correo de bienvenida comercio: {ex.Message}");
+            }
+
             return ApiResponse<object>.Success(
                null,
                 "Usuario creado correctamente"
@@ -848,7 +862,7 @@ namespace AdLocalAPI.Services
                 var link = UrlHelper.GenerarLinkCambioPassword(token, esProduccion, "user");
                 Console.WriteLine(link);
 
-                var html = TemplatesEmail.PlantillaCorreoCambioPasswordCoffee(codigo, link);
+                var html = TemplatesEmail.PlantillaRecuperacionPasswordLink(usuario.Nombre, codigo, link);
                 Console.WriteLine(html);
                 await _emailService.EnviarCorreoAsync(
                     usuario.Email,
@@ -882,6 +896,20 @@ namespace AdLocalAPI.Services
             usuario.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.PasswordNueva);
 
             await _repository.UpdateAsync(usuario);
+
+            try
+            {
+                var htmlConfirmacion = TemplatesEmail.PlantillaConfirmacionCambioPassword(usuario.Nombre);
+                await _emailService.EnviarCorreoAsync(
+                    usuario.Email,
+                    "Tu contraseña ha sido actualizada - AdLocal",
+                    htmlConfirmacion
+                );
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[EMAIL_WARNING] No se pudo enviar confirmación de contraseña: {ex.Message}");
+            }
 
             return ApiResponse<object>.Success(
                 null,

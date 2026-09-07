@@ -148,6 +148,20 @@ namespace AdLocalAPI.Services
 
                 await _repository.CrearAsync(usuario);
 
+                try
+                {
+                    var cuerpoBienvenida = TemplatesEmail.PlantillaBienvenidaCliente(usuario.Nombre);
+                    await _emailService.EnviarCorreoAsync(
+                        usuario.Email,
+                        "¡Bienvenido a AdLocal! Tu comunidad de comercios locales",
+                        cuerpoBienvenida
+                    );
+                }
+                catch (Exception emailEx)
+                {
+                    Console.WriteLine($"[EMAIL_WARNING] No se pudo enviar correo de bienvenida: {emailEx.Message}");
+                }
+
                 var token = GenerateJwtToken(usuario);
 
                 return ApiResponse<object>.Success(token,"Cliente registrado correctamente.");
@@ -229,12 +243,7 @@ namespace AdLocalAPI.Services
 
                 var usuario = await _repository.ObtenerPorEmailAsync(email);
 
-                if (usuario == null || !string.Equals(usuario.Rol,"Cliente",StringComparison.OrdinalIgnoreCase))
-                {
-                    return ApiResponse<object>.Success("Si existe una cuenta asociada al correo, recibirás un código de recuperación.",null);
-                }
-
-                if (!usuario.Activo)
+                if (usuario == null || !usuario.Activo)
                 {
                     return ApiResponse<object>.Success("Si existe una cuenta asociada al correo, recibirás un código de recuperación.",null);
                 }
@@ -255,37 +264,10 @@ namespace AdLocalAPI.Services
 
                 await _repository.ActualizarAsync(usuario);
 
-                var asunto = "Código para recuperar tu contraseña";
+                var asunto = "Código para recuperar tu contraseña - AdLocal";
+                var cuerpo = TemplatesEmail.PlantillaRecuperacionPasswordCodigo(usuario.Nombre, codigo);
 
-                var cuerpo = $@"
-                    <div style='font-family:Arial,sans-serif'>
-                        <h2>Recuperación de contraseña</h2>
-
-                        <p>Hola {usuario.Nombre},</p>
-
-                        <p>
-                            Recibimos una solicitud para cambiar
-                            la contraseña de tu cuenta de AdLocal.
-                        </p>
-
-                        <p>Tu código de recuperación es:</p>
-
-                        <h1 style='letter-spacing:5px'>
-                            {codigo}
-                        </h1>
-
-                        <p>
-                            Este código tiene una vigencia de
-                            10 minutos.
-                        </p>
-
-                        <p>
-                            Si tú no solicitaste este cambio,
-                            puedes ignorar este correo.
-                        </p>
-                    </div>";
-
-                await _emailService.EnviarCorreoAsync(usuario.Email,asunto,cuerpo);
+                await _emailService.EnviarCorreoAsync(usuario.Email, asunto, cuerpo);
 
                 return ApiResponse<object>.Success("Si existe una cuenta asociada al correo, recibirás un código de recuperación.",null);
             }
@@ -317,7 +299,7 @@ namespace AdLocalAPI.Services
 
                 var usuario = await _repository.ObtenerPorEmailAsync(email);
 
-                if (usuario == null || !string.Equals(usuario.Rol,"Cliente",StringComparison.OrdinalIgnoreCase))
+                if (usuario == null)
                 {
                     return ApiResponse<object>.Error("400","El código no es válido o ha expirado.");
                 }
@@ -406,7 +388,7 @@ namespace AdLocalAPI.Services
 
                 var usuario = await _repository.ObtenerPorEmailAsync(email);
 
-                if (usuario == null || !string.Equals(usuario.Rol,"Cliente",StringComparison.OrdinalIgnoreCase))
+                if (usuario == null)
                 {
                     return ApiResponse<object>.Error("400","No fue posible restablecer la contraseña.");
                 }
@@ -442,6 +424,20 @@ namespace AdLocalAPI.Services
                 usuario.Token = null;
 
                 await _repository.ActualizarAsync(usuario);
+
+                try
+                {
+                    var cuerpoConfirmacion = TemplatesEmail.PlantillaConfirmacionCambioPassword(usuario.Nombre);
+                    await _emailService.EnviarCorreoAsync(
+                        usuario.Email,
+                        "Tu contraseña ha sido actualizada - AdLocal",
+                        cuerpoConfirmacion
+                    );
+                }
+                catch (Exception emailEx)
+                {
+                    Console.WriteLine($"[EMAIL_WARNING] No se pudo enviar confirmación de contraseña: {emailEx.Message}");
+                }
 
                 return ApiResponse<object>.Success("La contraseña fue actualizada correctamente.",null);
             }

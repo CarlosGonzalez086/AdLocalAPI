@@ -1,4 +1,4 @@
-﻿using AdLocalAPI.Data;
+using AdLocalAPI.Data;
 using AdLocalAPI.DTOs;
 using AdLocalAPI.Models;
 using Amazon.S3;
@@ -24,16 +24,19 @@ namespace AdLocalAPI.Repositories
         }
         public async Task<bool> ExistePorCorreoAsync(string correo)
         {
+            if (string.IsNullOrWhiteSpace(correo)) return false;
+            var normalized = correo.Trim().ToLower();
             return await _context.Usuarios
                 .AsNoTracking()
-                .AnyAsync(u => u.Email == correo);
+                .AnyAsync(u => u.Email.ToLower() == normalized);
         }
 
         public async Task<Usuario?> GetByCorreoAsync(string correo)
         {
+            if (string.IsNullOrWhiteSpace(correo)) return null;
+            var normalized = correo.Trim().ToLower();
             return await _context.Usuarios
-                .AsNoTracking()
-                .FirstOrDefaultAsync(u => u.Email == correo);
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == normalized);
         }
 
         public async Task<ApiResponse<PagedResponse<Models.Usuario>>> GetAllAsync(
