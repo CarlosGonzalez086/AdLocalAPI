@@ -1,4 +1,4 @@
-﻿using AdLocalAPI.DTOs;
+using AdLocalAPI.DTOs;
 using AdLocalAPI.Helpers;
 using AdLocalAPI.Models;
 using AdLocalAPI.Repositories;
@@ -10,10 +10,11 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using AdLocalAPI.Services.Interfaces;
 
 namespace AdLocalAPI.Services
 {
-    public class UsuarioService
+    public class UsuarioService : IUsuarioService
     {
         private readonly UsuarioRepository _repository;
         private readonly IConfiguration _config;
@@ -905,6 +906,103 @@ namespace AdLocalAPI.Services
             );
         }
 
+        private ClaimsPrincipal? ObtenerPrincipalDeTokenExpirado(string token)
+        {
+            var jwtKey = _config["Jwt:Key"]
+                ?? _config["JWT:Key"]
+                ?? Environment.GetEnvironmentVariable("JWT__Key");
+
+            if (string.IsNullOrWhiteSpace(jwtKey))
+            {
+                return null;
+            }
+
+            var jwtIssuer = _config["Jwt:Issuer"]
+                ?? _config["JWT:Issuer"]
+                ?? Environment.GetEnvironmentVariable("JWT__Issuer")
+                ?? "AdLocalAPI";
+
+            var tokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidIssuer = jwtIssuer,
+                ValidateAudience = false,
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+                ValidateLifetime = false // Permite que el token haya expirado
+            };
+
+            var tokenHandler = new JwtSecurityTokenHandler();
+
+            try
+            {
+                var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out var securityToken);
+
+                if (securityToken is not JwtSecurityToken jwtSecurityToken ||
+                    !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
+                {
+                    return null;
+                }
+
+                // Ventana de expiración: máximo 7 días expirado
+                var expClaim = principal.FindFirst(JwtRegisteredClaimNames.Exp)?.Value;
+                if (long.TryParse(expClaim, out var expSeconds))
+                {
+                    var fechaExpiracion = DateTimeOffset.FromUnixTimeSeconds(expSeconds).UtcDateTime;
+                    if (DateTime.UtcNow > fechaExpiracion.AddDays(7))
+                    {
+                        return null; // Expiró hace más de 7 días
+                    }
+                }
+
+                return principal;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        public async Task<ApiResponse<object>> RenovarTokenAsync(RenovarTokenDto dto)
+        {
+            if (dto == null || string.IsNullOrWhiteSpace(dto.TokenActual))
+                return ApiResponse<object>.Error("400", "El token actual es requerido");
+
+            var principal = ObtenerPrincipalDeTokenExpirado(dto.TokenActual);
+
+            if (principal == null)
+                return ApiResponse<object>.Error("401", "El token proporcionado es inválido o ha expirado hace más de 7 días");
+
+            var userIdClaim = principal.FindFirst("id")?.Value
+                ?? principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? principal.FindFirst("propietario_id")?.Value;
+
+            if (!long.TryParse(userIdClaim, out var userId) || userId <= 0)
+                return ApiResponse<object>.Error("401", "No se pudo identificar al usuario desde el token");
+
+            var usuario = await _repository.GetByIdAsync(userId);
+
+            if (usuario == null || !usuario.Activo)
+                return ApiResponse<object>.Error("404", "El usuario no existe o se encuentra inactivo");
+
+            var nuevoJwt = await GenerateJwtToken(usuario);
+
+            return ApiResponse<object>.Success(
+                new
+                {
+                    token = nuevoJwt,
+                    usuario = new
+                    {
+                        usuario.Id,
+                        usuario.Nombre,
+                        usuario.Email,
+                        usuario.Rol,
+                        usuario.ComercioId
+                    }
+                },
+                "Token renovado correctamente"
+            );
+        }
 
     }
 }

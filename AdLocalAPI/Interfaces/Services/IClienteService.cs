@@ -1,4 +1,4 @@
-﻿using AdLocalAPI.DTOs;
+using AdLocalAPI.DTOs;
 using AdLocalAPI.Models;
 using AdLocalAPI.DTOs.UsuarioCliente;
 
@@ -13,5 +13,6 @@ namespace AdLocalAPI.Services.Interfaces
         Task<ApiResponse<object>> RestablecerPassword(RestablecerPasswordDto dto);
         Task<ApiResponse<PerfilClienteDto>> ObtenerPerfilAsync();
         Task<ApiResponse<PerfilClienteActualizadoDto>> ActualizarPerfilAsync(ActualizarPerfilClienteDto dto);
+        Task<ApiResponse<object>> RenovarTokenAsync(RenovarTokenDto dto);
     }
 }

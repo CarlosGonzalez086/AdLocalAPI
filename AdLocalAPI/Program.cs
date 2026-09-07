@@ -21,7 +21,9 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Text;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -83,6 +85,18 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             Encoding.UTF8.GetBytes(jwtKey)
         )
     };
+});
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter("auth", opt =>
+    {
+        opt.PermitLimit = 10;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        opt.QueueLimit = 2;
+    });
 });
 
 builder.Services.AddSingleton<IAmazonS3>(sp =>
@@ -148,6 +162,7 @@ builder.Services.AddScoped<IRelComercioImagenRepositorio, RelComercioImagenRepos
 
 builder.Services.AddScoped<UsuarioRepository>();
 builder.Services.AddScoped<UsuarioService>();
+builder.Services.AddScoped<IUsuarioService, UsuarioService>();
 
 builder.Services.AddScoped<IProductosServiciosRepository, ProductosServiciosRepository>();
 builder.Services.AddScoped<IProductosServiciosService, ProductosServiciosService>();
@@ -265,6 +280,7 @@ var defaultOrigins = string.Join(
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "https://adlocal.store",
+    "https://panel.adlocal.store",
     "https://www.adlocal.store",
     "https://ad-local-gamma.vercel.app",
     "https://adlocalweb.jcarlosgonzalez086.workers.dev",
@@ -396,6 +412,8 @@ app.MapGet("/ping", () => Results.Ok(new
 }));
 
 app.UseCors("AllowFrontend");
+
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();
