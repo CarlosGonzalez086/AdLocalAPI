@@ -1,8 +1,10 @@
-﻿using AdLocalAPI.DTOs;
+using AdLocalAPI.DTOs;
 using AdLocalAPI.Interfaces;
+using AdLocalAPI.Models;
 using AdLocalAPI.Utils;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace AdLocalAPI.Controllers
 {
@@ -12,11 +14,14 @@ namespace AdLocalAPI.Controllers
     public class ConfiguracionController : ControllerBase
     {
         private readonly IConfiguracionService _service;
+        private readonly EmailService _emailService;
 
         public ConfiguracionController(
-            IConfiguracionService service)
+            IConfiguracionService service,
+            EmailService emailService)
         {
             _service = service;
+            _emailService = emailService;
         }
 
         // ==========================================
@@ -96,6 +101,43 @@ namespace AdLocalAPI.Controllers
             return response.Codigo == "200"
                 ? Ok(response)
                 : BadRequest(response);
+        }
+
+        // ==========================================
+        // PROBAR CORREO
+        // ==========================================
+
+        [AllowAnonymous]
+        [EnableRateLimiting("auth")]
+        [HttpPost("probar-correo")]
+        public async Task<IActionResult> ProbarCorreo([FromBody] EmailDto dto)
+        {
+            if (dto == null || string.IsNullOrWhiteSpace(dto.Email))
+            {
+                return BadRequest(
+                    ApiResponse<object>.Error("400", "El correo de prueba es requerido.")
+                );
+            }
+
+            try
+            {
+                var htmlPrueba = TemplatesEmail.PlantillaPruebaConfiguracion(dto.Email.Trim());
+
+                await _emailService.EnviarCorreoAsync(
+                    dto.Email.Trim(),
+                    "Prueba de Configuración SMTP - AdLocal",
+                    htmlPrueba
+                );
+
+                return Ok(ApiResponse<object>.Success(
+                    null,
+                    $"Correo de prueba enviado exitosamente a {dto.Email.Trim()}."
+                ));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ApiResponse<object>.Error("500", ex.Message));
+            }
         }
     }
 }
