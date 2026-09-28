@@ -531,7 +531,7 @@ namespace AdLocalAPI.Repositories
             if (pageSize < 1) pageSize = 8;
             if (pageSize > 50) pageSize = 50;
 
-            var suscripcionesVigentes = _context.Suscripcions
+            var suscripciones = await _context.Suscripcions
                 .Where(s =>
                     s.IsActive &&
                     !s.IsDeleted &&
@@ -546,7 +546,9 @@ namespace AdLocalAPI.Repositories
                     s.Plan.BadgeTexto,
                     s.Plan.Tipo
                 })
-                .AsEnumerable()
+                .ToListAsync();
+
+            var suscripcionesVigentes = suscripciones
                 .GroupBy(s => s.UsuarioId)
                 .Select(g => g.OrderByDescending(x => x.CurrentPeriodEnd).First())
                 .ToList();
@@ -557,8 +559,10 @@ namespace AdLocalAPI.Repositories
                 .Include(c => c.Municipio)
                 .Include(c => c.CalificacionesComentarios);
 
+            var comercios = await comerciosQuery.ToListAsync();
+
             var query =
-                from c in comerciosQuery.AsEnumerable()
+                from c in comercios
                 join s in suscripcionesVigentes
                     on c.IdUsuario equals s.UsuarioId into sus
                 from suscripcion in sus.DefaultIfEmpty()

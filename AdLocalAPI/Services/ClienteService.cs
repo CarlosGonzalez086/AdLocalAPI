@@ -83,7 +83,7 @@ namespace AdLocalAPI.Services
             usuario.FechaActualizacion = DateTime.UtcNow;
             await _repository.ActualizarAsync(usuario);
 
-            var token = await GenerateJwtToken(usuario);
+            var token = GenerateJwtToken(usuario);
             var perfil = MapearPerfil(usuario);
             return ApiResponse<PerfilClienteActualizadoDto>.Success(new PerfilClienteActualizadoDto
             {
@@ -188,7 +188,7 @@ namespace AdLocalAPI.Services
                     Console.WriteLine($"[EMAIL_WARNING] No se pudo enviar correo de bienvenida/verificación: {emailEx.Message}");
                 }
 
-                var token = await GenerateJwtToken(usuario);
+                var token = GenerateJwtToken(usuario);
                 return ApiResponse<object>.Success(token, "Cliente registrado correctamente.");
             }
             catch (Exception ex)
@@ -240,7 +240,7 @@ namespace AdLocalAPI.Services
                     return ApiResponse<object>.Error("400", "Correo electrónico o contraseña incorrectos.");
                 }
 
-                var token = await GenerateJwtToken(usuario);
+                var token = GenerateJwtToken(usuario);
 
                 // Generar Refresh Token y Cookie HttpOnly
                 var httpContext = _httpContextAccessor.HttpContext;
@@ -276,7 +276,7 @@ namespace AdLocalAPI.Services
             }
         }
 
-        public async Task<string> GenerateJwtToken(Usuario usuario)
+        public string GenerateJwtToken(Usuario usuario)
         {
             var jwtKey = _configuration["Jwt:Key"];
             if (string.IsNullOrWhiteSpace(jwtKey))
