@@ -1,4 +1,4 @@
-﻿using AdLocalAPI.Data;
+using AdLocalAPI.Data;
 using AdLocalAPI.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
@@ -6,9 +6,11 @@ using System.Globalization;
 
 using static AdLocalAPI.DTOs.ComercioVisitaDTOs;
 
+using AdLocalAPI.Repositories.Interfaces;
+
 namespace AdLocalAPI.Repositories
 {
-    public class ComercioVisitaRepository
+    public class ComercioVisitaRepository : IComercioVisitaRepository
     {
         private readonly AppDbContext _context;
 

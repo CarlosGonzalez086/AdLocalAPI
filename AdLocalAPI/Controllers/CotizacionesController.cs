@@ -1,7 +1,49 @@
-using AdLocalAPI.Data;using AdLocalAPI.DTOs;using AdLocalAPI.Helpers;using AdLocalAPI.Models;using Microsoft.AspNetCore.Authorization;using Microsoft.AspNetCore.Mvc;using Microsoft.EntityFrameworkCore;
-namespace AdLocalAPI.Controllers;
-[ApiController,Route("api/Cotizaciones"),Authorize]public class CotizacionesController:ControllerBase{private readonly AppDbContext db;private readonly JwtContext jwt;public CotizacionesController(AppDbContext db,JwtContext jwt){this.db=db;this.jwt=jwt;}
-[Authorize(Roles="Cliente"),HttpPost]public async Task<IActionResult> Crear(CrearCotizacionDto dto){var p=await db.ProductosServicios.FirstOrDefaultAsync(x=>x.Uuid==dto.ProductoUuid&&x.Modalidad==ModalidadProductoServicio.Cotizacion&&x.Activo&&x.Visible);if(p==null)return NotFound(ApiResponse<object>.Error("404","Servicio no encontrado."));if(string.IsNullOrWhiteSpace(dto.Solicitud))return BadRequest(ApiResponse<object>.Error("400","Describe lo que necesitas cotizar."));var c=new Cotizacion{IdUsuario=jwt.GetUserId(),IdComercio=p.IdComercio,IdProductoServicio=p.Id,Solicitud=dto.Solicitud.Trim()};db.Cotizaciones.Add(c);await db.SaveChangesAsync();return Ok(ApiResponse<object>.Success(new{c.Uuid},"Cotización enviada."));}
-[Authorize(Roles="Cliente"),HttpGet("mias")]public async Task<IActionResult> Mias(){var uid=jwt.GetUserId();var q=await(from c in db.Cotizaciones.AsNoTracking()join p in db.ProductosServicios on c.IdProductoServicio equals p.Id join co in db.Comercios on c.IdComercio equals co.Id where c.IdUsuario==uid orderby c.FechaCreacion descending select new{c.Uuid,Servicio=p.Nombre,Comercio=co.Nombre,c.Solicitud,c.Respuesta,c.PrecioPropuesto,c.Estado,c.FechaCreacion}).ToListAsync();return Ok(ApiResponse<object>.Success(q));}
-[Authorize(Roles="Cliente"),HttpPut("{uuid:guid}/cancelar")]public async Task<IActionResult> Cancelar(Guid uuid){var c=await db.Cotizaciones.FirstOrDefaultAsync(x=>x.Uuid==uuid&&x.IdUsuario==jwt.GetUserId());if(c==null)return NotFound(ApiResponse<object>.Error("404","Cotización no encontrada."));if(c.Estado is EstadoCotizacion.Aceptada or EstadoCotizacion.Cancelada)return Conflict(ApiResponse<object>.Error("409","Ya no se puede cancelar."));c.Estado=EstadoCotizacion.Cancelada;c.FechaActualizacion=DateTime.UtcNow;await db.SaveChangesAsync();return Ok(ApiResponse<object>.Success(new{c.Uuid},"Cotización cancelada."));}}
-public class CrearCotizacionDto{public Guid ProductoUuid{get;set;}public string Solicitud{get;set;}=string.Empty;}
+using System;
+using System.Threading.Tasks;
+using AdLocalAPI.DTOs;
+using AdLocalAPI.Helpers;
+using AdLocalAPI.Interfaces.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace AdLocalAPI.Controllers
+{
+    [ApiController]
+    [Route("api/Cotizaciones")]
+    [Authorize]
+    public class CotizacionesController : ApiControllerBase
+    {
+        private readonly ICotizacionService _cotizacionService;
+        private readonly JwtContext _jwt;
+
+        public CotizacionesController(ICotizacionService cotizacionService, JwtContext jwt)
+        {
+            _cotizacionService = cotizacionService;
+            _jwt = jwt;
+        }
+
+        [Authorize(Roles = "Cliente")]
+        [HttpPost]
+        public async Task<IActionResult> Crear([FromBody] CrearCotizacionDto dto, System.Threading.CancellationToken cancellationToken = default)
+        {
+            var response = await _cotizacionService.CrearCotizacionAsync(_jwt.GetUserId(), dto, cancellationToken);
+            return Responder(response);
+        }
+
+        [Authorize(Roles = "Cliente")]
+        [HttpGet("mias")]
+        public async Task<IActionResult> Mias(System.Threading.CancellationToken cancellationToken = default)
+        {
+            var response = await _cotizacionService.ObtenerMiasAsync(_jwt.GetUserId(), cancellationToken);
+            return Responder(response);
+        }
+
+        [Authorize(Roles = "Cliente")]
+        [HttpPut("{uuid:guid}/cancelar")]
+        public async Task<IActionResult> Cancelar(Guid uuid, System.Threading.CancellationToken cancellationToken = default)
+        {
+            var response = await _cotizacionService.CancelarCotizacionAsync(_jwt.GetUserId(), uuid, cancellationToken);
+            return Responder(response);
+        }
+    }
+}

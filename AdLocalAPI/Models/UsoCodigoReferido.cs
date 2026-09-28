@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace AdLocalAPI.Models
@@ -17,7 +17,7 @@ namespace AdLocalAPI.Models
 
         [Required]
         [MaxLength(50)]
-        public string CodigoReferido { get; set; }
+        public string CodigoReferido { get; set; } = string.Empty;
 
         public DateTime FechaUso { get; set; } = DateTime.UtcNow;
 

@@ -35,12 +35,13 @@ namespace AdLocalAPI.Services
             _comisiones = comisiones;
         }
 
-        public async Task<ApiResponse<List<ComercioPedidoSelectorDto>>> ObtenerComerciosAsync() =>
+        public async Task<ApiResponse<List<ComercioPedidoSelectorDto>>> ObtenerComerciosAsync(CancellationToken cancellationToken = default) =>
             ApiResponse<List<ComercioPedidoSelectorDto>>.Success(
                 await _repository.ObtenerComerciosAsync(_jwt.GetUserId(), _jwt.GetUserRole()));
 
-        public async Task<ApiResponse<PedidosComercioDashboardDto>> ObtenerDashboardAsync(long comercioId)
+        public async Task<ApiResponse<PedidosComercioDashboardDto>> ObtenerDashboardAsync(long comercioId, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!await Autorizado(comercioId))
                 return ApiResponse<PedidosComercioDashboardDto>.Error("403", "No tienes acceso a este comercio.");
 
@@ -49,8 +50,9 @@ namespace AdLocalAPI.Services
         }
 
         public async Task<ApiResponse<PagedResponse<PedidoComercioListadoDto>>> ObtenerPedidosAsync(
-            long comercioId, int page, int pageSize, EstadoPedido? estado)
+            long comercioId, int page, int pageSize, EstadoPedido? estado, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!await Autorizado(comercioId))
                 return ApiResponse<PagedResponse<PedidoComercioListadoDto>>.Error("403", "No tienes acceso a este comercio.");
 
@@ -61,8 +63,9 @@ namespace AdLocalAPI.Services
         }
 
         public async Task<ApiResponse<PedidoComercioDetalleDto>> ObtenerDetalleAsync(
-            long comercioId, Guid pedidoUuid)
+            long comercioId, Guid pedidoUuid, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!await Autorizado(comercioId))
                 return ApiResponse<PedidoComercioDetalleDto>.Error("403", "No tienes acceso a este comercio.");
 
@@ -73,8 +76,9 @@ namespace AdLocalAPI.Services
         }
 
         public async Task<ApiResponse<PedidoComercioDetalleDto>> CambiarEstadoAsync(
-            long comercioId, Guid pedidoUuid, CambiarEstadoPedidoDto dto)
+            long comercioId, Guid pedidoUuid, CambiarEstadoPedidoDto dto, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!await Autorizado(comercioId))
                 return ApiResponse<PedidoComercioDetalleDto>.Error("403", "No tienes acceso a este comercio.");
 
@@ -119,8 +123,9 @@ namespace AdLocalAPI.Services
         }
 
         public async Task<ApiResponse<PedidoComercioDetalleDto>> RevisarPagoAsync(
-            long comercioId, Guid pedidoUuid, RevisarPagoPedidoDto dto)
+            long comercioId, Guid pedidoUuid, RevisarPagoPedidoDto dto, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!await Autorizado(comercioId))
                 return ApiResponse<PedidoComercioDetalleDto>.Error("403", "No tienes acceso a este comercio.");
 
@@ -173,8 +178,9 @@ namespace AdLocalAPI.Services
         }
 
         public async Task<ApiResponse<ArchivoComprobanteDto>> ObtenerComprobanteAsync(
-            long comercioId, Guid pedidoUuid)
+            long comercioId, Guid pedidoUuid, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (!await Autorizado(comercioId))
                 return ApiResponse<ArchivoComprobanteDto>.Error("403", "No tienes acceso a este comercio.");
 
@@ -189,9 +195,9 @@ namespace AdLocalAPI.Services
                 {
                     BucketName = _bucket,
                     Key = comprobante.ArchivoUrl
-                });
+                }, cancellationToken);
                 await using var memory = new MemoryStream();
-                await response.ResponseStream.CopyToAsync(memory);
+                await response.ResponseStream.CopyToAsync(memory, cancellationToken);
                 var extension = Path.GetExtension(comprobante.ArchivoUrl);
 
                 return ApiResponse<ArchivoComprobanteDto>.Success(new ArchivoComprobanteDto

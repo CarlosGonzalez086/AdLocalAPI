@@ -1,4 +1,4 @@
-﻿namespace AdLocalAPI.DTOs
+namespace AdLocalAPI.DTOs
 {
     public class TarjetaDto
     {
@@ -9,6 +9,6 @@
         public int ExpYear { get; set; }
         public string CardType { get; set; } = null!;
         public bool IsDefault { get; set; }
-        public string StripePaymentMethodId { get; set; }
+        public string StripePaymentMethodId { get; set; } = string.Empty;
     }
 }

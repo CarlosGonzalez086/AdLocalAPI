@@ -1,13 +1,14 @@
-﻿using AdLocalAPI.Models;
-using AdLocalAPI.Repositories;
+using AdLocalAPI.Interfaces.Services;
+using AdLocalAPI.Models;
+using AdLocalAPI.Repositories.Interfaces;
 
 namespace AdLocalAPI.Services
 {
-    public class ComercioVisitaService
+    public class ComercioVisitaService : IComercioVisitaService
     {
-        private readonly ComercioVisitaRepository _repository;
+        private readonly IComercioVisitaRepository _repository;
 
-        public ComercioVisitaService(ComercioVisitaRepository repository)
+        public ComercioVisitaService(IComercioVisitaRepository repository)
         {
             _repository = repository;
         }

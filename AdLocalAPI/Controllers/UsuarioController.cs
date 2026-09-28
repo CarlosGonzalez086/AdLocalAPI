@@ -1,5 +1,6 @@
-﻿using AdLocalAPI.DTOs;
-using AdLocalAPI.Services;
+using AdLocalAPI.DTOs;
+using AdLocalAPI.Models;
+using AdLocalAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -7,11 +8,11 @@ namespace AdLocalAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class UsuarioController : ControllerBase
+    public class UsuarioController : ApiControllerBase
     {
-        private readonly UsuarioService _service;
+        private readonly IUsuarioService _service;
 
-        public UsuarioController(UsuarioService service)
+        public UsuarioController(IUsuarioService service)
         {
             _service = service;
         }
@@ -20,18 +21,14 @@ namespace AdLocalAPI.Controllers
         public async Task<IActionResult> CrearUsuario([FromBody] UsuarioRegistroDto dto)
         {
             var response = await _service.CrearUsuarioCliente(dto);
-            return response.Codigo == "200"
-                ? Ok(response)
-                : BadRequest(response);
+            return Responder(response);
         }
 
         [HttpPost("login")]
         public async Task<IActionResult> LoginUsuario([FromBody] LoginDto dto)
         {
             var response = await _service.Login(dto.Email, dto.Password);
-            return response.Codigo == "200"
-                ? Ok(response)
-                : BadRequest(response);
+            return Responder(response);
         }
 
         [Authorize]
@@ -39,9 +36,7 @@ namespace AdLocalAPI.Controllers
         public async Task<IActionResult> UpdateUsuario([FromBody] UsuarioUpdateDto dto)
         {
             var response = await _service.ActualizarUsuario(dto);
-            return response.Codigo == "200"
-                ? Ok(response)
-                : BadRequest(response);
+            return Responder(response);
         }
 
         [Authorize]
@@ -49,10 +44,7 @@ namespace AdLocalAPI.Controllers
         public async Task<IActionResult> CambiarPassword([FromBody] ChangePasswordDto dto)
         {
             var response = await _service.CambiarPassword(dto);
-
-            return response.Codigo == "200"
-                ? Ok(response)
-                : BadRequest(response);
+            return Responder(response);
         }
 
         [Authorize]
@@ -60,39 +52,28 @@ namespace AdLocalAPI.Controllers
         public async Task<IActionResult> VerUsuario()
         {
             var response = await _service.ObtenerInfoUsuario();
-            return response.Codigo == "200"
-                ? Ok(response)
-                : BadRequest(response);
+            return Responder(response);
         }
 
         [HttpPost("forget-password")]
         public async Task<IActionResult> ForgetPassword([FromBody] EmailDto email)
         {
             var response = await _service.ForgetPassword(email.Email);
-
-            return response.Codigo == "200"
-                ? Ok(response)
-                : BadRequest(response);
+            return Responder(response);
         }
 
         [HttpPost("new-password")]
         public async Task<IActionResult> NewPassword([FromBody] NewPasswordDto dto)
         {
             var response = await _service.NewPassword(dto);
-
-            return response.Codigo == "200"
-                ? Ok(response)
-                : BadRequest(response);
+            return Responder(response);
         }
 
         [HttpPost("check-token")]
         public async Task<IActionResult> CheckToken(string token)
         {
             var response = await _service.CheckToken(token);
-
-            return response.Codigo == "200"
-                ? Ok(response)
-                : BadRequest(response);
+            return Responder(response);
         }
 
         [Authorize]
@@ -106,31 +87,21 @@ namespace AdLocalAPI.Controllers
 
             if (!result.Success)
             {
-                return NotFound(new
-                {
-                    codigo = "404",
-                    mensaje = result.Message,
-                    respuesta = ""
-                });
+                return Responder(ApiResponse<object>.NotFound(result.Message));
             }
 
-            return Ok(new
+            return Responder(ApiResponse<object>.Success(new
             {
-                codigo = "200",
-                mensaje = result.Message,
-                respuesta = new
+                token = result.Token,
+                usuario = new
                 {
-                    token = result.Token,
-                    usuario = new
-                    {
-                        result.Usuario!.Id,
-                        result.Usuario.Nombre,
-                        result.Usuario.Email,
-                        result.Usuario.Rol,
-                        result.Usuario.ComercioId
-                    }
+                    result.Usuario!.Id,
+                    result.Usuario.Nombre,
+                    result.Usuario.Email,
+                    result.Usuario.Rol,
+                    result.Usuario.ComercioId
                 }
-            });
+            }, result.Message));
         }
     }
 }

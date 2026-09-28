@@ -1,3 +1,5 @@
+using System;
+
 namespace AdLocalAPI.DTOs
 {
     public class EstadoComisionesComercioDto
@@ -8,6 +10,7 @@ namespace AdLocalAPI.DTOs
         public decimal PendienteMes { get; set; }
         public PagoComisionListadoDto? PagoEnRevision { get; set; }
     }
+
     public class CrearPagoComisionDto
     {
         public long ComercioId { get; set; }
@@ -16,7 +19,13 @@ namespace AdLocalAPI.DTOs
         public string MetodoPago { get; set; } = "transferencia";
         public string ComprobanteBase64 { get; set; } = string.Empty;
     }
-    public class RevisarPagoComisionDto { public bool Aprobar { get; set; } public string? Comentario { get; set; } }
+
+    public class RevisarPagoComisionDto
+    {
+        public bool Aprobar { get; set; }
+        public string? Comentario { get; set; }
+    }
+
     public class PagoComisionListadoDto
     {
         public Guid Uuid { get; set; }
@@ -29,5 +38,13 @@ namespace AdLocalAPI.DTOs
         public string? Comentario { get; set; }
         public DateTime FechaCreacion { get; set; }
         public int ComisionesIncluidas { get; set; }
+    }
+
+    public class ComprobanteArchivoDto
+    {
+        public byte[]? Contenido { get; set; }
+        public string ContentType { get; set; } = "application/octet-stream";
+        public string? CodigoError { get; set; }
+        public string? MensajeError { get; set; }
     }
 }

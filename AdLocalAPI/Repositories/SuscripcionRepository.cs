@@ -1,11 +1,13 @@
-﻿using AdLocalAPI.Data;
+using AdLocalAPI.Data;
 using AdLocalAPI.DTOs;
 using AdLocalAPI.Models;
 using Microsoft.EntityFrameworkCore;
 
+using AdLocalAPI.Repositories.Interfaces;
+
 namespace AdLocalAPI.Repositories
 {
-    public class SuscripcionRepository
+    public class SuscripcionRepository : ISuscripcionRepository
     {
         private readonly AppDbContext _context;
 
@@ -172,8 +174,45 @@ namespace AdLocalAPI.Repositories
                 .CountAsync();
         }
 
+        public async Task<string> ObtenerBadgeTextoUsuarioAsync(long usuarioId)
+        {
+            var suscripcionActiva = await _context.Suscripcions
+                .Where(s =>
+                    s.UsuarioId == usuarioId &&
+                    s.IsActive &&
+                    !s.IsDeleted &&
+                    (s.Plan.Tipo == "PRO" || s.Plan.Tipo == "BUSINESS" || s.Plan.Tipo == "BASIC")
+                )
+                .Select(s => new
+                {
+                    s.Plan.Tipo,
+                    s.Plan.NivelVisibilidad,
+                    s.Plan.TieneBadge,
+                    s.Plan.BadgeTexto
+                })
+                .FirstOrDefaultAsync();
 
+            if (suscripcionActiva != null && suscripcionActiva.TieneBadge)
+            {
+                if (!string.IsNullOrWhiteSpace(suscripcionActiva.BadgeTexto))
+                {
+                    return suscripcionActiva.BadgeTexto;
+                }
+                return suscripcionActiva.Tipo switch
+                {
+                    "BUSINESS" => "Premium",
+                    "PRO" => "Recomendado",
+                    _ => "Esencial"
+                };
+            }
+            return "";
+        }
 
-
+        public async Task<List<Suscripcion>> ObtenerActivasConStripeAsync()
+        {
+            return await _context.Suscripcions
+                .Where(s => !s.IsDeleted && s.IsActive && !string.IsNullOrEmpty(s.StripeSubscriptionId))
+                .ToListAsync();
+        }
     }
 }

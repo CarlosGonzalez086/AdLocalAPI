@@ -46,8 +46,9 @@ namespace AdLocalAPI.Services
         }
 
         public async Task<ApiResponse<ComprobanteTransferenciaResponseDto>>
-            SubirAsync(Guid pedidoUuid, SubirComprobanteTransferenciaDto comprobanteDto)
+            SubirAsync(Guid pedidoUuid, SubirComprobanteTransferenciaDto comprobanteDto, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (comprobanteDto == null || string.IsNullOrWhiteSpace(comprobanteDto.ArchivoBase64))
             {
                 return ApiResponse<ComprobanteTransferenciaResponseDto>.Error(
@@ -154,7 +155,7 @@ namespace AdLocalAPI.Services
                     InputStream = stream,
                     ContentType = contentType,
                     DisablePayloadSigning = true
-                });
+                }, cancellationToken);
 
                 var fechaCarga = DateTime.UtcNow;
                 var comprobante = new ComprobantePago

@@ -1,3 +1,5 @@
+using System;
+using System.Threading.Tasks;
 using AdLocalAPI.DTOs;
 using AdLocalAPI.Interfaces;
 using AdLocalAPI.Models;
@@ -11,33 +13,24 @@ namespace AdLocalAPI.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Roles = "Admin")]
-    public class ConfiguracionController : ControllerBase
+    public class ConfiguracionController : ApiControllerBase
     {
         private readonly IConfiguracionService _service;
-        private readonly EmailService _emailService;
 
-        public ConfiguracionController(
-            IConfiguracionService service,
-            EmailService emailService)
+        public ConfiguracionController(IConfiguracionService service)
         {
             _service = service;
-            _emailService = emailService;
         }
 
         // ==========================================
         // LISTAR CONFIGURACIONES
         // ==========================================
 
-
         [HttpGet("listar")]
         public async Task<IActionResult> Listar()
         {
-            var response =
-                await _service.ObtenerTodosAsync();
-
-            return response.Codigo == "200"
-                ? Ok(response)
-                : BadRequest(response);
+            var response = await _service.ObtenerTodosAsync();
+            return Responder(response);
         }
 
         // ==========================================
@@ -45,50 +38,34 @@ namespace AdLocalAPI.Controllers
         // ==========================================
 
         [HttpPost("stripe")]
-        public async Task<IActionResult> CrearStripe(
-            [FromBody] StripeConfiguracionDto dto)
+        public async Task<IActionResult> CrearStripe([FromBody] StripeConfiguracionDto dto)
         {
-            var response =
-                await _service.RegistrarStripeAsync(dto);
-
-            return response.Codigo == "200"
-                ? Ok(response)
-                : BadRequest(response);
+            var response = await _service.RegistrarStripeAsync(dto);
+            return Responder(response);
         }
 
         // ==========================================
         // CLAVES
         // ==========================================
 
-
         [HttpPost("claves")]
-        public async Task<IActionResult> CrearClaves(
-            [FromBody] ClavesConfigDto dto)
+        public async Task<IActionResult> CrearClaves([FromBody] ClavesConfigDto dto)
         {
-            var response =
-                await _service.RegistrarCrearClavesAsync(dto);
-
-            return response.Codigo == "200"
-                ? Ok(response)
-                : BadRequest(response);
+            var response = await _service.RegistrarCrearClavesAsync(dto);
+            return Responder(response);
         }
 
         // ==========================================
         // COMISIÓN MARKETPLACE
         // ==========================================
 
-
         [HttpPost("comision-marketplace")]
-        public async Task<IActionResult> GuardarComisionMarketplace(
-            [FromBody] ComisionMarketplaceDto dto)
+        public async Task<IActionResult> GuardarComisionMarketplace([FromBody] ComisionMarketplaceDto dto)
         {
-            var response =
-                await _service.RegistrarComisionMarketplaceAsync(dto);
-
-            return response.Codigo == "200"
-                ? Ok(response)
-                : BadRequest(response);
+            var response = await _service.RegistrarComisionMarketplaceAsync(dto);
+            return Responder(response);
         }
+
         // ==========================================
         // CORREO
         // ==========================================
@@ -97,10 +74,7 @@ namespace AdLocalAPI.Controllers
         public async Task<IActionResult> GuardarCorreo([FromBody] EmailConfiguracionDto dto)
         {
             var response = await _service.RegistrarEmailAsync(dto);
-
-            return response.Codigo == "200"
-                ? Ok(response)
-                : BadRequest(response);
+            return Responder(response);
         }
 
         // ==========================================
@@ -112,32 +86,8 @@ namespace AdLocalAPI.Controllers
         [HttpPost("probar-correo")]
         public async Task<IActionResult> ProbarCorreo([FromBody] EmailDto dto)
         {
-            if (dto == null || string.IsNullOrWhiteSpace(dto.Email))
-            {
-                return BadRequest(
-                    ApiResponse<object>.Error("400", "El correo de prueba es requerido.")
-                );
-            }
-
-            try
-            {
-                var htmlPrueba = TemplatesEmail.PlantillaPruebaConfiguracion(dto.Email.Trim());
-
-                await _emailService.EnviarCorreoAsync(
-                    dto.Email.Trim(),
-                    "Prueba de Configuración SMTP - AdLocal",
-                    htmlPrueba
-                );
-
-                return Ok(ApiResponse<object>.Success(
-                    null,
-                    $"Correo de prueba enviado exitosamente a {dto.Email.Trim()}."
-                ));
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, ApiResponse<object>.Error("500", ex.Message));
-            }
+            var response = await _service.ProbarCorreoAsync(dto?.Email);
+            return Responder(response);
         }
     }
 }

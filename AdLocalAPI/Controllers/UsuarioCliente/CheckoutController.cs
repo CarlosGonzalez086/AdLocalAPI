@@ -1,4 +1,6 @@
-﻿using AdLocalAPI.DTOs.UsuarioCliente.Checkout;
+using System;
+using System.Threading.Tasks;
+using AdLocalAPI.DTOs.UsuarioCliente.Checkout;
 using AdLocalAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -8,12 +10,11 @@ namespace AdLocalAPI.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize(Roles = "Cliente")]
-    public class CheckoutController : ControllerBase
+    public class CheckoutController : ApiControllerBase
     {
         private readonly ICheckoutService _service;
 
-        public CheckoutController(
-            ICheckoutService service)
+        public CheckoutController(ICheckoutService service)
         {
             _service = service;
         }
@@ -23,19 +24,10 @@ namespace AdLocalAPI.Controllers
         // ==========================================
 
         [HttpGet]
-        public async Task<IActionResult> Obtener()
+        public async Task<IActionResult> Obtener(CancellationToken cancellationToken = default)
         {
-            var response =
-                await _service.ObtenerCheckout();
-
-            return response.Codigo switch
-            {
-                "200" => Ok(response),
-
-                "404" => NotFound(response),
-
-                _ => BadRequest(response)
-            };
+            var response = await _service.ObtenerCheckout(cancellationToken);
+            return Responder(response);
         }
 
         // ==========================================
@@ -44,20 +36,17 @@ namespace AdLocalAPI.Controllers
 
         [HttpPost("confirmar")]
         public async Task<IActionResult> Confirmar(
-            [FromBody]
-            ConfirmarCheckoutDto dto)
+            [FromBody] ConfirmarCheckoutDto dto,
+            [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey = null,
+            CancellationToken cancellationToken = default)
         {
-            var response =
-                await _service.Confirmar(dto);
-
-            return response.Codigo switch
+            if (!string.IsNullOrWhiteSpace(idempotencyKey))
             {
-                "200" => Ok(response),
+                dto.IdempotencyKey = idempotencyKey.Trim();
+            }
 
-                "404" => NotFound(response),
-
-                _ => BadRequest(response)
-            };
+            var response = await _service.Confirmar(dto, cancellationToken);
+            return Responder(response);
         }
     }
 }

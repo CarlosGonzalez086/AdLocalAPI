@@ -1,25 +1,26 @@
-﻿using AdLocalAPI.DTOs;
+using AdLocalAPI.DTOs;
 using AdLocalAPI.Helpers;
+using AdLocalAPI.Interfaces.Services;
 using AdLocalAPI.Models;
-using AdLocalAPI.Repositories;
+using AdLocalAPI.Repositories.Interfaces;
 using Stripe;
 using Plan = AdLocalAPI.Models.Plan;
 
 namespace AdLocalAPI.Services
 {
-    public class BeneficiosServices
+    public class BeneficiosServices : IBeneficiosService
     {
         private readonly JwtContext _jwt;
-        private readonly UsuarioRepository _usuarioRepository;
-        private readonly SuscripcionRepository _suscripcionRepository;
-        private readonly PlanRepository _planRepository;
-        private readonly UsoCodigoReferidoRepository _codigoReferidoRepository;
+        private readonly IUsuarioRepository _usuarioRepository;
+        private readonly ISuscripcionRepository _suscripcionRepository;
+        private readonly IPlanRepository _planRepository;
+        private readonly IUsoCodigoReferidoRepository _codigoReferidoRepository;
         public BeneficiosServices(
             JwtContext jwt,
-            UsuarioRepository usuarioRepository,
-            SuscripcionRepository suscripcionRepository,
-                        UsoCodigoReferidoRepository codigoReferidoRepository,
-            PlanRepository planRepository)
+            IUsuarioRepository usuarioRepository,
+            ISuscripcionRepository suscripcionRepository,
+            IUsoCodigoReferidoRepository codigoReferidoRepository,
+            IPlanRepository planRepository)
         {
             _jwt = jwt;
             _usuarioRepository = usuarioRepository;
@@ -76,7 +77,11 @@ namespace AdLocalAPI.Services
         }
         private async Task CrearPlanBasicoGratis(Usuario usuario)
         {
-            Plan plan = await _planRepository.GetByTipoAsync("BASIC");
+            Plan? plan = await _planRepository.GetByTipoAsync("BASIC");
+            if (plan == null)
+            {
+                throw new InvalidOperationException("Plan BASIC no encontrado para aplicar beneficio.");
+            }
             var options = new SubscriptionCreateOptions
             {
                 Customer = usuario.StripeCustomerId,

@@ -1,3 +1,5 @@
+using System.Threading;
+using System.Threading.Tasks;
 using AdLocalAPI.DTOs.UsuarioCliente.Checkout;
 using AdLocalAPI.Models;
 
@@ -7,7 +9,8 @@ namespace AdLocalAPI.Services.Interfaces
     {
         Task<ApiResponse<ComprobanteTransferenciaResponseDto>> SubirAsync(
             Guid pedidoUuid,
-            SubirComprobanteTransferenciaDto comprobante
+            SubirComprobanteTransferenciaDto comprobante,
+            CancellationToken cancellationToken = default
         );
     }
 }

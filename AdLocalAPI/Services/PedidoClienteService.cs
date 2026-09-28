@@ -25,8 +25,10 @@ namespace AdLocalAPI.Services
             ObtenerTodosAsync(
                 int page,
                 int pageSize,
-                EstadoPagoPedido? estadoPago)
+                EstadoPagoPedido? estadoPago,
+                CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             page = Math.Max(page, 1);
             pageSize = Math.Clamp(pageSize, 1, 50);
 
@@ -40,8 +42,9 @@ namespace AdLocalAPI.Services
         }
 
         public async Task<ApiResponse<PedidoClienteDetalleDto>>
-            ObtenerDetalleAsync(Guid pedidoUuid)
+            ObtenerDetalleAsync(Guid pedidoUuid, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var pedido = await _repository.ObtenerDetallePedidoClienteAsync(
                 pedidoUuid,
                 _jwtContext.GetUserId()

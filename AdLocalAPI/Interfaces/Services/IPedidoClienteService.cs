@@ -1,3 +1,5 @@
+using System.Threading;
+using System.Threading.Tasks;
 using AdLocalAPI.DTOs;
 using AdLocalAPI.DTOs.UsuarioCliente;
 using AdLocalAPI.Models;
@@ -10,11 +12,13 @@ namespace AdLocalAPI.Services.Interfaces
         Task<ApiResponse<PagedResponse<PedidoClienteListadoDto>>> ObtenerTodosAsync(
             int page,
             int pageSize,
-            EstadoPagoPedido? estadoPago
+            EstadoPagoPedido? estadoPago,
+            CancellationToken cancellationToken = default
         );
 
         Task<ApiResponse<PedidoClienteDetalleDto>> ObtenerDetalleAsync(
-            Guid pedidoUuid
+            Guid pedidoUuid,
+            CancellationToken cancellationToken = default
         );
     }
 }

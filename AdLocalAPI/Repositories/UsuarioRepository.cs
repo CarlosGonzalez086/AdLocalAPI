@@ -5,9 +5,11 @@ using Amazon.S3;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Index.HPRtree;
 
+using AdLocalAPI.Repositories.Interfaces;
+
 namespace AdLocalAPI.Repositories
 {
-    public class UsuarioRepository
+    public class UsuarioRepository : IUsuarioRepository
     {
         private readonly AppDbContext _context;
         private readonly Supabase.Client _supabaseClient;
@@ -176,43 +178,35 @@ namespace AdLocalAPI.Repositories
             }
         }
 
-        public async Task<Usuario> GetByIdComercioAsync(long id)
+        public async Task<Usuario?> GetByIdComercioAsync(long id)
         {
-            Usuario usuario = new Usuario();
             try
             {
-
-                usuario = await _context.Usuarios
+                return await _context.Usuarios
                     .FirstOrDefaultAsync(u => u.Comercios.Any(c => c.Id == id));
-
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error al obtener usuario por Id {id}: {ex.Message}");
                 return null;
             }
-            return usuario;
         }
-        public async Task<Usuario> GetByIdComercioAndIdUserAsync(long idUser,long idComercio)
+        public async Task<Usuario?> GetByIdComercioAndIdUserAsync(long idUser,long idComercio)
         {
-            Usuario usuario = new Usuario();
             try
             {
-                usuario = await _context.Usuarios
+                return await _context.Usuarios
                     .FirstOrDefaultAsync(x =>
                         x.Id == idUser &&
                         x.Rol == "Colaborador" &&
                         x.ComercioId == idComercio
                     );
-
-
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error al obtener usuario por Id {idUser}: {ex.Message}");
                 return null;
             }
-            return usuario;
         }
 
         public async Task<Usuario?> GetByCodeAsync(string code)
@@ -246,18 +240,9 @@ namespace AdLocalAPI.Repositories
 
         public async Task<Usuario> CreateAsync(Usuario usuario)
         {
-            try 
-            {
-                _context.Usuarios.Add(usuario);
-                await _context.SaveChangesAsync();
-                return usuario;
-            } 
-            catch 
-            (Exception ex) 
-            {
-                Console.WriteLine(ex);
-                return null;
-            }            
+            _context.Usuarios.Add(usuario);
+            await _context.SaveChangesAsync();
+            return usuario;
         }
 
         public async Task UpdateAsync(Usuario usuario)
@@ -311,8 +296,8 @@ namespace AdLocalAPI.Repositories
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.ToString);
-                return null;
+                Console.WriteLine(ex.ToString());
+                return string.Empty;
             }
         }
         public async Task<bool> DeleteFromS3Async(string storageReference)

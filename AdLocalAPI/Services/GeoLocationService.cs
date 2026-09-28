@@ -1,8 +1,11 @@
-﻿using AdLocalAPI.DTOs;
+using System.Net.Http.Json;
+using System.Threading.Tasks;
+using AdLocalAPI.DTOs;
+using AdLocalAPI.Interfaces.Services;
 
 namespace AdLocalAPI.Services
 {
-    public class GeoLocationService
+    public class GeoLocationService : IGeoLocationService
     {
         private readonly AppConfigState _config;
         private readonly HttpClient _http;
@@ -32,5 +35,4 @@ namespace AdLocalAPI.Services
             );
         }
     }
-
 }

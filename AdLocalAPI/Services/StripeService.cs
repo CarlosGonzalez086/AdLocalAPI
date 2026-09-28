@@ -1,13 +1,17 @@
-﻿using AdLocalAPI.Interfaces;
+using AdLocalAPI.Interfaces;
+using AdLocalAPI.Models;
+using AdLocalAPI.Repositories.Interfaces;
 using Stripe;
 
 namespace AdLocalAPI.Services
 {
     public class StripeService : IStripeService
     {
-        // ❌ NO constructor con keys
-        public StripeService()
+        private readonly IUsuarioRepository _usuarioRepository;
+
+        public StripeService(IUsuarioRepository usuarioRepository)
         {
+            _usuarioRepository = usuarioRepository;
         }
 
         // =========================
@@ -160,6 +164,33 @@ namespace AdLocalAPI.Services
             );
 
             return setupIntent.ClientSecret;
+        }
+
+        public async Task<ApiResponse<object>> CrearSetupIntentParaUsuarioAsync(long userId)
+        {
+            var user = await _usuarioRepository.GetByIdAsync(userId);
+            if (user == null)
+            {
+                return ApiResponse<object>.Error("404", "Usuario no encontrado.");
+            }
+
+            if (string.IsNullOrEmpty(user.StripeCustomerId))
+            {
+                var customerId = await CreateCustomer(user.Email);
+                user.StripeCustomerId = customerId;
+                await _usuarioRepository.UpdateAsync(user);
+            }
+
+            var setupIntentService = new SetupIntentService();
+            var setupIntent = await setupIntentService.CreateAsync(
+                new SetupIntentCreateOptions
+                {
+                    Customer = user.StripeCustomerId,
+                    PaymentMethodTypes = new List<string> { "card" }
+                }
+            );
+
+            return ApiResponse<object>.Success(new { clientSecret = setupIntent.ClientSecret });
         }
     }
 }

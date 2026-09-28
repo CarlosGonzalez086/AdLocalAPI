@@ -148,6 +148,46 @@ namespace AdLocalAPI.Migrations
                     b.ToTable("carrito_detalles");
                 });
 
+            modelBuilder.Entity("AdLocalAPI.Models.CheckoutIdempotencia", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime?>("FechaCompletado")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("IdUsuario")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("ResponseJson")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FechaCreacion");
+
+                    b.HasIndex("IdUsuario", "IdempotencyKey")
+                        .IsUnique();
+
+                    b.ToTable("checkout_idempotencias");
+                });
+
             modelBuilder.Entity("AdLocalAPI.Models.Cita", b =>
                 {
                     b.Property<long>("Id")
@@ -1878,6 +1918,59 @@ namespace AdLocalAPI.Migrations
                     b.ToTable("Publicidades");
                 });
 
+            modelBuilder.Entity("AdLocalAPI.Models.RefreshToken", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedByIp")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReasonRevoked")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ReplacedByTokenHash")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RevokedByIp")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<long>("UsuarioId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UsuarioId");
+
+                    b.ToTable("refresh_tokens");
+                });
+
             modelBuilder.Entity("AdLocalAPI.Models.RelComercioImagen", b =>
                 {
                     b.Property<long>("Id")
@@ -1909,6 +2002,50 @@ namespace AdLocalAPI.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("RelComercioImagen");
+                });
+
+            modelBuilder.Entity("AdLocalAPI.Models.StripeWebhookEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("ErrorMessage")
+                        .HasColumnType("text");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("StripeEventId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EventType");
+
+                    b.HasIndex("ReceivedAt");
+
+                    b.HasIndex("StripeEventId")
+                        .IsUnique();
+
+                    b.ToTable("StripeWebhookEvents");
                 });
 
             modelBuilder.Entity("AdLocalAPI.Models.Suscripcion", b =>
@@ -1972,6 +2109,14 @@ namespace AdLocalAPI.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("PlanId");
+
+                    b.HasIndex("StripeCheckoutSessionId")
+                        .IsUnique()
+                        .HasFilter("\"StripeCheckoutSessionId\" IS NOT NULL AND \"StripeCheckoutSessionId\" <> ''");
+
+                    b.HasIndex("StripeSubscriptionId")
+                        .IsUnique()
+                        .HasFilter("\"StripeSubscriptionId\" IS NOT NULL AND \"StripeSubscriptionId\" <> ''");
 
                     b.HasIndex("UsuarioId");
 
@@ -2120,6 +2265,9 @@ namespace AdLocalAPI.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<DateTime?>("CodigoExpiracion")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("CodigoReferido")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
@@ -2144,6 +2292,9 @@ namespace AdLocalAPI.Migrations
                     b.Property<string>("FotoUrl")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<int>("IntentosCodigo")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Nombre")
                         .IsRequired()
@@ -2177,6 +2328,9 @@ namespace AdLocalAPI.Migrations
                     b.Property<string>("Token")
                         .HasColumnType("text");
 
+                    b.Property<DateTime?>("TokensRevocadosAntesDe")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("UltimoAcceso")
                         .HasColumnType("timestamp with time zone");
 
@@ -2184,6 +2338,10 @@ namespace AdLocalAPI.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("StripeCustomerId")
+                        .IsUnique()
+                        .HasFilter("\"stripecustomerid\" IS NOT NULL AND \"stripecustomerid\" <> ''");
 
                     b.ToTable("Usuarios");
                 });
@@ -2549,6 +2707,17 @@ namespace AdLocalAPI.Migrations
                 });
 
             modelBuilder.Entity("AdLocalAPI.Models.Publicidad", b =>
+                {
+                    b.HasOne("AdLocalAPI.Models.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Usuario");
+                });
+
+            modelBuilder.Entity("AdLocalAPI.Models.RefreshToken", b =>
                 {
                     b.HasOne("AdLocalAPI.Models.Usuario", "Usuario")
                         .WithMany()

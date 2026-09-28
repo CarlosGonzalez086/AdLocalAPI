@@ -6,9 +6,11 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using MimeKit;
 
+using AdLocalAPI.Interfaces.Services;
+
 namespace AdLocalAPI.Utils
 {
-    public class EmailService
+    public class EmailService : IEmailService
     {
         private readonly IConfiguracionRepository _repository;
         private readonly IConfiguration _config;

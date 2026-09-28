@@ -1,9 +1,11 @@
-﻿using AdLocalAPI.Utils;
+using AdLocalAPI.Utils;
 
 namespace AdLocalAPI.DTOs.UsuarioCliente.Checkout
 {
     public class ConfirmarCheckoutDto
     {
+        public string? IdempotencyKey { get; set; }
+
         public List<CheckoutComercioDto> Comercios { get; set; }
             = new();
     }

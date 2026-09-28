@@ -1,4 +1,4 @@
-﻿using AdLocalAPI.Data;
+using AdLocalAPI.Data;
 using AdLocalAPI.DTOs;
 using AdLocalAPI.Interfaces.ProductosServicios;
 using AdLocalAPI.Models;
@@ -77,7 +77,7 @@ namespace AdLocalAPI.Repositories
 
                 query = query.Where(x =>
                     x.Nombre.Contains(searchTerm) ||
-                    x.Descripcion.Contains(searchTerm)
+                    (x.Descripcion != null && x.Descripcion.Contains(searchTerm))
                 );
             }
 
@@ -195,8 +195,8 @@ namespace AdLocalAPI.Repositories
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.ToString);
-                return null;
+                Console.WriteLine(ex.ToString());
+                return string.Empty;
             }
         }
 

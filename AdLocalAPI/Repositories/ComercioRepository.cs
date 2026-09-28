@@ -1,4 +1,4 @@
-﻿using AdLocalAPI.Data;
+using AdLocalAPI.Data;
 using AdLocalAPI.DTOs;
 using AdLocalAPI.Models;
 using AdLocalAPI.Utils;
@@ -13,9 +13,11 @@ using System.Text;
 using System.Text.RegularExpressions;
 
 
+using AdLocalAPI.Repositories.Interfaces;
+
 namespace AdLocalAPI.Repositories
 {
-    public class ComercioRepository
+    public class ComercioRepository : IComercioRepository
     {
         private readonly AppDbContext _context;
         private readonly Supabase.Client _supabaseClient;
@@ -132,7 +134,7 @@ namespace AdLocalAPI.Repositories
             {
                 case "cercanos":
                     comerciosBase = comerciosBase
-                        .Where(c => c.Ubicacion.IsWithinDistance(userLocation, RadioCercanosMetros));
+                        .Where(c => c.Ubicacion != null && c.Ubicacion.IsWithinDistance(userLocation, RadioCercanosMetros));
                     break;
 
                 case "sugeridos":
@@ -143,7 +145,7 @@ namespace AdLocalAPI.Repositories
                     }
                     else if (lat != 0 || lng != 0)
                     {
-                        comerciosBase = comerciosBase.Where(c => c.Ubicacion.IsWithinDistance(userLocation, RadioSugeridosMetros));
+                        comerciosBase = comerciosBase.Where(c => c.Ubicacion != null && c.Ubicacion.IsWithinDistance(userLocation, RadioSugeridosMetros));
                     }
                     break;
 
@@ -375,7 +377,7 @@ namespace AdLocalAPI.Repositories
 
             return Math.Sqrt(deltaLat * deltaLat + deltaLng * deltaLng);
         }
-        public async Task<Comercio> GetByIdAsync(long id)
+        public async Task<Comercio?> GetByIdAsync(long id)
         {
 
             try
@@ -472,8 +474,8 @@ namespace AdLocalAPI.Repositories
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.ToString);
-                return null;
+                Console.WriteLine(ex.ToString());
+                return string.Empty;
             }
         }
         public async Task<bool> DeleteFromS3Async(string storageReference)
@@ -695,7 +697,7 @@ namespace AdLocalAPI.Repositories
                     FechaCreacion = c.FechaCreacion,
                     EstadoNombre = c.Estado!.EstadoNombre,
                     MunicipioNombre = c.Municipio!.MunicipioNombre,
-                    Badge = badge,
+                    Badge = badge ?? string.Empty,
                     idColaborador = queryColaboradores
     .Where(uc => uc.ComercioId == c.Id)
     .Select(uc => uc.Id)

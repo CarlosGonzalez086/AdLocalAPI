@@ -1,4 +1,4 @@
-﻿using AdLocalAPI.DTOs;
+using AdLocalAPI.DTOs;
 using AdLocalAPI.Models;
 
 namespace AdLocalAPI.Services.Interfaces
@@ -11,7 +11,8 @@ namespace AdLocalAPI.Services.Interfaces
         );
 
         Task<ApiResponse<CitaDto>> CrearAsync(
-            CrearCitaDto dto
+            CrearCitaDto dto,
+            CancellationToken cancellationToken = default
         );
 
         Task<ApiResponse<List<CitaDto>>> MisCitasAsync();

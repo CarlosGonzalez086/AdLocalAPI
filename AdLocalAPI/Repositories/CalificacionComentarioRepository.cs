@@ -1,10 +1,12 @@
-﻿using AdLocalAPI.Data;
+using AdLocalAPI.Data;
 using AdLocalAPI.Models;
 using Microsoft.EntityFrameworkCore;
 
+using AdLocalAPI.Repositories.Interfaces;
+
 namespace AdLocalAPI.Repositories
 {
-    public class CalificacionComentarioRepository
+    public class CalificacionComentarioRepository : ICalificacionComentarioRepository
     {
         private readonly AppDbContext _context;
 

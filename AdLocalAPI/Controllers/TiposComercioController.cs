@@ -1,4 +1,4 @@
-﻿using AdLocalAPI.DTOs;
+using AdLocalAPI.DTOs;
 using AdLocalAPI.Interfaces.TipoComercio;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -7,7 +7,7 @@ namespace AdLocalAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class TiposComercioController : ControllerBase
+    public class TiposComercioController : ApiControllerBase
     {
         private readonly ITipoComercioService _service;
 
@@ -21,7 +21,7 @@ namespace AdLocalAPI.Controllers
         public async Task<IActionResult> Crear([FromBody] TipoComercioCreateDto dto)
         {
             var response = await _service.Crear(dto);
-            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+            return Responder(response);
         }
 
         [Authorize]
@@ -29,7 +29,7 @@ namespace AdLocalAPI.Controllers
         public async Task<IActionResult> Actualizar(long id, [FromBody] TipoComercioCreateDto dto)
         {
             var response = await _service.Actualizar(id, dto);
-            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+            return Responder(response);
         }
 
         [Authorize]
@@ -37,7 +37,7 @@ namespace AdLocalAPI.Controllers
         public async Task<IActionResult> Eliminar(long id)
         {
             var response = await _service.Eliminar(id);
-            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+            return Responder(response);
         }
 
         [Authorize]
@@ -45,7 +45,7 @@ namespace AdLocalAPI.Controllers
         public async Task<IActionResult> GetById(long id)
         {
             var response = await _service.GetById(id);
-            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+            return Responder(response);
         }
         [Authorize]
         [HttpGet("getAllPaged")]
@@ -57,13 +57,13 @@ namespace AdLocalAPI.Controllers
         )
         {
             var response = await _service.GetAllPagedAsync(page, pageSize, orderBy, search);
-            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+            return Responder(response);
         }
         [HttpGet("getAllForSelect")]
         public async Task<IActionResult> GetForSelect()
         {
             var response = await _service.GetAllForSelectAsync();
-            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+            return Responder(response);
         }
 
     }

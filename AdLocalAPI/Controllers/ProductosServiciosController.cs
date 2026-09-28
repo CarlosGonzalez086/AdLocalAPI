@@ -1,4 +1,4 @@
-﻿using AdLocalAPI.DTOs;
+using AdLocalAPI.DTOs;
 using AdLocalAPI.Interfaces.ProductosServicios;
 using AdLocalAPI.Models;
 using AdLocalAPI.Services;
@@ -10,7 +10,7 @@ namespace AdLocalAPI.Controllers
 
     [ApiController]
     [Route("api/[controller]")]
-    public class ProductosServiciosController : ControllerBase
+    public class ProductosServiciosController : ApiControllerBase
     {
         private readonly IProductosServiciosService _service;
 
@@ -23,35 +23,35 @@ namespace AdLocalAPI.Controllers
         public async Task<IActionResult> Crear([FromBody] ProductosServiciosDto dto)
         {
             var response = await _service.CreateAsync(dto);
-            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+            return Responder(response);
         }
         [Authorize]
         [HttpPut("{id}")]
         public async Task<IActionResult> Actualizar(long id, [FromBody] ProductosServiciosDto dto)
         {
             var response = await _service.UpdateAsync(id, dto);
-            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+            return Responder(response);
         }
         [Authorize]
         [HttpDelete("{id}/idComercio/{idComercio}")]
         public async Task<IActionResult> Eliminar(long id,long idComercio = 0)
         {
             var response = await _service.DeleteAsync(id, idComercio);
-            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+            return Responder(response);
         }
         [Authorize]
         [HttpPut("desactivar/{id}/idComercio/{idComercio}")]
         public async Task<IActionResult> Desactivar(long id,long idComercio = 0)
         {
             var response = await _service.DesactivarAsync(id, idComercio);
-            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+            return Responder(response);
         }
         [Authorize]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(long id)
         {
             var response = await _service.GetByIdAsync(id);
-            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+            return Responder(response);
         }
         [Authorize]
         [HttpGet]
@@ -64,14 +64,14 @@ namespace AdLocalAPI.Controllers
         )
         {
             var response = await _service.GetAllPagedAsync(page, pageSize, orderBy, search, idComercio);
-            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+            return Responder(response);
         }
         [Authorize]
         [HttpGet("comercio/{idComercio}")]
         public async Task<IActionResult> GetAll(long idComercio)
         {
             var response = await _service.GetAllAsync(idComercio);
-            return response.Codigo == "200" ? Ok(response) : BadRequest(response);
+            return Responder(response);
         }
     }
 }
