@@ -56,10 +56,9 @@ namespace AdLocalAPI.Repositories
         }
         public async Task<IEnumerable<Models.CalificacionComentario>> GetCalificacionByComercioAsync(long idComercio) 
         {
-            var query = _context.CalificacionComentario.AsQueryable();
-
-            query = query.Where(c => c.IdComercio == idComercio);
-            return query;
+            return await _context.CalificacionComentario
+                .Where(c => c.IdComercio == idComercio)
+                .ToListAsync();
         }
     }
 }
