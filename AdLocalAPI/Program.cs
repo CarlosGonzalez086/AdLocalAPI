@@ -80,8 +80,8 @@ var jwtAudience = Environment.GetEnvironmentVariable("JWT__Audience")
     ?? builder.Configuration["Jwt:Audience"]
     ?? "AdLocal";
 
-var webhookSecret = ConfiguracionSegura.Requerir(Environment.GetEnvironmentVariable("STRIPE_WEBHOOK_SECRET")
-    ?? builder.Configuration["Stripe:WebhookSecret"], "STRIPE_WEBHOOK_SECRET / Stripe__WebhookSecret");
+//var webhookSecret = ConfiguracionSegura.Requerir(Environment.GetEnvironmentVariable("STRIPE_WEBHOOK_SECRET")
+//    ?? builder.Configuration["Stripe:WebhookSecret"], "STRIPE_WEBHOOK_SECRET / Stripe__WebhookSecret");
 
 var supabaseUrl = Environment.GetEnvironmentVariable("SUPABASE__URL")
     ?? "https://uzgnfwbztoizcctyfdiv.supabase.co";
