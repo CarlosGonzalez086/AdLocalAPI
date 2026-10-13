@@ -103,7 +103,7 @@ if (string.IsNullOrWhiteSpace(connectionString))
 builder.Configuration["Jwt:Key"] = jwtKey;
 builder.Configuration["Jwt:Issuer"] = jwtIssuer;
 builder.Configuration["Jwt:Audience"] = jwtAudience;
-builder.Configuration["Stripe:WebhookSecret"] = webhookSecret;
+//builder.Configuration["Stripe:WebhookSecret"] = webhookSecret;
 
 Stripe.StripeConfiguration.ApiKey =
    builder.Configuration["Stripe:SecretKey"];
