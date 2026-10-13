@@ -4,6 +4,7 @@ namespace AdLocalAPI.DTOs
 {
     public class ComercioPedidoSelectorDto
     {
+        public string ZonaHoraria { get; set; } = Helpers.CitaOperacion.ZonaHoraria;
         public long Id { get; set; }
         public Guid Uuid { get; set; }
         public string Nombre { get; set; } = string.Empty;
@@ -45,6 +46,12 @@ namespace AdLocalAPI.DTOs
 
     public class PedidoComercioDetalleDto : PedidoComercioListadoDto
     {
+        public long Version { get; set; }
+        public bool InventarioPendiente { get; set; }
+        public bool? RestituirReserva { get; set; }
+        public bool PuedeRegistrarPago { get; set; }
+        public bool PuedeReembolsar { get; set; }
+        public PedidoReembolsoDto? Reembolso { get; set; }
         public decimal Subtotal { get; set; }
         public decimal CostoEnvio { get; set; }
         public string? ClienteEmail { get; set; }
@@ -58,6 +65,9 @@ namespace AdLocalAPI.DTOs
 
     public class PedidoComercioProductoDto
     {
+        public int? StockDescontado { get; set; }
+        public int StockPorRestituir { get; set; }
+        public int StockRestituido { get; set; }
         public Guid Uuid { get; set; }
         public string Nombre { get; set; } = string.Empty;
         public string? LogoUrl { get; set; }
@@ -69,6 +79,9 @@ namespace AdLocalAPI.DTOs
 
     public class PedidoComercioHistorialDto
     {
+        public string Evento { get; set; } = "Estado";
+        public EstadoPagoPedido? EstadoPago { get; set; }
+        public long? IdUsuarioCambio { get; set; }
         public EstadoPedido Estado { get; set; }
         public string? Comentario { get; set; }
         public DateTime Fecha { get; set; }
@@ -76,12 +89,17 @@ namespace AdLocalAPI.DTOs
 
     public class CambiarEstadoPedidoDto
     {
+        [System.Text.Json.Serialization.JsonRequired]
+        public long VersionPedido { get; set; }
         public EstadoPedido Estado { get; set; }
         public string? Comentario { get; set; }
+        public List<DevolucionPedidoProductoDto>? ProductosRestituibles { get; set; }
     }
 
     public class RevisarPagoPedidoDto
     {
+        [System.Text.Json.Serialization.JsonRequired]
+        public long VersionPedido { get; set; }
         public EstadoPagoPedido EstadoPago { get; set; }
         public string? Comentario { get; set; }
     }

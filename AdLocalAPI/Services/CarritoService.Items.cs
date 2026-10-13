@@ -1,3 +1,4 @@
+using AdLocalAPI.Helpers;
 using System;
 using System.Threading.Tasks;
 using AdLocalAPI.DTOs;
@@ -202,6 +203,10 @@ namespace AdLocalAPI.Services
             {
                 return ApiResponse<object>.Error("401", ex.Message);
             }
+            catch (CheckoutConflictException ex)
+            {
+                return ApiResponse<object>.Error("409", ex.Message);
+            }
             catch (Exception ex)
             {
                 return ApiResponse<object>.Error("500", $"Ocurrió un error al agregar el producto al carrito: {ex.Message}");
@@ -299,6 +304,10 @@ namespace AdLocalAPI.Services
             {
                 return ApiResponse<object>.Error("401", ex.Message);
             }
+            catch (CheckoutConflictException ex)
+            {
+                return ApiResponse<object>.Error("409", ex.Message);
+            }
             catch (Exception ex)
             {
                 return ApiResponse<object>.Error("500", $"Ocurrió un error al actualizar la cantidad: {ex.Message}");
@@ -361,6 +370,10 @@ namespace AdLocalAPI.Services
             catch (UnauthorizedAccessException ex)
             {
                 return ApiResponse<object>.Error("401", ex.Message);
+            }
+            catch (CheckoutConflictException ex)
+            {
+                return ApiResponse<object>.Error("409", ex.Message);
             }
             catch (Exception ex)
             {

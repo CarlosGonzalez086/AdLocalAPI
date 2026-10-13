@@ -17,7 +17,7 @@ using AdLocalAPI.Repositories.Interfaces;
 
 namespace AdLocalAPI.Repositories
 {
-    public class ComercioRepository : IComercioRepository
+    public partial class ComercioRepository : IComercioRepository
     {
         private readonly AppDbContext _context;
         private readonly Supabase.Client _supabaseClient;
@@ -219,6 +219,7 @@ namespace AdLocalAPI.Repositories
                 {
                     Dto = new ComercioPublicDto
                     {
+                        ZonaHoraria = x.Comercio.ZonaHoraria,
                         Id = x.Comercio.Id,
                         Nombre = x.Comercio.Nombre,
                         Direccion = x.Comercio.Direccion,
@@ -426,6 +427,8 @@ namespace AdLocalAPI.Repositories
         public async Task UpdateAsync(Comercio comercio)
         {
             _context.Comercios.Update(comercio);
+            // Timezone has a separate locked command; stale general edits must never overwrite it.
+            _context.Entry(comercio).Property(x => x.ZonaHoraria).IsModified = false;
             await _context.SaveChangesAsync();
         }
 
@@ -583,6 +586,7 @@ namespace AdLocalAPI.Repositories
             var lista = query
                 .Select(x => new ComercioPublicDto
                 {
+                    ZonaHoraria = x.Comercio.ZonaHoraria,
                     Id = x.Comercio.Id,
                     Nombre = x.Comercio.Nombre,
                     Direccion = x.Comercio.Direccion,
@@ -687,6 +691,7 @@ namespace AdLocalAPI.Repositories
                 .Take(pageSize)
                 .Select(c => new ComercioPublicDto
                 {
+                    ZonaHoraria = c.ZonaHoraria,
                     Id = c.Id,
                     Nombre = c.Nombre,
                     Direccion = c.Direccion,

@@ -170,6 +170,10 @@ namespace AdLocalAPI.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
+                    b.Property<string>("RequestHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<string>("ResponseJson")
                         .HasColumnType("text");
 
@@ -222,6 +226,9 @@ namespace AdLocalAPI.Migrations
                     b.Property<long>("IdUsuario")
                         .HasColumnType("bigint");
 
+                    b.Property<Guid?>("IdempotencyKey")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("MotivoCancelacion")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -239,8 +246,22 @@ namespace AdLocalAPI.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("RequestHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<Guid>("Uuid")
                         .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("ZonaHoraria")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasDefaultValue("America/Mexico_City");
 
                     b.HasKey("Id");
 
@@ -251,9 +272,62 @@ namespace AdLocalAPI.Migrations
 
                     b.HasIndex("IdUsuario", "FechaInicio");
 
+                    b.HasIndex("IdUsuario", "IdempotencyKey")
+                        .IsUnique();
+
                     b.HasIndex("IdComercio", "FechaInicio", "FechaFin");
 
-                    b.ToTable("citas");
+                    b.ToTable("citas", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_citas_estado", "\"Estado\" BETWEEN 1 AND 6");
+
+                            t.HasCheckConstraint("CK_citas_intervalo", "\"FechaFin\" > \"FechaInicio\"");
+                        });
+                });
+
+            modelBuilder.Entity("AdLocalAPI.Models.CitaHistorial", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Comentario")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("EstadoAnterior")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("EstadoNuevo")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Evento")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("Fecha")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("IdCita")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("IdUsuario")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("InicioAnterior")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<DateTime>("InicioNuevo")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdCita", "Fecha");
+
+                    b.ToTable("cita_historial");
                 });
 
             modelBuilder.Entity("AdLocalAPI.Models.Comercio", b =>
@@ -326,6 +400,13 @@ namespace AdLocalAPI.Migrations
 
                     b.Property<bool>("Visible")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("ZonaHoraria")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasDefaultValue("America/Mexico_City");
 
                     b.HasKey("Id");
 
@@ -1027,7 +1108,6 @@ namespace AdLocalAPI.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Lugar")
-                        .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
@@ -1459,6 +1539,9 @@ namespace AdLocalAPI.Migrations
                     b.Property<decimal>("PorcentajeComision")
                         .HasColumnType("numeric(8,4)");
 
+                    b.Property<bool?>("RestituirReserva")
+                        .HasColumnType("boolean");
+
                     b.Property<decimal>("Subtotal")
                         .HasColumnType("numeric(18,2)");
 
@@ -1474,6 +1557,9 @@ namespace AdLocalAPI.Migrations
 
                     b.Property<Guid>("Uuid")
                         .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
 
                     b.HasKey("Id");
 
@@ -1543,6 +1629,15 @@ namespace AdLocalAPI.Migrations
 
                     b.Property<Guid>("ProductoUuid")
                         .HasColumnType("uuid");
+
+                    b.Property<int?>("StockDescontado")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("StockPorRestituir")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("StockRestituido")
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("Subtotal")
                         .HasColumnType("numeric(18,2)");
@@ -1615,6 +1710,17 @@ namespace AdLocalAPI.Migrations
                     b.Property<int>("EstadoNuevo")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("EstadoPagoAnterior")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("EstadoPagoNuevo")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Evento")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
                     b.Property<DateTime>("FechaCreacion")
                         .HasColumnType("timestamp with time zone");
 
@@ -1637,6 +1743,89 @@ namespace AdLocalAPI.Migrations
                         .IsUnique();
 
                     b.ToTable("pedido_historial_estados");
+                });
+
+            modelBuilder.Entity("AdLocalAPI.Models.PedidoMovimientoInventario", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("Cantidad")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("IdPedidoDetalle")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("IdUsuario")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdPedidoDetalle")
+                        .IsUnique();
+
+                    b.ToTable("pedido_movimientos_inventario");
+                });
+
+            modelBuilder.Entity("AdLocalAPI.Models.PedidoReembolso", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("IdPedido")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("IdUsuarioRegistro")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("IdempotencyKey")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Metodo")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Monto")
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Referencia")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("Uuid")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdPedido")
+                        .IsUnique();
+
+                    b.HasIndex("Uuid")
+                        .IsUnique();
+
+                    b.ToTable("pedido_reembolsos");
                 });
 
             modelBuilder.Entity("AdLocalAPI.Models.Plan", b =>
@@ -1812,6 +2001,12 @@ namespace AdLocalAPI.Migrations
                     b.Property<Guid>("Uuid")
                         .HasColumnType("uuid");
 
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
                     b.Property<bool>("Visible")
                         .HasColumnType("boolean")
                         .HasColumnName("visible");
@@ -1899,7 +2094,6 @@ namespace AdLocalAPI.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("ImagenUrl")
-                        .IsRequired()
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
 
@@ -2406,6 +2600,15 @@ namespace AdLocalAPI.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("AdLocalAPI.Models.CitaHistorial", b =>
+                {
+                    b.HasOne("AdLocalAPI.Models.Cita", null)
+                        .WithMany()
+                        .HasForeignKey("IdCita")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("AdLocalAPI.Models.Comercio", b =>
                 {
                     b.HasOne("AdLocalAPI.Models.Estado", "Estado")
@@ -2695,6 +2898,28 @@ namespace AdLocalAPI.Migrations
                     b.Navigation("Pedido");
                 });
 
+            modelBuilder.Entity("AdLocalAPI.Models.PedidoMovimientoInventario", b =>
+                {
+                    b.HasOne("AdLocalAPI.Models.PedidoDetalle", "Detalle")
+                        .WithMany()
+                        .HasForeignKey("IdPedidoDetalle")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Detalle");
+                });
+
+            modelBuilder.Entity("AdLocalAPI.Models.PedidoReembolso", b =>
+                {
+                    b.HasOne("AdLocalAPI.Models.Pedido", "Pedido")
+                        .WithOne("Reembolso")
+                        .HasForeignKey("AdLocalAPI.Models.PedidoReembolso", "IdPedido")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Pedido");
+                });
+
             modelBuilder.Entity("AdLocalAPI.Models.Promocion", b =>
                 {
                     b.HasOne("AdLocalAPI.Models.Usuario", "Usuario")
@@ -2777,6 +3002,8 @@ namespace AdLocalAPI.Migrations
                     b.Navigation("Detalles");
 
                     b.Navigation("HistorialEstados");
+
+                    b.Navigation("Reembolso");
                 });
 
             modelBuilder.Entity("AdLocalAPI.Models.TipoComercio", b =>

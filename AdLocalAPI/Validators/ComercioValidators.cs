@@ -8,6 +8,7 @@ namespace AdLocalAPI.Validators
     {
         public ComercioCreateDtoValidator()
         {
+            RuleFor(x => x.ZonaHoraria).Must(Helpers.CitaOperacion.ZonaValida).WithMessage("Zona horaria no válida");
             RuleFor(x => x.Nombre)
                 .NotEmpty().WithMessage("El nombre del comercio es obligatorio")
                 .MinimumLength(2).WithMessage("El nombre debe tener al menos 2 caracteres")

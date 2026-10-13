@@ -1,4 +1,5 @@
-﻿using AdLocalAPI.Data;
+using AdLocalAPI.Helpers;
+using AdLocalAPI.Data;
 using AdLocalAPI.DTOs.Carrito;
 using AdLocalAPI.Models;
 using AdLocalAPI.Repositories.Interfaces;
@@ -240,11 +241,15 @@ namespace AdLocalAPI.Repositories
         public async Task<CarritoDetalle> CrearDetalleAsync(
             CarritoDetalle detalle)
         {
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            await BloquearCarritoActivoAsync(detalle.IdCarrito);
+
             await _context.CarritoDetalles.AddAsync(
                 detalle
             );
 
             await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
 
             return detalle;
         }
@@ -253,15 +258,22 @@ namespace AdLocalAPI.Repositories
         // ACTUALIZAR CARRITO
         // ============================================================
 
-        public async Task ActualizarCarritoAsync(
-            Carrito carrito)
+        public async Task ActualizarCarritoAsync(Carrito carrito)
         {
-            _context.Carritos.Update(
-                carrito
-            );
-
-            await _context.SaveChangesAsync();
+            // Un objeto leído antes del checkout no puede reabrir un carrito ya cerrado.
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            await BloquearCarritoActivoAsync(carrito.Id);
+            if (!carrito.Activo && await _context.CarritoDetalles.AnyAsync(x => x.IdCarrito == carrito.Id && x.Activo))
+                throw new CheckoutConflictException("El carrito cambió. Actualiza tu carrito.");
+            var changed = await _context.Carritos.Where(x => x.Id == carrito.Id && x.Activo)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(x => x.Subtotal, carrito.Subtotal)
+                    .SetProperty(x => x.Activo, carrito.Activo)
+                    .SetProperty(x => x.FechaActualizacion, carrito.FechaActualizacion));
+            if (changed == 0) throw new CheckoutConflictException("El carrito ya fue procesado. Actualiza tu carrito.");
+            await transaction.CommitAsync();
         }
+
 
         // ============================================================
         // ACTUALIZAR DETALLE
@@ -270,11 +282,15 @@ namespace AdLocalAPI.Repositories
         public async Task ActualizarDetalleAsync(
             CarritoDetalle detalle)
         {
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            await BloquearCarritoActivoAsync(detalle.IdCarrito);
+
             _context.CarritoDetalles.Update(
                 detalle
             );
 
             await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
         }
 
         // ============================================================
@@ -284,6 +300,9 @@ namespace AdLocalAPI.Repositories
         public async Task DesactivarDetalleAsync(
             CarritoDetalle detalle)
         {
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            await BloquearCarritoActivoAsync(detalle.IdCarrito);
+
             detalle.Activo = false;
 
             detalle.FechaActualizacion =
@@ -294,6 +313,7 @@ namespace AdLocalAPI.Repositories
             );
 
             await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
         }
 
         // ============================================================
@@ -303,6 +323,8 @@ namespace AdLocalAPI.Repositories
         public async Task VaciarCarritoAsync(
             Carrito carrito)
         {
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            await BloquearCarritoActivoAsync(carrito.Id);
             var detalles =
                 await _context.CarritoDetalles
                     .Where(x =>
@@ -338,6 +360,7 @@ namespace AdLocalAPI.Repositories
             );
 
             await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
         }
 
         // ============================================================
@@ -367,6 +390,14 @@ namespace AdLocalAPI.Repositories
                     x.IdCarrito == idCarrito &&
                     x.Activo
                 );
+        }
+        private async Task BloquearCarritoActivoAsync(long idCarrito)
+        {
+            var carrito = await _context.Carritos.FromSqlInterpolated(
+                $"SELECT * FROM carritos WHERE \"Id\" = {idCarrito} FOR UPDATE")
+                .AsNoTracking().SingleOrDefaultAsync();
+            if (carrito == null || !carrito.Activo)
+                throw new CheckoutConflictException("El carrito ya fue procesado. Actualiza tu carrito.");
         }
     }
 }

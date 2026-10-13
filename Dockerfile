@@ -22,20 +22,16 @@ ENV ASPNETCORE_URLS=http://+:8080
 ENV AllowedHosts=*
 
 # Connection String (EF Core)
-ENV SUPABASE_DB_CONNECTION=Host=ep-empty-moon-adsd2mcc-pooler.c-2.us-east-1.aws.neon.tech;Port=5432;Database=AdLocal;Username=neondb_owner;Password=npg_vXt9sekfG3rY;SslMode=Require
-ENV STRIPE_WEBHOOK_SECRET=whsec_vRaXms0x16TSCd2LYEAEDGBdBtmuT1tz
 
 
 
 
 
 # JWT
-ENV JWT__Key=AdLocal_SUPER_SECRET_KEY_PROD_2025_256_BITS
 ENV JWT__Issuer=AdLocalAPI
 
 # Supabase
 ENV SUPABASE__URL="https://uzgnfwbztoizcctyfdiv.supabase.co"
-ENV SUPABASE__KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6Z25md2J6dG9pemNjdHlmZGl2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2Njk0MzUyNywiZXhwIjoyMDgyNTE5NTI3fQ.opjCm_q7U9GX0ah7UUgRMzQJwBQhyBupWVGJQXY6v0I"
 
 # ===============================
 

@@ -1,4 +1,5 @@
 using AdLocalAPI.DTOs;
+using AdLocalAPI.Helpers;
 using AdLocalAPI.Interfaces.Services;
 using AdLocalAPI.Models;
 using AdLocalAPI.Repositories.Interfaces;
@@ -8,11 +9,18 @@ namespace AdLocalAPI.Services
     public class PlanService : IPlanService
     {
         private readonly IPlanRepository _repository;
+        private readonly JwtContext _jwtContext;
 
-        public PlanService(IPlanRepository repository)
+        public PlanService(IPlanRepository repository, JwtContext jwtContext)
         {
             _repository = repository;
+            _jwtContext = jwtContext;
         }
+
+        private ApiResponse<object>? ValidarAdministrador() => !_jwtContext.EstaAutenticado()
+            ? ApiResponse<object>.Error("401", "Usuario no autenticado")
+            : !_jwtContext.EsRol("Admin")
+                ? ApiResponse<object>.Error("403", "Se requiere permiso de administrador") : null;
 
         public async Task<ApiResponse<object>> GetAllPlanes(
             int page,
@@ -73,6 +81,8 @@ namespace AdLocalAPI.Services
         }
         public async Task<ApiResponse<object>> CrearPlan(PlanCreateDto dto)
         {
+            var permiso = ValidarAdministrador();
+            if (permiso != null) return permiso;
             try
             {
                 if (string.IsNullOrWhiteSpace(dto.Nombre))
@@ -122,6 +132,8 @@ namespace AdLocalAPI.Services
 
         public async Task<ApiResponse<object>> ActualizarPlan(int id, PlanCreateDto dto)
         {
+            var permiso = ValidarAdministrador();
+            if (permiso != null) return permiso;
             try
             {
                 var plan = await _repository.GetByIdAsync(id);
@@ -158,6 +170,8 @@ namespace AdLocalAPI.Services
 
         public async Task<ApiResponse<object>> EliminarPlan(int id)
         {
+            var permiso = ValidarAdministrador();
+            if (permiso != null) return permiso;
             try
             {
                 var plan = await _repository.GetByIdAsync(id);

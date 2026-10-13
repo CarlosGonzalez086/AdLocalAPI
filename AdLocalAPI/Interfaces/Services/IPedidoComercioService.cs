@@ -18,5 +18,7 @@ namespace AdLocalAPI.Services.Interfaces
         Task<ApiResponse<PedidoComercioDetalleDto>> RevisarPagoAsync(
             long comercioId, Guid pedidoUuid, RevisarPagoPedidoDto dto, CancellationToken cancellationToken = default);
         Task<ApiResponse<ArchivoComprobanteDto>> ObtenerComprobanteAsync(long comercioId, Guid pedidoUuid, CancellationToken cancellationToken = default);
+        Task<ApiResponse<PedidoComercioDetalleDto>> ReembolsarAsync(long comercioId, Guid pedidoUuid, RegistrarReembolsoPedidoDto dto, CancellationToken cancellationToken = default);
+        Task<ApiResponse<PedidoComercioDetalleDto>> ConciliarInventarioAsync(long comercioId, Guid pedidoUuid, ConciliarInventarioPedidoDto dto, CancellationToken cancellationToken = default);
     }
 }

@@ -123,16 +123,29 @@ namespace AdLocalAPI.Services
 
         public async Task<UpdateJwtResult> ActualizarJwtAsync(string email, bool updateJWT)
         {
-            var usuario = await _repository.GetByCorreoAsync(email);
+            if (!_jwtContext.EstaAutenticado())
+                return new UpdateJwtResult { Codigo = "401", Message = "Usuario no autenticado" };
 
-            if (usuario == null)
+            long userId;
+            try { userId = _jwtContext.GetUserId(); }
+            catch (UnauthorizedAccessException)
             {
-                return new UpdateJwtResult
-                {
-                    Success = false,
-                    Message = "Usuario no encontrado"
-                };
+                return new UpdateJwtResult { Codigo = "401", Message = "Identidad de sesión inválida" };
             }
+
+            // La identidad procede de la sesión validada, nunca del correo enviado.
+            var usuario = await _repository.GetByIdAsync(userId);
+
+            if (usuario == null || !usuario.Activo)
+                return new UpdateJwtResult { Codigo = "401", Message = "La sesión ya no es válida" };
+
+            if (string.IsNullOrWhiteSpace(email) ||
+                !string.Equals(email.Trim(), usuario.Email, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning("Security.ForeignJwtDenied ActorId={ActorId}", userId);
+                return new UpdateJwtResult { Codigo = "403", Message = "Solo puedes actualizar tu propia sesión" };
+            }
+
 
             string? token = null;
 

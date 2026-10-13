@@ -9,9 +9,17 @@ namespace AdLocalAPI.Services
 {
     public partial class ComercioService
     {
+        private async Task<bool> PuedeGestionarColaboradores(long comercioId)
+        {
+            if (!_jwtContext.EstaAutenticado() || !_jwtContext.EsComercio()) return false;
+            var comercio = await _repository.GetByIdAsync(comercioId);
+            return comercio != null && comercio.IdUsuario == _jwtContext.GetUserId();
+        }
+
         public async Task<ApiResponse<object>> guardarColaborador(ColaborarDto dto) 
         {
-            long idUser = _jwtContext.GetUserId();
+            if (!await PuedeGestionarColaboradores(dto.IdComercio))
+                return ApiResponse<object>.Error("403", "No tienes permiso para gestionar colaboradores de este comercio");
             var plan = await _planRepository.GetByTipoAsync(_jwtContext.GetPlanTipo());
             if (plan != null && plan.IsMultiUsuario)
             {
@@ -73,6 +81,8 @@ namespace AdLocalAPI.Services
         {
             try
             {
+                if (!await PuedeGestionarColaboradores(idComercio))
+                    return ApiResponse<PagedResponse<UsuarioInfoDto>>.Error("403", "No tienes permiso para gestionar colaboradores de este comercio");
                 return await _repository.getAllColaboradores(
                     idComercio,
                     page,
@@ -89,7 +99,8 @@ namespace AdLocalAPI.Services
         {
             try
             {
-                long idUser = _jwtContext.GetUserId();
+                if (!await PuedeGestionarColaboradores(idComercio))
+                    return ApiResponse<bool>.Error("403", "No tienes permiso para gestionar colaboradores de este comercio");
                 var user = await _usuarioRepository.GetByIdComercioAndIdUserAsync(idColaborador, idComercio);
                 if (user == null)
                 {
@@ -116,7 +127,8 @@ namespace AdLocalAPI.Services
         {
             try
             {
-                long idUser = _jwtContext.GetUserId();
+                if (!await PuedeGestionarColaboradores(idComercio))
+                    return ApiResponse<bool>.Error("403", "No tienes permiso para gestionar colaboradores de este comercio");
                 var user = await _usuarioRepository.GetByIdComercioAndIdUserAsync(idColaborador, idComercio);
                 if (user == null)
                 {

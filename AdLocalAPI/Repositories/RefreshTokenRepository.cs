@@ -71,6 +71,7 @@ namespace AdLocalAPI.Repositories
         {
             var ahora = DateTime.UtcNow;
             var tokensActivos = await _context.RefreshTokens
+                .AsTracking()
                 .Where(r => r.UsuarioId == usuarioId && r.RevokedAt == null && r.ExpiresAt > ahora)
                 .ToListAsync();
 
@@ -81,7 +82,7 @@ namespace AdLocalAPI.Repositories
                 t.ReasonRevoked = razon;
             }
 
-            var usuario = await _context.Usuarios.FindAsync(usuarioId);
+            var usuario = await _context.Usuarios.AsTracking().FirstOrDefaultAsync(u => u.Id == usuarioId);
             if (usuario != null)
             {
                 usuario.TokensRevocadosAntesDe = ahora;

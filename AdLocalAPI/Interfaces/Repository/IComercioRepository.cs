@@ -7,6 +7,7 @@ namespace AdLocalAPI.Repositories.Interfaces
 {
     public interface IComercioRepository
     {
+        Task<string> ActualizarZonaHorariaAsync(long id, long usuario, ComercioZonaHorariaDto dto, CancellationToken ct = default);
         Task<(List<ComercioPublicDto> comercios, int total)> GetAllAsync(
             string tipo, double lat, double lng,
             string municipio, int page, int pageSize, string ip, long? idCliente = null);

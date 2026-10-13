@@ -7,7 +7,8 @@ namespace AdLocalAPI.Services.Interfaces
     {
         Task<ApiResponse<List<string>>> HorariosAsync(
             Guid productoUuid,
-            DateOnly fecha
+            DateOnly fecha,
+            Guid? citaUuid = null
         );
 
         Task<ApiResponse<CitaDto>> CrearAsync(
@@ -19,7 +20,7 @@ namespace AdLocalAPI.Services.Interfaces
 
         Task<ApiResponse<CitaDto>> CancelarClienteAsync(
             Guid uuid,
-            string? motivo
+            CancelarCitaDto dto
         );
 
         Task<ApiResponse<CitaDto>> ReprogramarClienteAsync(

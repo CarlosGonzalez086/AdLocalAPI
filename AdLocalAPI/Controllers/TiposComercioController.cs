@@ -16,7 +16,7 @@ namespace AdLocalAPI.Controllers
             _service = service;
         }
 
-        [Authorize]
+        [Authorize(Roles = "Admin")]
         [HttpPost]
         public async Task<IActionResult> Crear([FromBody] TipoComercioCreateDto dto)
         {
@@ -24,7 +24,7 @@ namespace AdLocalAPI.Controllers
             return Responder(response);
         }
 
-        [Authorize]
+        [Authorize(Roles = "Admin")]
         [HttpPut("{id}")]
         public async Task<IActionResult> Actualizar(long id, [FromBody] TipoComercioCreateDto dto)
         {
@@ -32,7 +32,7 @@ namespace AdLocalAPI.Controllers
             return Responder(response);
         }
 
-        [Authorize]
+        [Authorize(Roles = "Admin")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> Eliminar(long id)
         {

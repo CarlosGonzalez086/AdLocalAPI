@@ -23,6 +23,7 @@ namespace AdLocalAPI.DTOs.UsuarioCliente
 
     public class PedidoClienteDetalleDto : PedidoClienteListadoDto
     {
+        public PedidoReembolsoDto? Reembolso { get; set; }
         public string? ObservacionesCliente { get; set; }
         public string? Direccion { get; set; }
         public string? TelefonoEntrega { get; set; }
@@ -50,6 +51,8 @@ namespace AdLocalAPI.DTOs.UsuarioCliente
 
     public class PedidoClienteHistorialDto
     {
+        public string Evento { get; set; } = "Estado";
+        public EstadoPagoPedido? EstadoPago { get; set; }
         public EstadoPedido Estado { get; set; }
         public string? Comentario { get; set; }
         public DateTime Fecha { get; set; }

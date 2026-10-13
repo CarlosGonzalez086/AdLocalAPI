@@ -18,6 +18,7 @@ namespace AdLocalAPI.Models
 
         [Required]
         public long IdUsuario { get; set; }
+        [MaxLength(100)] public string ZonaHoraria { get; set; } = Helpers.CitaOperacion.ZonaHoraria;
 
         [MaxLength(1000)]
         public string? Descripcion { get; set; }

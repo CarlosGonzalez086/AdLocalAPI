@@ -37,6 +37,8 @@ namespace AdLocalAPI.Data
 
         public DbSet<Pedido> Pedidos { get; set; }
         public DbSet<PedidoDetalle> PedidoDetalles { get; set; }
+        public DbSet<PedidoReembolso> PedidoReembolsos { get; set; }
+        public DbSet<PedidoMovimientoInventario> PedidoMovimientosInventario { get; set; }
         public DbSet<PedidoHistorial> PedidoHistorial { get; set; }
 
         public DbSet<DireccionUsuario> DireccionesUsuarios { get; set; }
@@ -58,6 +60,7 @@ namespace AdLocalAPI.Data
         public DbSet<CarritoDetalle> CarritoDetalles { get; set; }
         public DbSet<ConfiguracionPagoComercio> ConfiguracionPagoComercios { get; set; }
         public DbSet<Cita> Citas { get; set; }
+        public DbSet<CitaHistorial> CitaHistorial { get; set; }
         public DbSet<HorarioCitaServicio> HorariosCitaServicio { get; set; }
         public DbSet<Cotizacion> Cotizaciones { get; set; }
         public DbSet<StripeWebhookEvent> StripeWebhookEvents { get; set; }
@@ -80,6 +83,12 @@ namespace AdLocalAPI.Data
 
             modelBuilder.Entity<Cita>(entity =>
             {
+                entity.Property(x => x.ZonaHoraria).HasDefaultValue(Helpers.CitaOperacion.ZonaHoraria);
+                entity.HasIndex(x => new { x.IdUsuario, x.IdempotencyKey }).IsUnique();
+                entity.ToTable("citas", t => {
+                    t.HasCheckConstraint("CK_citas_intervalo", "\"FechaFin\" > \"FechaInicio\"");
+                    t.HasCheckConstraint("CK_citas_estado", "\"Estado\" BETWEEN 1 AND 6");
+                });
                 entity.HasIndex(x => x.Uuid).IsUnique();
                 entity.HasIndex(x => new { x.IdComercio, x.FechaInicio, x.FechaFin });
                 entity.HasIndex(x => new { x.IdUsuario, x.FechaInicio });
@@ -100,6 +109,11 @@ namespace AdLocalAPI.Data
                 entity.HasOne<ProductosServicios>().WithMany().HasForeignKey(x => x.IdProductoServicio).OnDelete(DeleteBehavior.Cascade);
                 entity.HasOne<Comercio>().WithMany().HasForeignKey(x => x.IdComercio).OnDelete(DeleteBehavior.Cascade);
                 entity.HasOne<Cita>().WithMany().HasForeignKey(x => x.IdCita).OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<CitaHistorial>(entity => {
+                entity.HasOne<Cita>().WithMany().HasForeignKey(x => x.IdCita).OnDelete(DeleteBehavior.Restrict);
+                entity.HasIndex(x => new { x.IdCita, x.Fecha });
             });
 
             /* =========================
@@ -160,6 +174,7 @@ namespace AdLocalAPI.Data
 
             modelBuilder.Entity<Comercio>(entity =>
             {
+                entity.Property(x => x.ZonaHoraria).HasDefaultValue(Helpers.CitaOperacion.ZonaHoraria);
                 entity.HasKey(c => c.Id);
 
                 entity.HasOne(c => c.Usuario)
@@ -459,6 +474,20 @@ namespace AdLocalAPI.Data
                     .WithMany()
                     .HasForeignKey(x => x.IdProductoServicio)
                     .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<PedidoReembolso>(entity =>
+            {
+                entity.HasIndex(x => x.IdPedido).IsUnique();
+                entity.HasIndex(x => x.Uuid).IsUnique();
+                entity.HasOne(x => x.Pedido).WithOne(x => x.Reembolso)
+                    .HasForeignKey<PedidoReembolso>(x => x.IdPedido).OnDelete(DeleteBehavior.Restrict);
+            });
+            modelBuilder.Entity<PedidoMovimientoInventario>(entity =>
+            {
+                entity.HasIndex(x => x.IdPedidoDetalle).IsUnique();
+                entity.HasOne(x => x.Detalle).WithMany().HasForeignKey(x => x.IdPedidoDetalle)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
 

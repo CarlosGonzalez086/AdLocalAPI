@@ -27,6 +27,7 @@ namespace AdLocalAPI.Services
         private readonly IWebHostEnvironment _environment;
         private readonly string _bucketName;
         private readonly INotificacionService _notificaciones;
+        private readonly ILogger<ComprobantePagoService>? _logger;
 
         public ComprobantePagoService(
             IPedidoRepository repository,
@@ -34,7 +35,7 @@ namespace AdLocalAPI.Services
             IAmazonS3 s3Client,
             IWebHostEnvironment environment,
             IConfiguration configuration,
-            INotificacionService notificaciones)
+            INotificacionService notificaciones, ILogger<ComprobantePagoService>? logger = null)
         {
             _repository = repository;
             _jwtContext = jwtContext;
@@ -43,6 +44,7 @@ namespace AdLocalAPI.Services
             _bucketName = configuration["R2:ComprobantesBucket"]
                 ?? "comprobantes-pago";
             _notificaciones = notificaciones;
+            _logger = logger;
         }
 
         public async Task<ApiResponse<ComprobanteTransferenciaResponseDto>>
@@ -177,18 +179,22 @@ namespace AdLocalAPI.Services
                         comprobante
                     );
 
-                    await _notificaciones.NotificarComercioAsync(
-                        pedido,
-                        TipoNotificacionPedido.ComprobanteSubido,
-                        "Comprobante recibido",
-                        $"El cliente adjuntó el comprobante del pedido {pedido.NumeroPedido}."
-                    );
                 }
                 catch
                 {
-                    await EliminarArchivoSilenciosamenteAsync(key);
-                    throw;
+                    bool? registrado = null;
+                    try { registrado = await _repository.ComprobanteRegistradoAsync(comprobanteUuid, idUsuario); }
+                    catch (Exception ex) { _logger?.LogWarning(ex, "No se pudo comprobar si persistió el comprobante {ComprobanteUuid}", comprobanteUuid); }
+                    // A failed COMMIT response is ambiguous. Never delete an object referenced by a committed order.
+                    if (registrado == false) await EliminarArchivoSilenciosamenteAsync(key);
+                    if (registrado != true) throw;
                 }
+                try
+                {
+                    await _notificaciones.NotificarComercioAsync(pedido, TipoNotificacionPedido.ComprobanteSubido,
+                        "Comprobante recibido", $"El cliente adjuntó el comprobante del pedido {pedido.NumeroPedido}.");
+                }
+                catch (Exception ex) { _logger?.LogWarning(ex, "No se pudo notificar el comprobante del pedido {PedidoUuid}", pedido.Uuid); }
 
                 return ApiResponse<ComprobanteTransferenciaResponseDto>.Success(
                     new ComprobanteTransferenciaResponseDto
@@ -201,6 +207,11 @@ namespace AdLocalAPI.Services
                     "Comprobante enviado para verificación."
                 );
             }
+            catch (PedidoOperacionException ex)
+            {
+                return ApiResponse<ComprobanteTransferenciaResponseDto>.Error(ex.Codigo, ex.Message);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
             catch
             {
                 return ApiResponse<ComprobanteTransferenciaResponseDto>.Error(

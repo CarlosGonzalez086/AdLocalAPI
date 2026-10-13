@@ -71,9 +71,9 @@ namespace AdLocalAPI.Tests.Unit
         [InlineData(EstadoPedido.Aprobado, TipoEntregaPedido.Recoger, new[] { EstadoPedido.Preparando, EstadoPedido.Cancelado })]
         [InlineData(EstadoPedido.Preparando, TipoEntregaPedido.Domicilio, new[] { EstadoPedido.ListoParaEnviar, EstadoPedido.Cancelado })]
         [InlineData(EstadoPedido.Preparando, TipoEntregaPedido.Recoger, new[] { EstadoPedido.ListoParaRecoger, EstadoPedido.Cancelado })]
-        [InlineData(EstadoPedido.ListoParaEnviar, TipoEntregaPedido.Domicilio, new[] { EstadoPedido.Enviado })]
+        [InlineData(EstadoPedido.ListoParaEnviar, TipoEntregaPedido.Domicilio, new[] { EstadoPedido.Enviado, EstadoPedido.Cancelado })]
         [InlineData(EstadoPedido.Enviado, TipoEntregaPedido.Domicilio, new[] { EstadoPedido.Entregado })]
-        [InlineData(EstadoPedido.ListoParaRecoger, TipoEntregaPedido.Recoger, new[] { EstadoPedido.Entregado })]
+        [InlineData(EstadoPedido.ListoParaRecoger, TipoEntregaPedido.Recoger, new[] { EstadoPedido.Entregado, EstadoPedido.Cancelado })]
         [InlineData(EstadoPedido.Entregado, TipoEntregaPedido.Domicilio, new[] { EstadoPedido.Completado })]
         [InlineData(EstadoPedido.Entregado, TipoEntregaPedido.Recoger, new[] { EstadoPedido.Completado })]
         public void ObtenerAcciones_EstadosValidos_RetornaAccionesPermitidas(
@@ -108,105 +108,35 @@ namespace AdLocalAPI.Tests.Unit
         // ==============================================================
 
         [Fact]
-        public async Task CambiarEstado_TransicionInvalida_Retorna409Conflict()
+        public void CambiarEstado_TransicionInvalida_Retorna409Conflict()
         {
-            const long comercioId = 5;
-            var pedidoUuid = Guid.NewGuid();
-            var service = CrearServicio(userId: 10, role: "Comercio");
-
-            _repoMock.Setup(r => r.PuedeGestionarAsync(10, "Comercio", comercioId)).ReturnsAsync(true);
-            _repoMock.Setup(r => r.ObtenerPedidoTrackingAsync(comercioId, pedidoUuid))
-                .ReturnsAsync(new Pedido
-                {
-                    Id = 1,
-                    Uuid = pedidoUuid,
-                    IdComercio = comercioId,
-                    Estado = EstadoPedido.PendienteAprobacion,
-                    TipoEntrega = TipoEntregaPedido.Domicilio,
-                    EstadoPago = EstadoPagoPedido.Pendiente
-                });
-
-            // Intento ilegal: de PendienteAprobacion directo a Entregado
-            var resultado = await service.CambiarEstadoAsync(comercioId, pedidoUuid, new CambiarEstadoPedidoDto
-            {
-                Estado = EstadoPedido.Entregado
-            });
-
-            Assert.Equal("409", resultado.Codigo);
-            Assert.Equal("La transición de estado no está permitida.", resultado.Mensaje);
+            var ex = Assert.Throws<PedidoOperacionException>(() => PedidoOperacion.ValidarEstado(new Pedido
+            { Estado = EstadoPedido.PendienteAprobacion, TipoEntrega = TipoEntregaPedido.Domicilio },
+                new CambiarEstadoPedidoDto { Estado = EstadoPedido.Entregado }));
+            Assert.Equal("409", ex.Codigo);
+            Assert.Equal("La transición de estado no está permitida.", ex.Message);
         }
-
         [Fact]
-        public async Task CambiarEstado_PedidoPagadoSinReembolso_NoPermiteCancelarNiRechazar()
+        public void CambiarEstado_PedidoPagadoSinReembolso_NoPermiteCancelarNiRechazar()
         {
-            const long comercioId = 5;
-            var pedidoUuid = Guid.NewGuid();
-            var service = CrearServicio(userId: 10, role: "Comercio");
-
-            _repoMock.Setup(r => r.PuedeGestionarAsync(10, "Comercio", comercioId)).ReturnsAsync(true);
-            _repoMock.Setup(r => r.ObtenerPedidoTrackingAsync(comercioId, pedidoUuid))
-                .ReturnsAsync(new Pedido
-                {
-                    Id = 1,
-                    Uuid = pedidoUuid,
-                    IdComercio = comercioId,
-                    Estado = EstadoPedido.PendienteAprobacion,
-                    TipoEntrega = TipoEntregaPedido.Domicilio,
-                    EstadoPago = EstadoPagoPedido.Pagado // Ya está cobrado
-                });
-
-            // Intentar rechazar un pedido pagado
-            var resRechazo = await service.CambiarEstadoAsync(comercioId, pedidoUuid, new CambiarEstadoPedidoDto
-            {
-                Estado = EstadoPedido.Rechazado
-            });
-
-            Assert.Equal("409", resRechazo.Codigo);
-            Assert.Contains("reembolsarse", resRechazo.Mensaje);
+            var ex = Assert.Throws<PedidoOperacionException>(() => PedidoOperacion.ValidarEstado(new Pedido
+            { Estado = EstadoPedido.PendienteAprobacion, EstadoPago = EstadoPagoPedido.Pagado },
+                new CambiarEstadoPedidoDto { Estado = EstadoPedido.Rechazado, Comentario = "Sin stock" }));
+            Assert.Contains("reembolsarse", ex.Message);
         }
-
         [Fact]
-        public async Task CambiarEstado_TransicionValida_ActualizaEstadoYFechasAuditoria()
+        public async Task CambiarEstado_DelegacionAtomica_NotificacionFallida_NoOcultaExito()
         {
-            const long comercioId = 5;
-            var pedidoUuid = Guid.NewGuid();
-            var service = CrearServicio(userId: 10, role: "Comercio");
-
-            var pedido = new Pedido
-            {
-                Id = 100,
-                Uuid = pedidoUuid,
-                IdComercio = comercioId,
-                NumeroPedido = "PED-2026-001",
-                Estado = EstadoPedido.PendienteAprobacion,
-                TipoEntrega = TipoEntregaPedido.Domicilio,
-                EstadoPago = EstadoPagoPedido.Pendiente
-            };
-
-            _repoMock.Setup(r => r.PuedeGestionarAsync(10, "Comercio", comercioId)).ReturnsAsync(true);
-            _repoMock.Setup(r => r.ObtenerPedidoTrackingAsync(comercioId, pedidoUuid)).ReturnsAsync(pedido);
-            _repoMock.Setup(r => r.ObtenerDetalleAsync(comercioId, pedidoUuid)).ReturnsAsync(new PedidoComercioDetalleDto
-            {
-                Uuid = pedidoUuid,
-                Estado = EstadoPedido.Aprobado
-            });
-
-            var resultado = await service.CambiarEstadoAsync(comercioId, pedidoUuid, new CambiarEstadoPedidoDto
-            {
-                Estado = EstadoPedido.Aprobado,
-                Comentario = "Pedido aceptado por cocina"
-            });
-
-            Assert.Equal("200", resultado.Codigo);
-            Assert.Equal(EstadoPedido.Aprobado, pedido.Estado);
-            Assert.NotNull(pedido.FechaAprobacion);
-
-            _repoMock.Verify(r => r.GuardarEstadoAsync(pedido, It.Is<PedidoHistorialEstado>(h =>
-                h.IdPedido == pedido.Id &&
-                h.EstadoAnterior == EstadoPedido.PendienteAprobacion &&
-                h.EstadoNuevo == EstadoPedido.Aprobado &&
-                h.Comentario == "Pedido aceptado por cocina"
-            )), Times.Once);
+            var service = CrearServicio(); var uuid = Guid.NewGuid();
+            var dto = new CambiarEstadoPedidoDto { Estado = EstadoPedido.Aprobado, VersionPedido = 8 };
+            _repoMock.Setup(r => r.PuedeGestionarAsync(10, "Comercio", 5)).ReturnsAsync(true);
+            _repoMock.Setup(r => r.CambiarEstadoAsync(5, uuid, 10, dto, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new Pedido { Uuid = uuid, Estado = EstadoPedido.Aprobado });
+            _repoMock.Setup(r => r.ObtenerDetalleAsync(5, uuid)).ReturnsAsync(new PedidoComercioDetalleDto { Estado = EstadoPedido.Aprobado });
+            _notifMock.Setup(n => n.NotificarClienteAsync(It.IsAny<Pedido>(), It.IsAny<TipoNotificacionPedido>(), It.IsAny<string>(), It.IsAny<string>()))
+                .ThrowsAsync(new System.IO.IOException("Fallo sintético de notificación"));
+            Assert.Equal("200", (await service.CambiarEstadoAsync(5, uuid, dto)).Codigo);
+            _repoMock.Verify(r => r.CambiarEstadoAsync(5, uuid, 10, dto, It.IsAny<CancellationToken>()), Times.Once);
         }
 
         // ==============================================================

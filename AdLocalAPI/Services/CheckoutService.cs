@@ -50,7 +50,11 @@ namespace AdLocalAPI.Services
                     return ApiResponse<CheckoutResponseDto>.Error("400", "Tu carrito está vacío.");
                 }
 
-                var response = new CheckoutResponseDto();
+                var response = new CheckoutResponseDto
+                {
+                    CarritoUuid = carrito.Uuid,
+                    CarritoVersion = CheckoutOperacion.Carrito(items)
+                };
                 var grupos = items.GroupBy(x => x.Producto.IdComercio);
 
                 foreach (var grupo in grupos)

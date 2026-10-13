@@ -5,6 +5,7 @@ namespace AdLocalAPI.DTOs
 {
     public class ComercioCreateDto
     {
+        public string ZonaHoraria { get; set; } = Helpers.CitaOperacion.ZonaHoraria;
         public string Nombre { get; set; } = "";
         public string Direccion { get; set; } = "";
         public string Telefono { get; set; } = "";

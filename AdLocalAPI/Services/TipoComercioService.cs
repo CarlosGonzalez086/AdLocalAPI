@@ -1,5 +1,6 @@
 ﻿using AdLocalAPI.DTOs;
 using AdLocalAPI.Interfaces.TipoComercio;
+using AdLocalAPI.Helpers;
 using AdLocalAPI.Models;
 
 namespace AdLocalAPI.Services
@@ -7,14 +8,18 @@ namespace AdLocalAPI.Services
     public class TipoComercioService : ITipoComercioService
     {
         private readonly ITipoComercioRepository _repository;
+        private readonly JwtContext _jwtContext;
 
-        public TipoComercioService(ITipoComercioRepository repository)
+        public TipoComercioService(ITipoComercioRepository repository, JwtContext jwtContext)
         {
             _repository = repository;
+            _jwtContext = jwtContext;
         }
 
         public async Task<ApiResponse<object>> Crear(TipoComercioCreateDto dto)
         {
+            if (!_jwtContext.EstaAutenticado()) return ApiResponse<object>.Error("401", "Usuario no autenticado");
+            if (!_jwtContext.EsRol("Admin")) return ApiResponse<object>.Error("403", "Se requiere permiso de administrador");
             var entity = new TipoComercio
             {
                 Nombre = dto.Nombre,
@@ -32,6 +37,8 @@ namespace AdLocalAPI.Services
 
         public async Task<ApiResponse<object>> Actualizar(long id, TipoComercioCreateDto dto)
         {
+            if (!_jwtContext.EstaAutenticado()) return ApiResponse<object>.Error("401", "Usuario no autenticado");
+            if (!_jwtContext.EsRol("Admin")) return ApiResponse<object>.Error("403", "Se requiere permiso de administrador");
             var entity = await _repository.GetById(id);
             if (entity == null)
                 return ApiResponse<object>.Error("404", "Tipo de comercio no encontrado");
@@ -50,6 +57,8 @@ namespace AdLocalAPI.Services
 
         public async Task<ApiResponse<bool>> Eliminar(long id)
         {
+            if (!_jwtContext.EstaAutenticado()) return ApiResponse<bool>.Error("401", "Usuario no autenticado");
+            if (!_jwtContext.EsRol("Admin")) return ApiResponse<bool>.Error("403", "Se requiere permiso de administrador");
             var entity = await _repository.GetById(id);
             if (entity == null)
                 return ApiResponse<bool>.Error("404", "Tipo de comercio no encontrado");

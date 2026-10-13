@@ -46,6 +46,11 @@ namespace AdLocalAPI.Models
         [Required]
         public int Cantidad { get; set; }
 
+        // Null means a legacy checkout without a reliable inventory snapshot.
+        public int? StockDescontado { get; set; }
+        public int StockPorRestituir { get; set; }
+        public int StockRestituido { get; set; }
+
         [Required]
         [Column(TypeName = "numeric(18,2)")]
         public decimal PrecioUnitario { get; set; }

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.RateLimiting;
 using AdLocalAPI.DTOs;
 using AdLocalAPI.Models;
 using AdLocalAPI.Services.Interfaces;
@@ -24,6 +25,7 @@ namespace AdLocalAPI.Controllers
             return Responder(response);
         }
 
+        [EnableRateLimiting("auth")]
         [HttpPost("login")]
         public async Task<IActionResult> LoginUsuario([FromBody] LoginDto dto)
         {
@@ -55,6 +57,7 @@ namespace AdLocalAPI.Controllers
             return Responder(response);
         }
 
+        [EnableRateLimiting("auth")]
         [HttpPost("forget-password")]
         public async Task<IActionResult> ForgetPassword([FromBody] EmailDto email)
         {
@@ -62,6 +65,7 @@ namespace AdLocalAPI.Controllers
             return Responder(response);
         }
 
+        [EnableRateLimiting("auth")]
         [HttpPost("new-password")]
         public async Task<IActionResult> NewPassword([FromBody] NewPasswordDto dto)
         {
@@ -69,6 +73,7 @@ namespace AdLocalAPI.Controllers
             return Responder(response);
         }
 
+        [EnableRateLimiting("auth")]
         [HttpPost("check-token")]
         public async Task<IActionResult> CheckToken(string token)
         {
@@ -87,7 +92,7 @@ namespace AdLocalAPI.Controllers
 
             if (!result.Success)
             {
-                return Responder(ApiResponse<object>.NotFound(result.Message));
+                return Responder(ApiResponse<object>.Error(result.Codigo, result.Message));
             }
 
             return Responder(ApiResponse<object>.Success(new

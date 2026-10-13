@@ -17,7 +17,7 @@ namespace AdLocalAPI.Services
         private readonly IAmazonS3 _s3;
         private readonly string _bucket;
         private readonly INotificacionService _notificaciones;
-        private readonly IComisionService _comisiones;
+        private readonly ILogger<PedidoComercioService>? _logger;
 
         public PedidoComercioService(
             IPedidoComercioRepository repository,
@@ -25,14 +25,14 @@ namespace AdLocalAPI.Services
             IAmazonS3 s3,
             IConfiguration configuration,
             INotificacionService notificaciones,
-            IComisionService comisiones)
+            IComisionService comisiones, ILogger<PedidoComercioService>? logger = null)
         {
             _repository = repository;
             _jwt = jwt;
             _s3 = s3;
             _bucket = configuration["R2:ComprobantesBucket"] ?? "comprobantes-pago";
             _notificaciones = notificaciones;
-            _comisiones = comisiones;
+            _logger = logger;
         }
 
         public async Task<ApiResponse<List<ComercioPedidoSelectorDto>>> ObtenerComerciosAsync(CancellationToken cancellationToken = default) =>
@@ -75,106 +75,55 @@ namespace AdLocalAPI.Services
                 : ApiResponse<PedidoComercioDetalleDto>.Success(pedido);
         }
 
-        public async Task<ApiResponse<PedidoComercioDetalleDto>> CambiarEstadoAsync(
-            long comercioId, Guid pedidoUuid, CambiarEstadoPedidoDto dto, CancellationToken cancellationToken = default)
+        public Task<ApiResponse<PedidoComercioDetalleDto>> CambiarEstadoAsync(
+            long comercioId, Guid pedidoUuid, CambiarEstadoPedidoDto dto, CancellationToken cancellationToken = default) =>
+            OperarAsync(comercioId, pedidoUuid, () => _repository.CambiarEstadoAsync(comercioId, pedidoUuid, _jwt.GetUserId(), dto, cancellationToken),
+                "Pedido actualizado", $"El pedido cambió a: {ObtenerTextoEstado(dto.Estado)}.", cancellationToken);
+
+        public Task<ApiResponse<PedidoComercioDetalleDto>> RevisarPagoAsync(
+            long comercioId, Guid pedidoUuid, RevisarPagoPedidoDto dto, CancellationToken cancellationToken = default) =>
+            OperarAsync(comercioId, pedidoUuid, () => _repository.RevisarPagoAsync(comercioId, pedidoUuid, _jwt.GetUserId(), dto, cancellationToken),
+                "Pago actualizado", dto.EstadoPago == EstadoPagoPedido.Pagado ? "El comercio confirmó la recepción del pago." : "El comprobante fue rechazado. Revisa el motivo en el pedido.", cancellationToken);
+
+        public async Task<ApiResponse<PedidoComercioDetalleDto>> ReembolsarAsync(
+            long comercioId, Guid pedidoUuid, RegistrarReembolsoPedidoDto dto, CancellationToken cancellationToken = default)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!await Autorizado(comercioId))
-                return ApiResponse<PedidoComercioDetalleDto>.Error("403", "No tienes acceso a este comercio.");
-
-            var pedido = await _repository.ObtenerPedidoTrackingAsync(comercioId, pedidoUuid);
-            if (pedido == null) return ApiResponse<PedidoComercioDetalleDto>.Error("404", "Pedido no encontrado.");
-
-            var permitidos = PedidoComercioRepository.ObtenerAcciones(pedido.Estado, pedido.TipoEntrega);
-            if (!permitidos.Contains(dto.Estado))
-                return ApiResponse<PedidoComercioDetalleDto>.Error("409", "La transición de estado no está permitida.");
-
-            if (pedido.EstadoPago == EstadoPagoPedido.Pagado &&
-                (dto.Estado == EstadoPedido.Rechazado || dto.Estado == EstadoPedido.Cancelado))
-                return ApiResponse<PedidoComercioDetalleDto>.Error(
-                    "409", "Un pedido pagado debe reembolsarse antes de rechazarse o cancelarse.");
-
-            var anterior = pedido.Estado;
-            pedido.Estado = dto.Estado;
-            pedido.FechaActualizacion = DateTime.UtcNow;
-            if (dto.Estado == EstadoPedido.Aprobado) pedido.FechaAprobacion = DateTime.UtcNow;
-            if (dto.Estado == EstadoPedido.Entregado) pedido.FechaEntrega = DateTime.UtcNow;
-            if (dto.Estado == EstadoPedido.Completado) pedido.FechaFinalizacion = DateTime.UtcNow;
-
-            await _repository.GuardarEstadoAsync(pedido, new PedidoHistorialEstado
-            {
-                Uuid = Guid.NewGuid(),
-                IdPedido = pedido.Id,
-                EstadoAnterior = anterior,
-                EstadoNuevo = dto.Estado,
-                IdUsuarioCambio = _jwt.GetUserId(),
-                Comentario = string.IsNullOrWhiteSpace(dto.Comentario) ? null : dto.Comentario.Trim(),
-                FechaCreacion = DateTime.UtcNow
-            });
-
-            await _notificaciones.NotificarClienteAsync(
-                pedido,
-                TipoNotificacionPedido.EstadoPedidoActualizado,
-                "Pedido actualizado",
-                $"Tu pedido {pedido.NumeroPedido} ahora está: {ObtenerTextoEstado(dto.Estado)}."
-            );
-
-            return await ObtenerDetalleAsync(comercioId, pedidoUuid);
+            if (_jwt.GetUserRole() != RolesUsuario.Comercio)
+                return ApiResponse<PedidoComercioDetalleDto>.Error("403", "Sólo el dueño del comercio puede registrar reembolsos.");
+            return await OperarAsync(comercioId, pedidoUuid, () => _repository.ReembolsarAsync(comercioId, pedidoUuid, _jwt.GetUserId(), dto, cancellationToken),
+                "Reembolso registrado", "El comercio registró la devolución del total del pedido. Revisa el método y la referencia en el detalle.", cancellationToken);
         }
 
-        public async Task<ApiResponse<PedidoComercioDetalleDto>> RevisarPagoAsync(
-            long comercioId, Guid pedidoUuid, RevisarPagoPedidoDto dto, CancellationToken cancellationToken = default)
+        public async Task<ApiResponse<PedidoComercioDetalleDto>> ConciliarInventarioAsync(
+            long comercioId, Guid pedidoUuid, ConciliarInventarioPedidoDto dto, CancellationToken cancellationToken = default)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            if (_jwt.GetUserRole() != RolesUsuario.Comercio)
+                return ApiResponse<PedidoComercioDetalleDto>.Error("403", "Sólo el dueño puede conciliar el inventario.");
+            return await OperarAsync(comercioId, pedidoUuid, () => _repository.ConciliarInventarioAsync(comercioId, pedidoUuid, _jwt.GetUserId(), dto, cancellationToken),
+                "Inventario conciliado", "El comercio revisó el inventario del pedido.", cancellationToken);
+        }
+
+        private async Task<ApiResponse<PedidoComercioDetalleDto>> OperarAsync(long comercioId, Guid uuid,
+            Func<Task<Pedido>> operar, string titulo, string mensaje, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
             if (!await Autorizado(comercioId))
                 return ApiResponse<PedidoComercioDetalleDto>.Error("403", "No tienes acceso a este comercio.");
-
-            if (dto.EstadoPago != EstadoPagoPedido.Pagado && dto.EstadoPago != EstadoPagoPedido.Rechazado)
-                return ApiResponse<PedidoComercioDetalleDto>.Error("400", "Estado de pago no válido.");
-
-            var pedido = await _repository.ObtenerPedidoTrackingAsync(comercioId, pedidoUuid);
-            if (pedido == null) return ApiResponse<PedidoComercioDetalleDto>.Error("404", "Pedido no encontrado.");
-
-            ComprobantePago? comprobante = null;
-            if (pedido.MetodoPago == MetodoPagoPedido.Transferencia)
+            try
             {
-                if (pedido.EstadoPago != EstadoPagoPedido.PendienteVerificacion)
-                    return ApiResponse<PedidoComercioDetalleDto>.Error("409", "El pago no está pendiente de verificación.");
-
-                comprobante = await _repository.ObtenerComprobanteTrackingAsync(pedido.Id);
-                if (comprobante == null)
-                    return ApiResponse<PedidoComercioDetalleDto>.Error("404", "No se encontró el comprobante.");
-
-                comprobante.Estatus = (int)dto.EstadoPago;
-                comprobante.IdUsuarioValidacion = _jwt.GetUserId();
-                comprobante.FechaValidacion = DateTime.UtcNow;
-                comprobante.Comentario = string.IsNullOrWhiteSpace(dto.Comentario) ? null : dto.Comentario.Trim();
+                var pedido = await operar();
+                // A notification failure must never turn a committed payment/refund into a failed operation.
+                try { await _notificaciones.NotificarClienteAsync(pedido, TipoNotificacionPedido.EstadoPedidoActualizado, titulo, mensaje); }
+                catch (Exception ex) { _logger?.LogWarning(ex, "No se pudo notificar la operación del pedido {PedidoUuid}", uuid); }
+                return await ObtenerDetalleAsync(comercioId, uuid, ct);
             }
-            else if (dto.EstadoPago == EstadoPagoPedido.Rechazado)
+            catch (PedidoOperacionException ex) { return ApiResponse<PedidoComercioDetalleDto>.Error(ex.Codigo, ex.Message); }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+            catch (Exception ex)
             {
-                return ApiResponse<PedidoComercioDetalleDto>.Error("400", "Un pago en efectivo no utiliza comprobante.");
+                _logger?.LogError(ex, "Falló la operación del pedido {PedidoUuid}", uuid);
+                return ApiResponse<PedidoComercioDetalleDto>.Error("500", "No se pudo confirmar la operación. Actualiza el pedido antes de reintentar; para reembolsos conserva la misma clave y referencia.");
             }
-
-            pedido.EstadoPago = dto.EstadoPago;
-            pedido.FechaActualizacion = DateTime.UtcNow;
-            await _repository.GuardarPagoAsync(pedido, comprobante);
-
-            if (dto.EstadoPago == EstadoPagoPedido.Pagado)
-                await _comisiones.RegistrarVentaAsync(pedido);
-
-            await _notificaciones.NotificarClienteAsync(
-                pedido,
-                dto.EstadoPago == EstadoPagoPedido.Pagado
-                    ? TipoNotificacionPedido.PagoAprobado
-                    : TipoNotificacionPedido.PagoRechazado,
-                dto.EstadoPago == EstadoPagoPedido.Pagado
-                    ? "Pago aprobado"
-                    : "Comprobante rechazado",
-                dto.EstadoPago == EstadoPagoPedido.Pagado
-                    ? $"El pago del pedido {pedido.NumeroPedido} fue aprobado."
-                    : $"El comprobante del pedido {pedido.NumeroPedido} fue rechazado. Envía uno nuevo."
-            );
-            return await ObtenerDetalleAsync(comercioId, pedidoUuid);
         }
 
         public async Task<ApiResponse<ArchivoComprobanteDto>> ObtenerComprobanteAsync(

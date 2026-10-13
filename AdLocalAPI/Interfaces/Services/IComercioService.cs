@@ -6,6 +6,7 @@ namespace AdLocalAPI.Interfaces.Services
 {
     public interface IComercioService
     {
+        Task<ApiResponse<string>> ActualizarZonaHorariaAsync(long id, ComercioZonaHorariaDto dto, CancellationToken ct = default);
         Task<ApiResponse<object>> GetAllComercios(
             string tipo,
             double lat,

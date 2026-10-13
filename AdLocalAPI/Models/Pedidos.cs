@@ -14,6 +14,10 @@ namespace AdLocalAPI.Models
         [Required]
         public Guid Uuid { get; set; } = Guid.NewGuid();
 
+        public long Version { get; set; }
+        public bool? RestituirReserva { get; set; }
+        public PedidoReembolso? Reembolso { get; set; }
+
         [Required]
         [MaxLength(40)]
         public string NumeroPedido { get; set; } = string.Empty;

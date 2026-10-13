@@ -81,7 +81,6 @@ namespace AdLocalAPI.Controllers
         // PROBAR CORREO
         // ==========================================
 
-        [AllowAnonymous]
         [EnableRateLimiting("auth")]
         [HttpPost("probar-correo")]
         public async Task<IActionResult> ProbarCorreo([FromBody] EmailDto dto)

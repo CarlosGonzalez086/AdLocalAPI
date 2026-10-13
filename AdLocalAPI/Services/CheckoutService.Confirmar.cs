@@ -31,82 +31,53 @@ namespace AdLocalAPI.Services
                     return ApiResponse<ConfirmarCheckoutResponseDto>.Error("404", "Usuario no encontrado.");
                 }
 
-                var carrito = await _repository.ObtenerCarritoActivoAsync(idUsuario);
-                if (carrito == null)
+                if (string.IsNullOrWhiteSpace(dto.IdempotencyKey) || dto.IdempotencyKey.Trim().Length > 100 ||
+                    dto.CarritoUuid == Guid.Empty || string.IsNullOrEmpty(dto.CarritoVersion) || dto.CarritoVersion.Length != 64 || dto.Comercios == null)
+                    return ApiResponse<ConfirmarCheckoutResponseDto>.Error("400", "Actualiza el checkout antes de confirmar: falta la clave o la versión del carrito.");
+
+                var idempotencyKey = dto.IdempotencyKey.Trim();
+                var requestHash = CheckoutOperacion.Solicitud(dto);
+                // Recuperar el resultado ANTES de buscar un carrito activo.
+                var existente = await _repository.ObtenerIdempotenciaAsync(idUsuario, idempotencyKey);
+                if (existente != null)
                 {
-                    return ApiResponse<ConfirmarCheckoutResponseDto>.Error("404", "No tienes un carrito activo.");
+                    if (existente.RequestHash != null || existente.Status == "completed")
+                        CheckoutOperacion.ValidarSolicitud(existente, requestHash);
+                    if (existente.Status == "completed")
+                        return RespuestaGuardada(existente.ResponseJson);
+                    if (existente.Status == "processing" &&
+                        existente.FechaCreacion > DateTime.UtcNow - CheckoutOperacion.EsperaLegado)
+                        throw new CheckoutConflictException("Tu pedido ya se encuentra en procesamiento. Reintenta la misma operación en unos momentos.");
+                }
+
+                var carrito = await _repository.ObtenerCarritoActivoAsync(idUsuario);
+                if (carrito == null || carrito.Uuid != dto.CarritoUuid)
+                {
+                    // Otra solicitud pudo terminar entre la primera consulta y la lectura del carrito.
+                    existente = await _repository.ObtenerIdempotenciaAsync(idUsuario, idempotencyKey);
+                    if (existente?.Status == "completed")
+                    {
+                        CheckoutOperacion.ValidarSolicitud(existente, requestHash);
+                        return RespuestaGuardada(existente.ResponseJson);
+                    }
+                    throw new CheckoutConflictException("El carrito ya se cerró o cambió. Revisa tus pedidos y actualiza el checkout.");
                 }
 
                 var items = await _repository.ObtenerProductosCarritoAsync(carrito.Id);
                 if (items.Count == 0)
-                {
                     return ApiResponse<ConfirmarCheckoutResponseDto>.Error("400", "Tu carrito está vacío.");
-                }
-
-                // ==========================================
-                // CONTROL DE IDEMPOTENCIA
-                // ==========================================
-                var idempotencyKey = !string.IsNullOrWhiteSpace(dto.IdempotencyKey)
-                    ? dto.IdempotencyKey.Trim()
-                    : $"cart_{carrito.Id}";
-
-                var idempotenciaExistente = await _repository.ObtenerIdempotenciaAsync(idUsuario, idempotencyKey);
-                if (idempotenciaExistente != null)
-                {
-                    if (idempotenciaExistente.Status == "completed" && !string.IsNullOrEmpty(idempotenciaExistente.ResponseJson))
-                    {
-                        try
-                        {
-                            var cached = System.Text.Json.JsonSerializer.Deserialize<ConfirmarCheckoutResponseDto>(
-                                idempotenciaExistente.ResponseJson
-                            );
-
-                            if (cached != null)
-                            {
-                                return ApiResponse<ConfirmarCheckoutResponseDto>.Success(
-                                    cached,
-                                    "Pedido previamente confirmado (idempotente)."
-                                );
-                            }
-                        }
-                        catch
-                        {
-                            // Ignorar error de deserialización
-                        }
-                    }
-
-                    if (idempotenciaExistente.Status == "processing")
-                    {
-                        return ApiResponse<ConfirmarCheckoutResponseDto>.Error(
-                            "409",
-                            "Tu pedido ya se encuentra en procesamiento. Por favor espera unos momentos antes de reintentar."
-                        );
-                    }
-                }
+                if (CheckoutOperacion.Carrito(items) != dto.CarritoVersion)
+                    return ApiResponse<ConfirmarCheckoutResponseDto>.Error("400", "El contenido o precio del carrito cambió. Actualiza el checkout antes de confirmar.");
 
                 var idempotenciaRegistro = new CheckoutIdempotencia
                 {
-                    IdUsuario = idUsuario,
-                    IdempotencyKey = idempotencyKey,
-                    Status = "processing",
-                    FechaCreacion = DateTime.UtcNow
+                    IdUsuario = idUsuario, IdempotencyKey = idempotencyKey,
+                    RequestHash = requestHash, Status = "processing", FechaCreacion = DateTime.UtcNow
                 };
-
-                try
-                {
-                    await _repository.RegistrarIdempotenciaInicioAsync(idempotenciaRegistro);
-                }
-                catch
-                {
-                    return ApiResponse<ConfirmarCheckoutResponseDto>.Error(
-                        "409",
-                        "Tu pedido ya se encuentra en procesamiento."
-                    );
-                }
 
                 var grupos = items.GroupBy(x => x.Producto.IdComercio).ToList();
 
-                if (dto.Comercios == null || dto.Comercios.Count != grupos.Count)
+                if (dto.Comercios == null || dto.Comercios.Count != grupos.Count || dto.Comercios.Select(x => x.ComercioUuid).Distinct().Count() != grupos.Count)
                 {
                     return ApiResponse<ConfirmarCheckoutResponseDto>.Error(
                         "400",
@@ -137,6 +108,8 @@ namespace AdLocalAPI.Services
                 foreach (var grupo in grupos)
                 {
                     var comercio = grupo.First().Comercio;
+                    if (!comercio.Activo || !comercio.Visible)
+                        return ApiResponse<ConfirmarCheckoutResponseDto>.Error("400", $"El comercio {comercio.Nombre} ya no está disponible.");
                     var configuracionCliente = dto.Comercios.FirstOrDefault(x => x.ComercioUuid == comercio.Uuid);
 
                     if (configuracionCliente == null)
@@ -316,6 +289,7 @@ namespace AdLocalAPI.Services
                             LogoUrl = producto.LogoUrl,
                             CodigoInterno = producto.CodigoInterno,
                             Cantidad = item.Cantidad,
+                            StockDescontado = producto.ManejaStock ? item.Cantidad : 0,
                             PrecioUnitario = precio,
                             Subtotal = subtotalDetalle,
                             Observaciones = item.Observaciones,
@@ -439,14 +413,18 @@ namespace AdLocalAPI.Services
                 response.TotalPedidos = pedidos.Count;
                 var responseJson = System.Text.Json.JsonSerializer.Serialize(response);
 
-                await _repository.GuardarCheckoutAsync(
+                var guardado = await _repository.GuardarCheckoutAsync(
                     pedidos,
                     productosActualizarStock,
                     carrito,
                     idempotenciaRegistro,
                     responseJson,
+                    dto.CarritoVersion,
                     cancellationToken
                 );
+
+                if (!guardado.Creado)
+                    return RespuestaGuardada(guardado.ResponseJson);
 
                 // ==========================================
                 // NOTIFICACIONES (DESACOPLADAS DEL ÉXITO DEL PEDIDO)
@@ -479,7 +457,15 @@ namespace AdLocalAPI.Services
                         : $"{pedidos.Count} pedidos creados correctamente."
                 );
             }
-            catch (InvalidOperationException invEx)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (CheckoutConflictException conflict)
+            {
+                return ApiResponse<ConfirmarCheckoutResponseDto>.Error("409", conflict.Message);
+            }
+            catch (CheckoutValidationException invEx)
             {
                 return ApiResponse<ConfirmarCheckoutResponseDto>.Error("400", invEx.Message);
             }
@@ -491,8 +477,14 @@ namespace AdLocalAPI.Services
                     _jwtContext.GetUserId()
                 );
 
-                return ApiResponse<ConfirmarCheckoutResponseDto>.Error("500", ex.Message);
+                return ApiResponse<ConfirmarCheckoutResponseDto>.Error("500", "No se pudo comprobar el resultado. Reintenta la misma operación para recuperar tu pedido.");
             }
+        }
+        private static ApiResponse<ConfirmarCheckoutResponseDto> RespuestaGuardada(string? json)
+        {
+            var response = System.Text.Json.JsonSerializer.Deserialize<ConfirmarCheckoutResponseDto>(json ?? "null")
+                ?? throw new InvalidOperationException("No se pudo recuperar el resultado guardado. Contacta a soporte antes de realizar otra compra.");
+            return ApiResponse<ConfirmarCheckoutResponseDto>.Success(response, "Pedido previamente confirmado (idempotente).");
         }
     }
 }

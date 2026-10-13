@@ -53,16 +53,13 @@ namespace AdLocalAPI.Repositories.Interfaces
                 string key
             );
 
-        Task RegistrarIdempotenciaInicioAsync(
-            CheckoutIdempotencia idempotencia
-        );
-
-        Task GuardarCheckoutAsync(
+        Task<AdLocalAPI.Helpers.CheckoutGuardado> GuardarCheckoutAsync(
             List<Pedido> pedidos,
             List<(long Id, int Cantidad, string Nombre)> productosActualizarStock,
             Carrito carrito,
-            CheckoutIdempotencia? idempotencia = null,
-            string? responseJson = null,
+            CheckoutIdempotencia idempotencia,
+            string responseJson,
+            string carritoVersion,
             CancellationToken cancellationToken = default
         );
 
@@ -75,6 +72,7 @@ namespace AdLocalAPI.Repositories.Interfaces
             Pedido pedido,
             ComprobantePago comprobante
         );
+        Task<bool> ComprobanteRegistradoAsync(Guid uuid, long idUsuario);
         Task<PagedResponse<PedidoClienteListadoDto>> ObtenerPedidosClienteAsync(
             long idUsuario,
             int page,

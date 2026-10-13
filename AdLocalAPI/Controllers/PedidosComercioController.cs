@@ -47,6 +47,18 @@ namespace AdLocalAPI.Controllers
             CancellationToken cancellationToken = default) =>
             Responder(await _service.RevisarPagoAsync(comercioId, pedidoUuid, dto, cancellationToken));
 
+        [HttpPost("{pedidoUuid:guid}/reembolso")]
+        [Authorize(Roles = "Comercio")]
+        public async Task<IActionResult> Reembolso(Guid pedidoUuid, [FromQuery] long comercioId,
+            [FromBody] RegistrarReembolsoPedidoDto dto, CancellationToken cancellationToken = default) =>
+            Responder(await _service.ReembolsarAsync(comercioId, pedidoUuid, dto, cancellationToken));
+
+        [HttpPut("{pedidoUuid:guid}/inventario/conciliacion")]
+        [Authorize(Roles = "Comercio")]
+        public async Task<IActionResult> Inventario(Guid pedidoUuid, [FromQuery] long comercioId,
+            [FromBody] ConciliarInventarioPedidoDto dto, CancellationToken cancellationToken = default) =>
+            Responder(await _service.ConciliarInventarioAsync(comercioId, pedidoUuid, dto, cancellationToken));
+
         [HttpGet("{pedidoUuid:guid}/comprobante")]
         public async Task<IActionResult> Comprobante(Guid pedidoUuid, [FromQuery] long comercioId, CancellationToken cancellationToken = default)
         {

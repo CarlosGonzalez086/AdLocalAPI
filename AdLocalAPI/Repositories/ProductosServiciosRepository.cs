@@ -125,6 +125,8 @@ namespace AdLocalAPI.Repositories
                 .Select(x => new ProductosServiciosDto
                 {
                     Id = x.Id,
+                    Uuid = x.Uuid,
+                    Version = x.Version,
                     IdComercio = x.IdComercio,
                     Nombre = x.Nombre,
                     Descripcion = x.Descripcion,

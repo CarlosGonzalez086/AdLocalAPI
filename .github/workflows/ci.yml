@@ -2,7 +2,7 @@ name: CI AdLocalAPI
 
 on:
   push:
-    branches: [main, master, develop]
+    branches: [main, master, develop, branch_Dev]
   pull_request:
     branches: [main, master, develop]
 
@@ -10,6 +10,24 @@ jobs:
   build-and-test:
     name: Build and Test API
     runs-on: ubuntu-latest
+
+    services:
+      checkout-postgres:
+        image: postgis/postgis:17-3.5
+        env:
+          POSTGRES_USER: checkout_test
+          POSTGRES_PASSWORD: checkout_ci_synthetic_only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U checkout_test -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      ADLOCAL_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Database=postgres;Username=checkout_test;Password=checkout_ci_synthetic_only;Pooling=false
 
     steps:
       - name: Checkout repository
@@ -19,6 +37,9 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+
+      - name: Reject tracked credential literals
+        run: python3 scripts/check_tracked_secrets.py
 
       - name: Restore dependencies
         run: dotnet restore AdLocalAPI.sln

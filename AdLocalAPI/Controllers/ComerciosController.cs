@@ -17,6 +17,11 @@ namespace AdLocalAPI.Controllers
             _service = service;
         }
 
+        [Authorize(Roles = "Comercio")]
+        [HttpPut("{id:long}/zona-horaria")]
+        public async Task<IActionResult> ZonaHoraria(long id, [FromBody] ComercioZonaHorariaDto dto, CancellationToken ct = default) =>
+            Responder(await _service.ActualizarZonaHorariaAsync(id, dto, ct));
+
         [Authorize]
         [HttpPost]
         public async Task<IActionResult> Crear([FromBody] ComercioCreateDto dto)
@@ -123,7 +128,7 @@ namespace AdLocalAPI.Controllers
             return Responder(response);
         }
 
-        [Authorize]
+        [Authorize(Roles = "Comercio")]
         [HttpPost("guardarColaborador")]
         public async Task<IActionResult> guardarColaborador([FromBody] ColaborarDto dto)
         {
@@ -131,7 +136,7 @@ namespace AdLocalAPI.Controllers
             return Responder(response);
         }
 
-        [Authorize]
+        [Authorize(Roles = "Comercio")]
         [HttpGet("getAllColaboradores")]
         public async Task<IActionResult> getAllColaboradores(long idComercio, int page = 1, int pageSize = 10)
         {
@@ -139,7 +144,7 @@ namespace AdLocalAPI.Controllers
             return Responder(response);
         }
 
-        [Authorize]
+        [Authorize(Roles = "Comercio")]
         [HttpPut("toggleAccesoColaborador")]
         public async Task<IActionResult> toggleAccesoColaborador(int idColaborador, long idComercio)
         {
@@ -147,7 +152,7 @@ namespace AdLocalAPI.Controllers
             return Responder(response);
         }
 
-        [Authorize]
+        [Authorize(Roles = "Comercio")]
         [HttpDelete("eliminarColaborador")]
         public async Task<IActionResult> eliminarColaborador(int idColaborador, long idComercio)
         {

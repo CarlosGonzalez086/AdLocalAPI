@@ -6,6 +6,9 @@ namespace AdLocalAPI.DTOs.UsuarioCliente.Checkout
     {
         public string? IdempotencyKey { get; set; }
 
+        public Guid CarritoUuid { get; set; }
+        public string CarritoVersion { get; set; } = string.Empty;
+
         public List<CheckoutComercioDto> Comercios { get; set; }
             = new();
     }
@@ -76,6 +79,9 @@ namespace AdLocalAPI.DTOs.UsuarioCliente.Checkout
     }
     public class CheckoutResponseDto
     {
+        public Guid CarritoUuid { get; set; }
+        public string CarritoVersion { get; set; } = string.Empty;
+
         public decimal TotalGeneral { get; set; }
 
         public List<CheckoutComercioResponseDto> Comercios { get; set; }
