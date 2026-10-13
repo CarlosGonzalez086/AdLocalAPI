@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using AdLocalAPI.DTOs;
+using AdLocalAPI.Helpers;
 using AdLocalAPI.Models;
 using AdLocalAPI.Repositories.Interfaces;
 using AdLocalAPI.Services.Interfaces;
@@ -108,6 +109,8 @@ namespace AdLocalAPI.Services
                 return ApiResponse<object>.Error("404", "No hay comisiones pendientes en el periodo.");
             }
 
+            if (pendientes.Sum(x => x.MontoComision) <= 0)
+                return ApiResponse<object>.Error("409", "El saldo está cubierto por créditos; no hay monto por cobrar.");
             var fecha = DateTime.UtcNow;
             foreach (var item in pendientes)
             {
@@ -115,7 +118,8 @@ namespace AdLocalAPI.Services
                 item.FechaPago = fecha;
             }
 
-            await _comisionRepository.ActualizarComisionesAsync(pendientes);
+            try { await _comisionRepository.ActualizarComisionesAsync(pendientes); }
+            catch (PedidoOperacionException ex) { return ApiResponse<object>.Error(ex.Codigo, ex.Message); }
 
             return ApiResponse<object>.Success(new
             {

@@ -115,9 +115,9 @@ namespace AdLocalAPI.Services
                         return ApiResponse<ProductosServiciosDto>.Error("400", "Los servicios con reservación deben tener un precio.");
                     }
 
-                    if (!dto.DuracionMinutos.HasValue || dto.DuracionMinutos.Value <= 0)
+                    if (!dto.DuracionMinutos.HasValue || dto.DuracionMinutos.Value <= 0 || dto.DuracionMinutos.Value > 1440)
                     {
-                        return ApiResponse<ProductosServiciosDto>.Error("400", "Los servicios con reservación deben indicar su duración.");
+                        return ApiResponse<ProductosServiciosDto>.Error("400", "La duración de una reservación debe ser de 1 a 1440 minutos.");
                     }
                 }
 
@@ -233,6 +233,9 @@ namespace AdLocalAPI.Services
                 return ApiResponse<bool>.Error("404", "Producto/Servicio no encontrado");
             }
 
+            if (dto.Version != entity.Version)
+                return ApiResponse<bool>.Error("409", "El producto o su inventario cambió. Vuelve a abrir el formulario antes de guardar.");
+
             if (!Enum.IsDefined(typeof(TipoProductoServicio), dto.Tipo))
             {
                 return ApiResponse<bool>.Error("400", "El tipo de producto o servicio no es válido.");
@@ -263,9 +266,9 @@ namespace AdLocalAPI.Services
                     return ApiResponse<bool>.Error("400", "Los servicios con reservación deben tener un precio.");
                 }
 
-                if (!dto.DuracionMinutos.HasValue || dto.DuracionMinutos.Value <= 0)
+                if (!dto.DuracionMinutos.HasValue || dto.DuracionMinutos.Value <= 0 || dto.DuracionMinutos.Value > 1440)
                 {
-                    return ApiResponse<bool>.Error("400", "Los servicios con reservación deben indicar su duración.");
+                    return ApiResponse<bool>.Error("400", "La duración de una reservación debe ser de 1 a 1440 minutos.");
                 }
             }
 
@@ -331,7 +334,9 @@ namespace AdLocalAPI.Services
             entity.CodigoInterno = string.IsNullOrWhiteSpace(dto.CodigoInterno) ? null : dto.CodigoInterno.Trim();
             entity.FechaActualizacion = DateTime.UtcNow;
 
-            await _repository.UpdateAsync(entity);
+            try { await _repository.UpdateAsync(entity); }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
+            { return ApiResponse<bool>.Error("409", "El inventario cambió durante la edición. Actualiza el producto."); }
 
             return ApiResponse<bool>.Success(true, "Actualizado correctamente");
         }
@@ -377,7 +382,9 @@ namespace AdLocalAPI.Services
             entity.FechaEliminado = DateTime.UtcNow;
             entity.FechaActualizacion = DateTime.UtcNow;
 
-            await _repository.UpdateAsync(entity);
+            try { await _repository.UpdateAsync(entity); }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
+            { return ApiResponse<bool>.Error("409", "El inventario cambió. Actualiza el producto e intenta nuevamente."); }
 
             return ApiResponse<bool>.Success(true, "Eliminado correctamente");
         }
@@ -416,7 +423,9 @@ namespace AdLocalAPI.Services
             entity.Activo = entity.Activo ? false : true;
             entity.FechaActualizacion = DateTime.UtcNow;
 
-            await _repository.UpdateAsync(entity);
+            try { await _repository.UpdateAsync(entity); }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
+            { return ApiResponse<bool>.Error("409", "El inventario cambió. Actualiza el producto e intenta nuevamente."); }
 
             return ApiResponse<bool>.Success(true, entity.Activo ? "Activado correctamente" : "Desactivado correctamente");
         }

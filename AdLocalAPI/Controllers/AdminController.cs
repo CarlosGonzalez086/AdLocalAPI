@@ -42,6 +42,7 @@ namespace AdLocalAPI.Controllers
             return Responder(ApiResponse.Success("Sesión cerrada correctamente"));
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpPost("crear")]
         public async Task<IActionResult> CrearAdmin([FromBody] AdminCreateDto dto)
         {
@@ -49,6 +50,7 @@ namespace AdLocalAPI.Controllers
             return Responder(response);
         }
 
+        [EnableRateLimiting("auth")]
         [HttpPost("login")]
         public async Task<IActionResult> LoginAdmin([FromBody] LoginDto dto)
         {
@@ -56,7 +58,7 @@ namespace AdLocalAPI.Controllers
             return Responder(response);
         }
 
-        [Authorize]
+        [Authorize(Roles = "Admin")]
         [HttpPut]
         public async Task<IActionResult> UpdateAdmin([FromBody] UsuarioUpdateDto dto)
         {
@@ -64,7 +66,7 @@ namespace AdLocalAPI.Controllers
             return Responder(response);
         }
 
-        [Authorize]
+        [Authorize(Roles = "Admin")]
         [HttpPut("cambiar-password")]
         public async Task<IActionResult> CambiarPassword([FromBody] ChangePasswordDto dto)
         {
@@ -72,7 +74,7 @@ namespace AdLocalAPI.Controllers
             return Responder(response);
         }
 
-        [Authorize]
+        [Authorize(Roles = "Admin")]
         [HttpGet]
         public async Task<IActionResult> VerAdmin()
         {
@@ -80,6 +82,7 @@ namespace AdLocalAPI.Controllers
             return Responder(response);
         }
 
+        [EnableRateLimiting("auth")]
         [HttpPost("forget-password")]
         public async Task<IActionResult> ForgetPassword([FromBody] EmailDto email)
         {
@@ -87,6 +90,7 @@ namespace AdLocalAPI.Controllers
             return Responder(response);
         }
 
+        [EnableRateLimiting("auth")]
         [HttpPost("new-password")]
         public async Task<IActionResult> NewPassword([FromBody] NewPasswordDto dto)
         {
@@ -94,6 +98,7 @@ namespace AdLocalAPI.Controllers
             return Responder(response);
         }
 
+        [EnableRateLimiting("auth")]
         [HttpPost("check-token")]
         public async Task<IActionResult> CheckToken(string token)
         {
@@ -101,7 +106,7 @@ namespace AdLocalAPI.Controllers
             return Responder(response);
         }
 
-        [Authorize]
+        [Authorize(Roles = "Admin")]
         [HttpPost("actualizar-jwt")]
         public async Task<IActionResult> ActualizarJwt([FromBody] UpdateJwtRequest request)
         {
@@ -112,7 +117,7 @@ namespace AdLocalAPI.Controllers
 
             if (!result.Success)
             {
-                return Responder(ApiResponse.NotFound(result.Message));
+                return Responder(ApiResponse.Error(result.Codigo, result.Message));
             }
 
             return Responder(ApiResponse<object>.Success(new

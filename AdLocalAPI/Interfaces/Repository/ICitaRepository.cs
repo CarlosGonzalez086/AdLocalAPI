@@ -5,6 +5,10 @@ namespace AdLocalAPI.Repositories.Interfaces
 {
     public interface ICitaRepository
     {
+        Task<List<string>> DisponibilidadAsync(Guid producto, DateOnly fecha, long usuario, Guid? cita, CancellationToken ct = default);
+        Task<Cita> ReservarAsync(long usuario, CrearCitaDto dto, CancellationToken ct);
+        Task<Cita> OperarAsync(Guid uuid, long actor, long? comercio, long version, EstadoCita? estado,
+            string? atiende, string? motivo, DateTime? inicio, CancellationToken ct = default, string? zonaHoraria = null);
         Task<Cita?> ObtenerPorIdAsync(long id);
 
         Task<Cita?> ObtenerPorUuidClienteAsync(
@@ -34,8 +38,5 @@ namespace AdLocalAPI.Repositories.Interfaces
 
         Task<CitaDto?> ObtenerDtoAsync(long id);
 
-        Task<Cita> CrearAsync(Cita cita);
-
-        Task GuardarCambiosAsync(Cita cita);
     }
 }

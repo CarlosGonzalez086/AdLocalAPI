@@ -361,3 +361,12 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Credenciales locales: nunca versionar ni incluir en imágenes.
+**/appsettings.Local.json
+secrets-migration.private.json
+.env
+.env.*
+!.env.example
+
+.checkout-postgres/

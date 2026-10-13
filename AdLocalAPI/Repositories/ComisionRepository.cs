@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using AdLocalAPI.Data;
+using AdLocalAPI.Helpers;
 using AdLocalAPI.DTOs;
 using AdLocalAPI.Models;
 using AdLocalAPI.Repositories.Interfaces;
@@ -27,8 +28,18 @@ namespace AdLocalAPI.Repositories
 
         public async Task AgregarAsync(Comision comision)
         {
-            _context.Comisiones.Add(comision);
-            await _context.SaveChangesAsync();
+            if (!_context.Database.IsRelational())
+            {
+                _context.Comisiones.Add(comision); await _context.SaveChangesAsync(); return;
+            }
+            await using var tx = await _context.Database.BeginTransactionAsync();
+            var actual = await _context.Pedidos.FromSqlInterpolated(
+                $"SELECT * FROM pedidos WHERE \"Id\" = {comision.IdReferencia} FOR UPDATE").AsNoTracking().SingleOrDefaultAsync();
+            if (actual?.EstadoPago == EstadoPagoPedido.Pagado && !await ExisteOperacionAsync(comision.TipoOperacion, comision.IdReferencia))
+            {
+                _context.Comisiones.Add(comision); await _context.SaveChangesAsync();
+            }
+            await tx.CommitAsync();
         }
 
         public async Task<List<Pedido>> ObtenerPedidosPendientesConciliacionAsync(int tipoOperacion)
@@ -82,7 +93,7 @@ namespace AdLocalAPI.Repositories
             var query = from c in _context.Comisiones.AsNoTracking()
                         join p in _context.Pedidos.AsNoTracking() on c.IdReferencia equals p.Id
                         join comercio in _context.Comercios.AsNoTracking() on c.IdComercio equals comercio.Id
-                        where c.Activo && c.TipoOperacion == (int)TipoOperacionComision.Venta && c.FechaCreacion >= desde
+                        where c.Activo && c.Estatus != (int)EstatusComision.Cancelada && (c.FechaCreacion >= desde || (c.TipoOperacion == (int)TipoOperacionComision.Reembolso && c.Estatus == (int)EstatusComision.Pendiente))
                         group new { c, p, comercio } by new { comercio.Id, comercio.Uuid, comercio.Nombre } into g
                         orderby g.Sum(x => x.c.Estatus == (int)EstatusComision.Pendiente ? x.c.MontoComision : 0) descending
                         select new ComisionComercioResumenDto
@@ -90,7 +101,7 @@ namespace AdLocalAPI.Repositories
                             ComercioId = g.Key.Id,
                             ComercioUuid = g.Key.Uuid,
                             Comercio = g.Key.Nombre,
-                            Ventas = g.Count(),
+                            Ventas = g.Count(x => x.c.TipoOperacion == (int)TipoOperacionComision.Venta),
                             VentasMonto = g.Sum(x => x.c.MontoOperacion),
                             ComisionGenerada = g.Sum(x => x.c.MontoComision),
                             PendientePago = g.Sum(x => x.c.Estatus == (int)EstatusComision.Pendiente ? x.c.MontoComision : 0),
@@ -112,6 +123,8 @@ namespace AdLocalAPI.Repositories
                         select new ComisionMovimientoDto
                         {
                             Uuid = c.Uuid,
+                            TipoOperacion = c.TipoOperacion,
+                            Observaciones = c.Observaciones,
                             Comercio = comercio.Nombre,
                             PedidoUuid = p.Uuid,
                             NumeroPedido = p.NumeroPedido,
@@ -134,15 +147,31 @@ namespace AdLocalAPI.Repositories
         {
             return await _context.Comisiones
                 .Where(x => x.IdComercio == comercioId && x.Activo &&
-                    x.Estatus == (int)EstatusComision.Pendiente && x.FechaCreacion >= desde &&
+                    x.Estatus == (int)EstatusComision.Pendiente && (x.FechaCreacion >= desde || x.TipoOperacion == (int)TipoOperacionComision.Reembolso) &&
                     !_context.PagosComisionesDetalle.Any(d => d.IdComision == x.Id))
                 .ToListAsync();
         }
 
         public async Task ActualizarComisionesAsync(List<Comision> comisiones)
         {
-            _context.Comisiones.UpdateRange(comisiones);
-            await _context.SaveChangesAsync();
+            if (!_context.Database.IsRelational())
+            {
+                _context.Comisiones.UpdateRange(comisiones); await _context.SaveChangesAsync(); return;
+            }
+            _context.ChangeTracker.Clear();
+            await using var tx = await _context.Database.BeginTransactionAsync();
+            var actuales = new List<Comision>();
+            foreach (var item in comisiones.OrderBy(x => x.Id))
+            {
+                var actual = await _context.Comisiones.FromSqlInterpolated(
+                    $"SELECT * FROM comisiones WHERE \"Id\" = {item.Id} FOR UPDATE").AsTracking().SingleOrDefaultAsync();
+                PedidoOperacion.Exigir(actual != null && actual.Estatus == (int)EstatusComision.Pendiente && actual.Activo &&
+                    !await _context.PagosComisionesDetalle.AnyAsync(x => x.IdComision == item.Id), "Las comisiones cambiaron; actualiza antes de liquidar.");
+                actuales.Add(actual!);
+            }
+            PedidoOperacion.Exigir(actuales.Sum(x => x.MontoComision) > 0, "El saldo está cubierto por créditos; no hay monto por cobrar.");
+            foreach (var actual in actuales) { actual.Estatus = (int)EstatusComision.Pagada; actual.FechaPago = DateTime.UtcNow; }
+            await _context.SaveChangesAsync(); await tx.CommitAsync();
         }
     }
 }

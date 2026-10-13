@@ -20,6 +20,10 @@ namespace AdLocalAPI.Models
         public DateTime FechaFin { get; set; }
         public EstadoCita Estado { get; set; } = EstadoCita.Pendiente;
         [MaxLength(500)] public string? MotivoCancelacion { get; set; }
+        public long Version { get; set; }
+        [MaxLength(100)] public string ZonaHoraria { get; set; } = Helpers.CitaOperacion.ZonaHoraria;
+        public Guid? IdempotencyKey { get; set; }
+        [MaxLength(64)] public string? RequestHash { get; set; }
         [Column("FechaCreacion", TypeName = "timestamp with time zone")]
         public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
         [Column("FechaActualizacion", TypeName = "timestamp with time zone")]

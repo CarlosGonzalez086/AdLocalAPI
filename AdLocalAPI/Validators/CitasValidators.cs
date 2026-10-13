@@ -9,13 +9,16 @@ namespace AdLocalAPI.Validators
     {
         public CrearCitaDtoValidator()
         {
+            RuleFor(x => x.ZonaHoraria).Must(Helpers.CitaOperacion.ZonaValida).WithMessage("Zona horaria no válida");
+            RuleFor(x => x.IdempotencyKey).NotEmpty();
             RuleFor(x => x.ProductoUuid)
                 .NotEmpty().WithMessage("El identificador del servicio es obligatorio")
                 .Must(id => id != Guid.Empty).WithMessage("El identificador del servicio no puede ser vacío");
 
             RuleFor(x => x.FechaInicio)
                 .NotEmpty().WithMessage("La fecha y hora de la cita es obligatoria")
-                .GreaterThan(DateTime.UtcNow.AddMinutes(-5)).WithMessage("La cita no puede ser programada en el pasado");
+                .Must(x => x.Kind == DateTimeKind.Unspecified && x.Ticks % TimeSpan.TicksPerMinute == 0)
+                .WithMessage("Utiliza la hora local del comercio sin zona ni segundos adicionales");
 
             RuleFor(x => x.NombrePersona)
                 .NotEmpty().WithMessage("El nombre de la persona que asistirá es obligatorio")
@@ -32,6 +35,7 @@ namespace AdLocalAPI.Validators
     {
         public ActualizarCitaComercioDtoValidator()
         {
+            RuleFor(x => x.VersionCita).GreaterThanOrEqualTo(0);
             RuleFor(x => x.Estado)
                 .IsInEnum().WithMessage("El estado de la cita no es válido");
 
@@ -49,9 +53,21 @@ namespace AdLocalAPI.Validators
     {
         public ReprogramarCitaDtoValidator()
         {
+            RuleFor(x => x.ZonaHoraria).Must(Helpers.CitaOperacion.ZonaValida).WithMessage("Zona horaria no válida");
+            RuleFor(x => x.VersionCita).GreaterThanOrEqualTo(0);
             RuleFor(x => x.FechaInicio)
                 .NotEmpty().WithMessage("La nueva fecha y hora de la cita es obligatoria")
-                .GreaterThan(DateTime.UtcNow.AddMinutes(-5)).WithMessage("La nueva fecha no puede ser en el pasado");
+                .Must(x => x.Kind == DateTimeKind.Unspecified && x.Ticks % TimeSpan.TicksPerMinute == 0)
+                .WithMessage("Utiliza la hora local del comercio sin zona ni segundos adicionales");
+        }
+    }
+
+    public class CancelarCitaDtoValidator : AbstractValidator<CancelarCitaDto>
+    {
+        public CancelarCitaDtoValidator()
+        {
+            RuleFor(x => x.VersionCita).GreaterThanOrEqualTo(0);
+            RuleFor(x => x.Motivo).NotEmpty().MaximumLength(500);
         }
     }
 }

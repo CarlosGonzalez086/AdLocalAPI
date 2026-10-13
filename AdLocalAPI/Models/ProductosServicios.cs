@@ -12,6 +12,10 @@ namespace AdLocalAPI.Models
         [Required]
         public Guid Uuid { get; set; } = Guid.NewGuid();
 
+        // PostgreSQL xmin protects catalog edits against checkout/refund inventory changes.
+        [Timestamp]
+        public uint Version { get; set; }
+
         [Required]
         [Column("id_comercio")]
         public long IdComercio { get; set; }

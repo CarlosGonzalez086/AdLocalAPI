@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using AdLocalAPI.DTOs;
+using AdLocalAPI.Helpers;
 using AdLocalAPI.Interfaces.Services;
 using AdLocalAPI.Models;
 using AdLocalAPI.Repositories.Interfaces;
@@ -93,7 +94,7 @@ namespace AdLocalAPI.Services
 
             var desde = Desde(dto.Periodo);
             var comisiones = await _repository.ObtenerComisionesPendientesAsync(dto.ComercioId, desde);
-            if (comisiones.Count == 0)
+            if (comisiones.Count == 0 || comisiones.Sum(x => x.MontoComision) <= 0)
             {
                 return ApiResponse<PagoComisionListadoDto>.Error("400", "No hay comisiones pendientes para este periodo.");
             }
@@ -129,7 +130,8 @@ namespace AdLocalAPI.Services
                 }).ToList()
             };
 
-            await _repository.CrearPagoAsync(pago);
+            try { await _repository.CrearPagoAsync(pago); }
+            catch (PedidoOperacionException ex) { return ApiResponse<PagoComisionListadoDto>.Error(ex.Codigo, ex.Message); }
 
             var listadoDto = new PagoComisionListadoDto
             {
@@ -172,17 +174,8 @@ namespace AdLocalAPI.Services
             pago.IdUsuarioRevision = userIdRevision;
             pago.FechaRevision = DateTime.UtcNow;
 
-            if (dto.Aprobar)
-            {
-                var ids = pago.Detalles.Select(x => x.IdComision).ToList();
-                await _repository.MarcarComisionesComoPagadasAsync(ids, pago.FechaRevision.Value);
-            }
-            else
-            {
-                await _repository.EliminarDetallesAsync(pago.Detalles);
-            }
-
-            await _repository.ActualizarPagoAsync(pago);
+            try { await _repository.ActualizarPagoAsync(pago); }
+            catch (PedidoOperacionException ex) { return ApiResponse<object>.Error(ex.Codigo, ex.Message); }
 
             return ApiResponse<object>.Success(null, dto.Aprobar ? "Pago aprobado." : "Pago rechazado.");
         }

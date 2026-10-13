@@ -22,6 +22,11 @@ namespace AdLocalAPI.Models
         [Required]
         public EstadoPedido EstadoNuevo { get; set; }
 
+        [MaxLength(30)]
+        public string Evento { get; set; } = "Estado";
+        public EstadoPagoPedido? EstadoPagoAnterior { get; set; }
+        public EstadoPagoPedido? EstadoPagoNuevo { get; set; }
+
         /*
          * Usuario que ejecutó el cambio.
          *

@@ -58,6 +58,7 @@ namespace AdLocalAPI.Services
                 {
                     Id = x.Id,
                     Uuid = x.Uuid,
+                    Version = x.Version,
                     Nombre = x.Nombre,
                     Descripcion = x.Descripcion,
                     Tipo = (int)x.Tipo,
@@ -117,13 +118,13 @@ namespace AdLocalAPI.Services
 
             var dto = new ProductosServiciosDto
             {
-                Id = entity.Id,
-                Nombre = entity.Nombre,
-                Descripcion = entity.Descripcion,
-                Tipo = (int)entity.Tipo,
-                Precio = entity.Precio,
-                Stock = entity.Stock ?? 0,
-                Activo = entity.Activo
+                Id = entity.Id, Uuid = entity.Uuid, Version = entity.Version, IdComercio = entity.IdComercio,
+                Nombre = entity.Nombre, Descripcion = entity.Descripcion, Tipo = (int)entity.Tipo,
+                Modalidad = (int)entity.Modalidad, Precio = entity.Precio, PrecioDesde = entity.PrecioDesde,
+                ManejaStock = entity.ManejaStock, Stock = entity.Stock, Disponible = entity.Disponible,
+                PermiteDomicilio = entity.PermiteDomicilio, PermiteRecoger = entity.PermiteRecoger,
+                DuracionMinutos = entity.DuracionMinutos, Activo = entity.Activo, Visible = entity.Visible,
+                CodigoInterno = entity.CodigoInterno, ImagenBase64 = entity.LogoUrl
             };
 
             return ApiResponse<ProductosServiciosDto>.Success(dto);

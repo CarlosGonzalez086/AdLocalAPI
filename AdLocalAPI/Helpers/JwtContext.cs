@@ -30,7 +30,7 @@ namespace AdLocalAPI.Helpers
                 );
             }
 
-            if (!long.TryParse(value, out var idUsuario))
+            if (!long.TryParse(value, out var idUsuario) || idUsuario <= 0)
             {
                 throw new UnauthorizedAccessException(
                     "El ID del usuario contenido en el JWT no es válido."
@@ -227,7 +227,7 @@ namespace AdLocalAPI.Helpers
 
         public bool EsAdministrador()
         {
-            return EsRol("Administrador");
+            return EsRol("Admin");
         }
     }
 }

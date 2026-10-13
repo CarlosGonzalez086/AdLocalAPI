@@ -15,6 +15,7 @@ using AdLocalAPI.Services.Interfaces;
 
 using AdLocalAPI.Interfaces.Services;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace AdLocalAPI.Services
 {
@@ -31,9 +32,11 @@ namespace AdLocalAPI.Services
         private readonly IUsoCodigoReferidoRepository _usoCodigoReferidoRepository;
         private readonly IRefreshTokenService _refreshTokenService;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly ILogger<UsuarioService> _logger;
 
         public UsuarioService(IUsuarioRepository repository, IConfiguration config, JwtContext jwtContext, IComercioRepository comercioRepository, IEmailService emailService, IWebHostEnvironment env, ISuscripcionRepository suscripcionRepository,
-            IPlanRepository planRepo, IUsoCodigoReferidoRepository usoCodigoReferidoRepository, IRefreshTokenService refreshTokenService, IHttpContextAccessor httpContextAccessor)
+            IPlanRepository planRepo, IUsoCodigoReferidoRepository usoCodigoReferidoRepository, IRefreshTokenService refreshTokenService, IHttpContextAccessor httpContextAccessor,
+            ILogger<UsuarioService>? logger = null)
         {
             _repository = repository;
             _config = config;
@@ -46,17 +49,39 @@ namespace AdLocalAPI.Services
             _usoCodigoReferidoRepository = usoCodigoReferidoRepository;
             _refreshTokenService = refreshTokenService;
             _httpContextAccessor = httpContextAccessor;
+            _logger = logger ?? NullLogger<UsuarioService>.Instance;
         }
 
-        public async Task<ApiResponse<PagedResponse<Models.Usuario>>> GetAllUsuarios(int page,
+        private ApiResponse<object>? ValidarAdministrador()
+        {
+            if (!_jwtContext.EstaAutenticado())
+                return ApiResponse<object>.Error("401", "Usuario no autenticado");
+            return _jwtContext.EsRol("Admin") ? null
+                : ApiResponse<object>.Error("403", "Se requiere permiso de administrador");
+        }
+
+        public async Task<ApiResponse<PagedResponse<UsuarioAdministracionDto>>> GetAllUsuarios(int page,
             int pageSize,
             string orderBy,
             string search)
-        {        
-                return await _repository.GetAllAsync(page, pageSize, orderBy, search);
+        {
+            var permiso = ValidarAdministrador();
+            if (permiso != null)
+                return ApiResponse<PagedResponse<UsuarioAdministracionDto>>.Error(permiso.Codigo, permiso.Mensaje);
+            var result = await _repository.GetAllAsync(page, pageSize, orderBy, search);
+            if (result.Codigo != "200" || result.Respuesta == null)
+                return ApiResponse<PagedResponse<UsuarioAdministracionDto>>.Error(result.Codigo, result.Mensaje);
+            var paged = result.Respuesta;
+            return ApiResponse<PagedResponse<UsuarioAdministracionDto>>.Success(new PagedResponse<UsuarioAdministracionDto>
+            {
+                Page = paged.Page, PageSize = paged.PageSize, TotalPages = paged.TotalPages,
+                TotalItems = paged.TotalItems, Items = paged.Items.Select(UsuarioAdministracionDto.Desde).ToList()
+            }, result.Mensaje);
         }
         public async Task<ApiResponse<object>> GetUsuarioById(int id)
         {
+            var permiso = ValidarAdministrador();
+            if (permiso != null) return permiso;
             try
             {
                 var usuario = await _repository.GetByIdAsync(id);
@@ -65,7 +90,7 @@ namespace AdLocalAPI.Services
                     return ApiResponse<object>.Error("404", "Usuario no encontrado");
 
                 return ApiResponse<object>.Success(
-                    usuario,
+                    UsuarioAdministracionDto.Desde(usuario),
                     "Usuario obtenido correctamente"
                 );
             }
@@ -77,6 +102,8 @@ namespace AdLocalAPI.Services
         public async Task<ApiResponse<object>> CrearUsuarioCliente(UsuarioRegistroDto dto, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (dto.ComercioId.HasValue)
+                return ApiResponse<object>.Error("400", "El comercio se asigna después del registro autenticado");
             if (string.IsNullOrEmpty(dto.Nombre))
                 return ApiResponse<object>.Error("400", "El nombre es obligatorio");
 
@@ -123,7 +150,7 @@ namespace AdLocalAPI.Services
                 Nombre = dto.Nombre,
                 Email = dto.Email,
                 Rol = "Comercio",
-                ComercioId = dto.ComercioId,
+                ComercioId = null,
                 CodigoReferido = codigoRef,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
                 FechaCreacion = DateTime.UtcNow,
@@ -195,6 +222,8 @@ namespace AdLocalAPI.Services
         }
         public async Task<ApiResponse<object>> CrearAdmin(AdminCreateDto dto)
         {
+            var permiso = ValidarAdministrador();
+            if (permiso != null) return permiso;
             try
             {
                 if (string.IsNullOrEmpty(dto.Nombre))
@@ -221,6 +250,7 @@ namespace AdLocalAPI.Services
                 };
 
                 var creado = await _repository.CreateAsync(admin);
+                _logger.LogWarning("Security.AdminCreated ActorId={ActorId} TargetId={TargetId}", _jwtContext.GetUserId(), creado.Id);
 
                 return ApiResponse<object>.Success(
                     new
@@ -265,12 +295,16 @@ namespace AdLocalAPI.Services
 
         public async Task<ApiResponse<object>> CambiarEstadoUsuario(long id, bool activo, string? motivo = null)
         {
+            var permiso = ValidarAdministrador();
+            if (permiso != null) return permiso;
             var usuario = await _repository.GetByIdAsync(id);
             if (usuario == null)
                 return ApiResponse<object>.Error("404", "Usuario no encontrado");
 
             usuario.Activo = activo;
             await _repository.UpdateAsync(usuario);
+            _logger.LogWarning("Security.UserStateChanged ActorId={ActorId} TargetId={TargetId} Active={Active}",
+                _jwtContext.GetUserId(), id, activo);
 
             if (!activo)
             {
@@ -283,8 +317,13 @@ namespace AdLocalAPI.Services
 
         public async Task<ApiResponse<object>> CambiarRolUsuario(long id, string nuevoRol)
         {
+            var permiso = ValidarAdministrador();
+            if (permiso != null) return permiso;
             if (string.IsNullOrWhiteSpace(nuevoRol))
                 return ApiResponse<object>.Error("400", "El rol es requerido");
+
+            if (nuevoRol.Trim() is not ("Admin" or "Comercio" or "Colaborador" or "Cliente"))
+                return ApiResponse<object>.Error("400", "El rol solicitado no es válido");
 
             var usuario = await _repository.GetByIdAsync(id);
             if (usuario == null)
@@ -292,6 +331,8 @@ namespace AdLocalAPI.Services
 
             usuario.Rol = nuevoRol.Trim();
             await _repository.UpdateAsync(usuario);
+            _logger.LogWarning("Security.UserRoleChanged ActorId={ActorId} TargetId={TargetId} Role={Role}",
+                _jwtContext.GetUserId(), id, usuario.Rol);
 
             var ip = _httpContextAccessor.HttpContext?.Connection?.RemoteIpAddress?.ToString();
             await _refreshTokenService.RevocarTodosPorUsuarioAsync(id, $"Rol modificado a {nuevoRol}", ip);
@@ -322,6 +363,8 @@ namespace AdLocalAPI.Services
         }
         public async Task<ApiResponse<object>> DeleteUsuario(int id)
         {
+            var permiso = ValidarAdministrador();
+            if (permiso != null) return permiso;
             try
             {
                 var usuario = await _repository.GetByIdAsync(id);
@@ -330,6 +373,7 @@ namespace AdLocalAPI.Services
                     return ApiResponse<object>.Error("404", "Usuario no encontrado");
 
                 await _repository.DeleteAsync(id);
+                _logger.LogWarning("Security.UserDeleted ActorId={ActorId} TargetId={TargetId}", _jwtContext.GetUserId(), id);
 
                 var ip = _httpContextAccessor.HttpContext?.Connection?.RemoteIpAddress?.ToString();
                 await _refreshTokenService.RevocarTodosPorUsuarioAsync(id, "Usuario eliminado", ip);

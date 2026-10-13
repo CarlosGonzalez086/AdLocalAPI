@@ -42,9 +42,10 @@ namespace AdLocalAPI.Validators
             RuleForEach(x => x.Comercios)
                 .SetValidator(new CheckoutComercioDtoValidator());
 
+            RuleFor(x => x.CarritoUuid).NotEmpty();
+            RuleFor(x => x.CarritoVersion).NotEmpty().Matches("^[A-Fa-f0-9]{64}$");
             RuleFor(x => x.IdempotencyKey)
-                .MaximumLength(100).WithMessage("La clave de idempotencia no puede exceder 100 caracteres")
-                .When(x => !string.IsNullOrEmpty(x.IdempotencyKey));
+                .MaximumLength(100).WithMessage("La clave de idempotencia no puede exceder 100 caracteres");
         }
     }
 

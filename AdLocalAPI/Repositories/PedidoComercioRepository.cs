@@ -3,11 +3,12 @@ using AdLocalAPI.DTOs;
 using AdLocalAPI.Models;
 using AdLocalAPI.Repositories.Interfaces;
 using AdLocalAPI.Utils;
+using AdLocalAPI.Helpers;
 using Microsoft.EntityFrameworkCore;
 
 namespace AdLocalAPI.Repositories
 {
-    public class PedidoComercioRepository : IPedidoComercioRepository
+    public partial class PedidoComercioRepository : IPedidoComercioRepository
     {
         private readonly AppDbContext _context;
 
@@ -24,6 +25,7 @@ namespace AdLocalAPI.Repositories
                     where usuario.Id == idUsuario && comercio.Activo
                     select new ComercioPedidoSelectorDto
                     {
+                        ZonaHoraria = comercio.ZonaHoraria,
                         Id = comercio.Id,
                         Uuid = comercio.Uuid,
                         Nombre = comercio.Nombre
@@ -35,6 +37,7 @@ namespace AdLocalAPI.Repositories
                 .OrderBy(x => x.Nombre)
                 .Select(x => new ComercioPedidoSelectorDto
                 {
+                    ZonaHoraria = x.ZonaHoraria,
                     Id = x.Id,
                     Uuid = x.Uuid,
                     Nombre = x.Nombre
@@ -134,7 +137,7 @@ namespace AdLocalAPI.Repositories
                 }).ToListAsync();
 
             foreach (var item in items)
-                item.AccionesDisponibles = ObtenerAcciones(item.Estado, item.TipoEntrega);
+                item.AccionesDisponibles = PedidoOperacion.Acciones(item.Estado, item.TipoEntrega, item.EstadoPago);
 
             return new PagedResponse<PedidoComercioListadoDto>
             {
@@ -153,6 +156,15 @@ namespace AdLocalAPI.Repositories
                 .Where(x => x.IdComercio == idComercio && x.Uuid == pedidoUuid)
                 .Select(x => new PedidoComercioDetalleDto
                 {
+                    Version = x.Version,
+                    RestituirReserva = x.RestituirReserva,
+                    InventarioPendiente = x.Detalles.Any(d => d.StockPorRestituir > d.StockRestituido ||
+                        ((x.Estado == EstadoPedido.Cancelado || x.Estado == EstadoPedido.Rechazado) && (d.StockDescontado == null || x.RestituirReserva == null))),
+                    Reembolso = x.Reembolso == null ? null : new PedidoReembolsoDto
+                    {
+                        Uuid = x.Reembolso.Uuid, Monto = x.Reembolso.Monto, Metodo = x.Reembolso.Metodo,
+                        Referencia = x.Reembolso.Referencia, Motivo = x.Reembolso.Motivo, FechaCreacion = x.Reembolso.FechaCreacion
+                    },
                     Uuid = x.Uuid,
                     NumeroPedido = x.NumeroPedido,
                     ClienteNombre = x.ClienteNombre,
@@ -176,6 +188,9 @@ namespace AdLocalAPI.Repositories
                         : null,
                     Productos = x.Detalles.OrderBy(d => d.Id).Select(d => new PedidoComercioProductoDto
                     {
+                        StockDescontado = d.StockDescontado,
+                        StockPorRestituir = d.StockPorRestituir,
+                        StockRestituido = d.StockRestituido,
                         Uuid = d.Uuid,
                         Nombre = d.Nombre,
                         LogoUrl = d.LogoUrl,
@@ -187,13 +202,21 @@ namespace AdLocalAPI.Repositories
                     Historial = x.HistorialEstados.OrderByDescending(h => h.FechaCreacion)
                         .Select(h => new PedidoComercioHistorialDto
                         {
+                            Evento = h.Evento,
+                            EstadoPago = h.EstadoPagoNuevo,
+                            IdUsuarioCambio = h.IdUsuarioCambio,
                             Estado = h.EstadoNuevo,
                             Comentario = h.Comentario,
                             Fecha = h.FechaCreacion
                         }).ToList()
                 }).FirstOrDefaultAsync();
 
-            if (dto != null) dto.AccionesDisponibles = ObtenerAcciones(dto.Estado, dto.TipoEntrega);
+            if (dto != null)
+            {
+                dto.AccionesDisponibles = PedidoOperacion.Acciones(dto.Estado, dto.TipoEntrega, dto.EstadoPago);
+                dto.PuedeRegistrarPago = PedidoOperacion.PuedeRegistrarPago(new Pedido { Estado = dto.Estado, EstadoPago = dto.EstadoPago });
+                dto.PuedeReembolsar = dto.EstadoPago == EstadoPagoPedido.Pagado && dto.Reembolso == null;
+            }
             return dto;
         }
 
@@ -206,34 +229,8 @@ namespace AdLocalAPI.Repositories
                 .Where(x => x.IdPedido == idPedido && x.Activo)
                 .OrderByDescending(x => x.FechaCreacion).FirstOrDefaultAsync();
 
-        public async Task GuardarEstadoAsync(Pedido pedido, PedidoHistorialEstado historial)
-        {
-            _context.Pedidos.Update(pedido);
-            await _context.Set<PedidoHistorialEstado>().AddAsync(historial);
-            await _context.SaveChangesAsync();
-        }
-
-        public async Task GuardarPagoAsync(Pedido pedido, ComprobantePago? comprobante)
-        {
-            _context.Pedidos.Update(pedido);
-            if (comprobante != null) _context.ComprobantesPago.Update(comprobante);
-            await _context.SaveChangesAsync();
-        }
-
         public static List<EstadoPedido> ObtenerAcciones(EstadoPedido estado, TipoEntregaPedido entrega) =>
-            estado switch
-            {
-                EstadoPedido.PendienteAprobacion => new() { EstadoPedido.Aprobado, EstadoPedido.Rechazado },
-                EstadoPedido.Aprobado => new() { EstadoPedido.Preparando, EstadoPedido.Cancelado },
-                EstadoPedido.Preparando => entrega == TipoEntregaPedido.Domicilio
-                    ? new() { EstadoPedido.ListoParaEnviar, EstadoPedido.Cancelado }
-                    : new() { EstadoPedido.ListoParaRecoger, EstadoPedido.Cancelado },
-                EstadoPedido.ListoParaEnviar => new() { EstadoPedido.Enviado },
-                EstadoPedido.Enviado => new() { EstadoPedido.Entregado },
-                EstadoPedido.ListoParaRecoger => new() { EstadoPedido.Entregado },
-                EstadoPedido.Entregado => new() { EstadoPedido.Completado },
-                _ => new()
-            };
+            PedidoOperacion.Acciones(estado, entrega);
 
         private static TimeZoneInfo ObtenerZonaHorariaMexico()
         {

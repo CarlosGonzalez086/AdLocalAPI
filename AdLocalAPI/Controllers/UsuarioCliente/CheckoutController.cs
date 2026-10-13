@@ -42,6 +42,8 @@ namespace AdLocalAPI.Controllers
         {
             if (!string.IsNullOrWhiteSpace(idempotencyKey))
             {
+                if (!string.IsNullOrWhiteSpace(dto.IdempotencyKey) && dto.IdempotencyKey.Trim() != idempotencyKey.Trim())
+                    return Responder(AdLocalAPI.Models.ApiResponse<ConfirmarCheckoutResponseDto>.Error("400", "La clave de idempotencia del encabezado y cuerpo debe coincidir."));
                 dto.IdempotencyKey = idempotencyKey.Trim();
             }
 

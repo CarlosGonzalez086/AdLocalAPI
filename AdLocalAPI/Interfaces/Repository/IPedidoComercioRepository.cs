@@ -14,7 +14,9 @@ namespace AdLocalAPI.Repositories.Interfaces
         Task<PedidoComercioDetalleDto?> ObtenerDetalleAsync(long idComercio, Guid pedidoUuid);
         Task<Pedido?> ObtenerPedidoTrackingAsync(long idComercio, Guid pedidoUuid);
         Task<ComprobantePago?> ObtenerComprobanteTrackingAsync(long idPedido);
-        Task GuardarEstadoAsync(Pedido pedido, PedidoHistorialEstado historial);
-        Task GuardarPagoAsync(Pedido pedido, ComprobantePago? comprobante);
+        Task<Pedido> CambiarEstadoAsync(long idComercio, Guid uuid, long actor, CambiarEstadoPedidoDto dto, CancellationToken ct);
+        Task<Pedido> RevisarPagoAsync(long idComercio, Guid uuid, long actor, RevisarPagoPedidoDto dto, CancellationToken ct);
+        Task<Pedido> ReembolsarAsync(long idComercio, Guid uuid, long actor, RegistrarReembolsoPedidoDto dto, CancellationToken ct);
+        Task<Pedido> ConciliarInventarioAsync(long idComercio, Guid uuid, long actor, ConciliarInventarioPedidoDto dto, CancellationToken ct);
     }
 }

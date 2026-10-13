@@ -28,10 +28,32 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Text;
 using System.Threading.RateLimiting;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
+
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Logging
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+
+// Configuración local para ejecución de la API.
+// La configuración para migraciones se carga también desde AppDbContextFactory.
+builder.Configuration.AddJsonFile(
+    "appsettings.Local.json",
+    optional: true,
+    reloadOnChange: builder.Environment.IsDevelopment()
+);
+
+// Conservar el cargador personalizado del proyecto.
+ConfiguracionSegura.CargarLocal(
+    builder.Configuration,
+    builder.Environment,
+    args
+);
+
+// Las variables de entorno tienen la última prioridad en la API.
+builder.Configuration.AddEnvironmentVariables();
 
 //Singlenton variable
 builder.Services.AddSingleton<StripeSettings>();
@@ -45,9 +67,10 @@ var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 builder.WebHost.UseUrls($"http://*:{port}");
 
 // JWT
-var jwtKey = Environment.GetEnvironmentVariable("JWT__Key")
-    ?? builder.Configuration["Jwt:Key"]
-    ?? throw new Exception("❌ JWT__Key no está definido");
+var jwtKey = ConfiguracionSegura.Requerir(Environment.GetEnvironmentVariable("JWT__Key")
+    ?? builder.Configuration["Jwt:Key"], "Jwt__Key");
+if (Encoding.UTF8.GetByteCount(jwtKey) < 32)
+    throw new InvalidOperationException("Jwt__Key debe tener al menos 32 bytes.");
 
 var jwtIssuer = Environment.GetEnvironmentVariable("JWT__Issuer")
     ?? builder.Configuration["Jwt:Issuer"]
@@ -57,27 +80,34 @@ var jwtAudience = Environment.GetEnvironmentVariable("JWT__Audience")
     ?? builder.Configuration["Jwt:Audience"]
     ?? "AdLocal";
 
-var webhookSecret = Environment.GetEnvironmentVariable("STRIPE_WEBHOOK_SECRET");
-
-if (string.IsNullOrWhiteSpace(webhookSecret))
-{
-    throw new Exception("Stripe Webhook Secret no configurado");
-}
+var webhookSecret = ConfiguracionSegura.Requerir(Environment.GetEnvironmentVariable("STRIPE_WEBHOOK_SECRET")
+    ?? builder.Configuration["Stripe:WebhookSecret"], "STRIPE_WEBHOOK_SECRET / Stripe__WebhookSecret");
 
 var supabaseUrl = Environment.GetEnvironmentVariable("SUPABASE__URL")
     ?? "https://uzgnfwbztoizcctyfdiv.supabase.co";
 
-var supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6Z25md2J6dG9pemNjdHlmZGl2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2Njk0MzUyNywiZXhwIjoyMDgyNTE5NTI3fQ.opjCm_q7U9GX0ah7UUgRMzQJwBQhyBupWVGJQXY6v0I";
+var supabaseKey = ConfiguracionSegura.Requerir(Environment.GetEnvironmentVariable("SUPABASE__KEY")
+    ?? builder.Configuration["Supabase:Key"], "SUPABASE__KEY");
 
 // PostgreSQL / Supabase
 var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION")
-    ?? builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? throw new Exception("No se encontró cadena de conexión");
+    ?? builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException(
+        "No se encontró la conexión PostgreSQL (DB_CONNECTION o ConnectionStrings:DefaultConnection)."
+    );
+}
+
+// Emisión y validación deben emplear exactamente la misma configuración efectiva.
+builder.Configuration["Jwt:Key"] = jwtKey;
+builder.Configuration["Jwt:Issuer"] = jwtIssuer;
+builder.Configuration["Jwt:Audience"] = jwtAudience;
+builder.Configuration["Stripe:WebhookSecret"] = webhookSecret;
 
 Stripe.StripeConfiguration.ApiKey =
    builder.Configuration["Stripe:SecretKey"];
 
-//var connectionString = "User Id=postgres.uzgnfwbztoizcctyfdiv;Password=q8dZ1szsEYIOzKrM;Server=aws-1-us-east-2.pooler.supabase.com;Port=6543;Database=postgres;SSL Mode=Require;Trust Server Certificate=true";
 
 // ======================================================
 // AUTH JWT
@@ -100,26 +130,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         ClockSkew = TimeSpan.FromMinutes(1)
     };
 
-    options.Events = new JwtBearerEvents
-    {
-        OnTokenValidated = async context =>
-        {
-            var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
-            var userIdClaim = context.Principal?.FindFirst("id")?.Value
-                ?? context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-            if (long.TryParse(userIdClaim, out var userId))
-            {
-                var user = await db.Usuarios.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
-                var (isValid, errorMessage) = AdLocalAPI.Helpers.TokenSecurityValidator.ValidarUsuarioYClaims(user, context.Principal);
-                if (!isValid)
-                {
-                    context.Fail(errorMessage!);
-                    return;
-                }
-            }
-        }
-    };
+    options.Events = TokenSecurityValidator.CrearEventos();
 });
 
 builder.Services.AddRateLimiter(options =>
@@ -278,8 +289,8 @@ builder.Services.AddScoped<IConfiguracionPagoComercioService, ConfiguracionPagoC
 builder.Services.AddScoped<ICuentaBancariaComercioRepository, CuentaBancariaComercioRepository>();
 builder.Services.AddScoped<ICuentaBancariaComercioService, CuentaBancariaComercioService>();
 
-builder.Services.AddScoped<IPedidoRepository,PedidoRepository>();
-builder.Services.AddScoped<ICheckoutService,AdLocalAPI.Services.CheckoutService>();
+builder.Services.AddScoped<IPedidoRepository, PedidoRepository>();
+builder.Services.AddScoped<ICheckoutService, AdLocalAPI.Services.CheckoutService>();
 builder.Services.AddScoped<IComprobantePagoService, ComprobantePagoService>();
 builder.Services.AddScoped<IPedidoClienteService, PedidoClienteService>();
 
@@ -292,9 +303,9 @@ builder.Services.AddScoped<IComisionService, ComisionService>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<AdLocalAPI.Interfaces.Services.IRefreshTokenService, RefreshTokenService>();
 
-builder.Services.AddScoped<ICitaService,CitaService>();
-builder.Services.AddScoped<ICitaRepository,CitaRepository>();
-builder.Services.AddScoped<IHorarioCitaServicioRepository,HorarioCitaServicioRepository>();
+builder.Services.AddScoped<ICitaService, CitaService>();
+builder.Services.AddScoped<ICitaRepository, CitaRepository>();
+builder.Services.AddScoped<IHorarioCitaServicioRepository, HorarioCitaServicioRepository>();
 
 builder.Services.AddScoped<ICotizacionRepository, CotizacionRepository>();
 builder.Services.AddScoped<ICotizacionService, CotizacionService>();
@@ -407,62 +418,6 @@ builder.Services.AddCors(options =>
 
 
 var app = builder.Build();
-
-
-//using (var scope = app.Services.CreateScope())
-//{
-//    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-//    var stripeSettings = scope.ServiceProvider.GetRequiredService<StripeSettings>();
-
-//    var secretKey = await dbContext.ConfiguracionSistema
-//        .Where(c => c.Key == "STRIPE_SECRET_KEY")
-//        .Select(c => c.Val)
-//        .FirstOrDefaultAsync();
-
-//    stripeSettings.Inicializar(secretKey ?? "sk_test_default_value");
-//}
-
-//using (var scope = app.Services.CreateScope())
-//{
-//    var repo = scope.ServiceProvider
-//        .GetRequiredService<IConfiguracionRepository>();
-
-//    var provider = scope.ServiceProvider
-//        .GetRequiredService<StripeConfigProvider>();
-
-//    var configs = await repo.ObtenerTodosAsync();
-
-//    provider.Load(configs);
-
-//    Stripe.StripeConfiguration.ApiKey = provider.SecretKey;
-
-//    Console.WriteLine("Stripe loaded from DB: " +
-//        (provider.SecretKey.StartsWith("sk_live") ? "LIVE" : "TEST"));
-//}
-
-//using (var scope = app.Services.CreateScope())
-//{
-//    var repo = scope.ServiceProvider
-//        .GetRequiredService<IConfiguracionRepository>();
-
-//    var provider = scope.ServiceProvider
-//        .GetRequiredService<ClavesConfigProvider>();
-
-//    var appConfig = scope.ServiceProvider
-//        .GetRequiredService<AppConfigState>();
-
-//    var configs = await repo.ObtenerTodosAsync();
-
-//    provider.Load(configs);
-
-//    appConfig.SetIp2LocationKey(provider.Ip2LocationKey);
-
-//    Console.WriteLine(
-//        "Ip2LocationKey loaded from DB: " + appConfig.Ip2LocationKey
-//    );
-//}
-
-
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
     ForwardedHeaders =

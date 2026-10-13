@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace AdLocalAPI.Models
 {
@@ -20,6 +21,7 @@ namespace AdLocalAPI.Models
         public string Email { get; set; } = string.Empty;
 
         [Required]
+        [JsonIgnore]
         public string PasswordHash { get; set; } = string.Empty;
 
         [Required]
@@ -36,6 +38,7 @@ namespace AdLocalAPI.Models
 
         public DateTime? UltimoAcceso { get; set; }
 
+        [JsonIgnore]
         public DateTime? TokensRevocadosAntesDe { get; set; }
 
         public long? ComercioId { get; set; }
@@ -49,13 +52,17 @@ namespace AdLocalAPI.Models
         [MaxLength(100)]
         public string? StripeCustomerId { get; set; }
 
+        [JsonIgnore]
         public string? Token { get; set; }
 
         [MaxLength(100)]
+        [JsonIgnore]
         public string? Codigo { get; set; }
 
+        [JsonIgnore]
         public DateTime? CodigoExpiracion { get; set; }
 
+        [JsonIgnore]
         public int IntentosCodigo { get; set; } = 0;
 
         [MaxLength(50)]
@@ -72,7 +79,7 @@ namespace AdLocalAPI.Models
     }
     public static class RolesUsuario
     {
-        public const string Administrador = "Administrador";
+        public const string Administrador = "Admin";
         public const string Comercio = "Comercio";
         public const string Colaborador = "Colaborador";
         public const string Cliente = "Cliente";

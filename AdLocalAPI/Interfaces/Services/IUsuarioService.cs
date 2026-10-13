@@ -5,7 +5,7 @@ namespace AdLocalAPI.Services.Interfaces
 {
     public interface IUsuarioService
     {
-        Task<ApiResponse<PagedResponse<Usuario>>> GetAllUsuarios(int page, int pageSize, string orderBy, string search);
+        Task<ApiResponse<PagedResponse<UsuarioAdministracionDto>>> GetAllUsuarios(int page, int pageSize, string orderBy, string search);
         Task<ApiResponse<object>> GetUsuarioById(int id);
         Task<ApiResponse<object>> DeleteUsuario(int id);
         Task<ApiResponse<object>> CrearUsuarioCliente(UsuarioRegistroDto dto, CancellationToken cancellationToken = default);

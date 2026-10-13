@@ -203,6 +203,7 @@ namespace AdLocalAPI.Services
 
                 var dto = new ComercioMineDto
                 {
+                    ZonaHoraria = comercio.ZonaHoraria,
                     Id = comercio.Id,
                     Nombre = comercio.Nombre,
                     Direccion = comercio.Direccion ?? "",
@@ -334,6 +335,7 @@ namespace AdLocalAPI.Services
 
                 var dto = new ComercioMineDto
                 {
+                    ZonaHoraria = comercio.ZonaHoraria,
                     Id = comercio.Id,
                     Nombre = comercio.Nombre,
                     Direccion = comercio.Direccion ?? "",

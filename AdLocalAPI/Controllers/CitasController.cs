@@ -26,9 +26,9 @@ namespace AdLocalAPI.Controllers
         [HttpGet("disponibilidad/{productoUuid:guid}")]
         public async Task<IActionResult> Disponibilidad(
             Guid productoUuid,
-            [FromQuery] DateOnly fecha)
+            [FromQuery] DateOnly fecha, [FromQuery] Guid? citaUuid = null)
         {
-            var response = await _service.HorariosAsync(productoUuid, fecha);
+            var response = await _service.HorariosAsync(productoUuid, fecha, citaUuid);
             return Responder(response);
         }
 
@@ -64,9 +64,9 @@ namespace AdLocalAPI.Controllers
         [HttpPut("{uuid:guid}/cancelar")]
         public async Task<IActionResult> Cancelar(
             Guid uuid,
-            [FromQuery] string? motivo = null)
+            [FromBody] CancelarCitaDto dto)
         {
-            var response = await _service.CancelarClienteAsync(uuid, motivo);
+            var response = await _service.CancelarClienteAsync(uuid, dto);
             return Responder(response);
         }
 

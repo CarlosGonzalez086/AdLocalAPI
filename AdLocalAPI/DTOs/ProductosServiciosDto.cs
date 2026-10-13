@@ -5,6 +5,7 @@
         public long Id { get; set; }
 
         public Guid Uuid { get; set; }
+        public uint Version { get; set; }
 
         public string Nombre { get; set; } = string.Empty;
 

@@ -121,6 +121,7 @@ namespace AdLocalAPI.Services
 
                 var comercio = new Comercio
                 {
+                    ZonaHoraria = CitaOperacion.Zona(dto.ZonaHoraria).Id,
                     Nombre = dto.Nombre,
                     Direccion = dto.Direccion,
                     Telefono = dto.Telefono,
@@ -191,6 +192,7 @@ namespace AdLocalAPI.Services
                     "El comercio se creó correctamente"
                 );
             }
+            catch (CitaOperacionException e) { return ApiResponse<object>.Error(e.Codigo, e.Message); }
             catch (FormatException)
             {
                 return ApiResponse<object>.Error(
@@ -419,6 +421,7 @@ namespace AdLocalAPI.Services
                     "El comercio se actualizó correctamente"
                 );
             }
+            catch (CitaOperacionException e) { return ApiResponse<object>.Error(e.Codigo, e.Message); }
             catch (FormatException)
             {
                 return ApiResponse<object>.Error(

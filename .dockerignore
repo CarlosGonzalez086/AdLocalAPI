@@ -1,0 +1,11 @@
+**/bin
+**/obj
+.git
+.vs
+**/appsettings.Local.json
+secrets-migration.private.json
+**/.env
+**/.env.*
+AdLocalAPI.Tests
+TestResults
+.checkout-postgres

@@ -22,6 +22,9 @@ namespace AdLocalAPI.Models
 
         public string? ResponseJson { get; set; }
 
+        [MaxLength(64)]
+        public string? RequestHash { get; set; }
+
         public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
 
         public DateTime? FechaCompletado { get; set; }

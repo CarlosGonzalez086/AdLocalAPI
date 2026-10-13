@@ -1,10 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.Security.Claims;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
-using AdLocalAPI.Constants;
 using AdLocalAPI.DTOs.UsuarioCliente.Checkout;
 using AdLocalAPI.Helpers;
 using AdLocalAPI.Models;
@@ -17,341 +12,125 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;
 
-namespace AdLocalAPI.Tests.Integration
+namespace AdLocalAPI.Tests.Integration;
+
+// Estos son tests del servicio con mocks; la concurrencia real está en CheckoutPostgresTests.
+public class CheckoutPipelineIntegrationTests
 {
-    public class CheckoutPipelineIntegrationTests
+    private sealed class Fixture
     {
-        private (CheckoutService service, Mock<IPedidoRepository> repoMock, Mock<INotificacionService> notifMock) CrearServicio(long userId = 5)
+        public readonly Mock<IPedidoRepository> Repo = new();
+        public readonly Mock<INotificacionService> Notificaciones = new();
+        public readonly Carrito Carrito = new() { Id = 10, IdUsuario = 5 };
+        public readonly List<CheckoutCarritoItemDto> Items;
+        public readonly ConfirmarCheckoutDto Dto;
+        public readonly CheckoutService Service;
+        public List<Pedido>? Guardados;
+        public Fixture()
         {
-            var httpContext = new DefaultHttpContext();
-            var claims = new List<Claim>
-            {
-                new Claim("id", userId.ToString()),
-                new Claim("rol", RolesUsuario.Cliente),
-                new Claim(ClaimTypes.Role, RolesUsuario.Cliente)
-            };
-            var identity = new ClaimsIdentity(claims, "TestAuth");
-            httpContext.User = new ClaimsPrincipal(identity);
-
-            var accessor = new HttpContextAccessor { HttpContext = httpContext };
-            var jwt = new JwtContext(accessor);
-            var repoMock = new Mock<IPedidoRepository>();
-            var notifMock = new Mock<INotificacionService>();
-
-            var service = new CheckoutService(
-                repoMock.Object,
-                jwt,
-                notifMock.Object,
-                NullLogger<CheckoutService>.Instance
-            );
-
-            return (service, repoMock, notifMock);
+            var comercio = new Comercio { Id = 1, Nombre = "Tienda sintética" };
+            Items = [new() { IdDetalleCarrito = 1, IdProductoServicio = 50, Cantidad = 2,
+                Comercio = comercio, Producto = new() { Id = 50, IdComercio = 1,
+                    Nombre = "Producto sintético", Precio = 45, ManejaStock = true, Stock = 10 } }];
+            Dto = new() { IdempotencyKey = Guid.NewGuid().ToString(), CarritoUuid = Carrito.Uuid,
+                CarritoVersion = CheckoutOperacion.Carrito(Items),
+                Comercios = [new() { ComercioUuid = comercio.Uuid, MetodoPago = MetodoPagoPedido.Efectivo,
+                    TipoEntrega = TipoEntregaPedido.Recoger }] };
+            Repo.Setup(r => r.ObtenerUsuarioAsync(5)).ReturnsAsync(new Usuario { Id = 5, Nombre = "Cliente sintético" });
+            Repo.Setup(r => r.ObtenerCarritoActivoAsync(5)).ReturnsAsync(Carrito);
+            Repo.Setup(r => r.ObtenerProductosCarritoAsync(10)).ReturnsAsync(Items);
+            Repo.Setup(r => r.ObtenerConfiguracionPagoAsync(1)).ReturnsAsync(new ConfiguracionPagoComercio { AceptaEfectivo = true });
+            Repo.Setup(r => r.GuardarCheckoutAsync(It.IsAny<List<Pedido>>(), It.IsAny<List<(long, int, string)>>(),
+                It.IsAny<Carrito>(), It.IsAny<CheckoutIdempotencia>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((List<Pedido> pedidos, List<(long,int,string)> stock, Carrito cart,
+                    CheckoutIdempotencia idempotencia, string json, string version, CancellationToken token) =>
+                    { Guardados = pedidos; return new CheckoutGuardado(json, true); });
+            var context = new DefaultHttpContext { User = new ClaimsPrincipal(new ClaimsIdentity([
+                new Claim("id", "5"), new Claim("rol", "Cliente"), new Claim(ClaimTypes.Role, "Cliente")], "test")) };
+            Service = new(Repo.Object, new JwtContext(new HttpContextAccessor { HttpContext = context }),
+                Notificaciones.Object, NullLogger<CheckoutService>.Instance);
         }
-
-        private CheckoutCarritoItemDto CrearItemCarrito(
-            long detalleId,
-            long prodId,
-            string prodNombre,
-            decimal precio,
-            int cantidad,
-            long comercioId,
-            Guid comercioUuid,
-            string comercioNombre,
-            bool manejaStock = true,
-            int stock = 10)
+        public void Cache(string status = "completed", string? json = null, DateTime? fecha = null)
         {
-            var comercio = new Comercio
-            {
-                Id = comercioId,
-                Uuid = comercioUuid,
-                Nombre = comercioNombre,
-                Activo = true
-            };
-
-            var producto = new ProductosServicios
-            {
-                Id = prodId,
-                Nombre = prodNombre,
-                Precio = precio,
-                IdComercio = comercioId,
-                Activo = true,
-                Eliminado = false,
-                Visible = true,
-                Disponible = true,
-                Modalidad = ModalidadProductoServicio.Compra,
-                PermiteRecoger = true,
-                PermiteDomicilio = true,
-                ManejaStock = manejaStock,
-                Stock = stock
-            };
-
-            return new CheckoutCarritoItemDto
-            {
-                IdDetalleCarrito = detalleId,
-                IdProductoServicio = prodId,
-                Cantidad = cantidad,
-                Comercio = comercio,
-                Producto = producto
-            };
+            Repo.Setup(r => r.ObtenerIdempotenciaAsync(5, Dto.IdempotencyKey!)).ReturnsAsync(new CheckoutIdempotencia {
+                IdUsuario = 5, IdempotencyKey = Dto.IdempotencyKey!, RequestHash = CheckoutOperacion.Solicitud(Dto),
+                Status = status, ResponseJson = json ?? JsonSerializer.Serialize(new ConfirmarCheckoutResponseDto { TotalPedidos = 1, TotalGeneral = 90 }),
+                FechaCreacion = fecha ?? DateTime.UtcNow });
         }
+        public void SinPersistencia() => Assert.Null(Guardados);
+    }
 
-        // ==============================================================
-        // 1. VALIDACIONES DE CARRITO Y CONFIGURACIÓN
-        // ==============================================================
-
-        [Fact]
-        public async Task Confirmar_CarritoVacio_Retorna400()
-        {
-            var (service, repoMock, _) = CrearServicio(5);
-
-            repoMock.Setup(r => r.ObtenerUsuarioAsync(5)).ReturnsAsync(new Usuario { Id = 5, Nombre = "Juan" });
-            repoMock.Setup(r => r.ObtenerCarritoActivoAsync(5)).ReturnsAsync(new Carrito { Id = 10, IdUsuario = 5, Activo = true });
-            repoMock.Setup(r => r.ObtenerProductosCarritoAsync(10)).ReturnsAsync(new List<CheckoutCarritoItemDto>());
-
-            var resultado = await service.Confirmar(new ConfirmarCheckoutDto());
-
-            Assert.Equal("400", resultado.Codigo);
-            Assert.Equal("Tu carrito está vacío.", resultado.Mensaje);
-        }
-
-        [Fact]
-        public async Task Confirmar_FaltaConfigurarComercio_Retorna400()
-        {
-            var (service, repoMock, _) = CrearServicio(5);
-            var comercioUuid = Guid.NewGuid();
-
-            repoMock.Setup(r => r.ObtenerUsuarioAsync(5)).ReturnsAsync(new Usuario { Id = 5, Nombre = "Juan" });
-            repoMock.Setup(r => r.ObtenerCarritoActivoAsync(5)).ReturnsAsync(new Carrito { Id = 10, IdUsuario = 5, Activo = true });
-            repoMock.Setup(r => r.ObtenerProductosCarritoAsync(10)).ReturnsAsync(new List<CheckoutCarritoItemDto>
-            {
-                CrearItemCarrito(1, 50, "Pizza Grande", 150m, 2, 1, comercioUuid, "Pizzería Test")
-            });
-
-            // Enviar DTO sin comercios
-            var resultado = await service.Confirmar(new ConfirmarCheckoutDto
-            {
-                Comercios = new List<CheckoutComercioDto>() // Lista vacía
-            });
-
-            Assert.Equal("400", resultado.Codigo);
-            Assert.Contains("Debes configurar el pago y entrega", resultado.Mensaje);
-        }
-
-        // ==============================================================
-        // 2. CONTROL DE IDEMPOTENCIA Y CONCURRENCIA
-        // ==============================================================
-
-        [Fact]
-        public async Task Confirmar_IdempotenciaCompletada_RetornaRespuestaPreviaCacheada()
-        {
-            var (service, repoMock, _) = CrearServicio(5);
-            var key = "idemp_test_key_123";
-
-            var responseOriginal = new ConfirmarCheckoutResponseDto
-            {
-                TotalPedidos = 1,
-                TotalGeneral = 300m,
-                Pedidos = new List<PedidoCheckoutResponseDto>
-                {
-                    new() { NumeroPedido = "ORD-0001", Total = 300m }
-                }
-            };
-            var json = JsonSerializer.Serialize(responseOriginal);
-
-            repoMock.Setup(r => r.ObtenerUsuarioAsync(5)).ReturnsAsync(new Usuario { Id = 5, Nombre = "Juan" });
-            repoMock.Setup(r => r.ObtenerCarritoActivoAsync(5)).ReturnsAsync(new Carrito { Id = 10, IdUsuario = 5, Activo = true });
-            repoMock.Setup(r => r.ObtenerProductosCarritoAsync(10)).ReturnsAsync(new List<CheckoutCarritoItemDto>
-            {
-                CrearItemCarrito(1, 10, "Item", 300m, 1, 1, Guid.NewGuid(), "Tienda")
-            });
-
-            repoMock.Setup(r => r.ObtenerIdempotenciaAsync(5, key)).ReturnsAsync(new CheckoutIdempotencia
-            {
-                IdUsuario = 5,
-                IdempotencyKey = key,
-                Status = "completed",
-                ResponseJson = json
-            });
-
-            var resultado = await service.Confirmar(new ConfirmarCheckoutDto { IdempotencyKey = key });
-
-            Assert.Equal("200", resultado.Codigo);
-            Assert.Equal("Pedido previamente confirmado (idempotente).", resultado.Mensaje);
-            Assert.NotNull(resultado.Respuesta);
-            Assert.Equal(300m, resultado.Respuesta.TotalGeneral);
-            // Verificar que no se volvió a invocar la persistencia del pedido
-            repoMock.Verify(r => r.GuardarCheckoutAsync(
-                It.IsAny<List<Pedido>>(),
-                It.IsAny<List<(long, int, string)>>(),
-                It.IsAny<Carrito>(),
-                It.IsAny<CheckoutIdempotencia?>(),
-                It.IsAny<string?>(),
-                It.IsAny<CancellationToken>()
-            ), Times.Never);
-        }
-
-        [Fact]
-        public async Task Confirmar_IdempotenciaEnProcesamiento_Retorna409Conflict()
-        {
-            var (service, repoMock, _) = CrearServicio(5);
-            var key = "idemp_in_progress";
-
-            repoMock.Setup(r => r.ObtenerUsuarioAsync(5)).ReturnsAsync(new Usuario { Id = 5, Nombre = "Juan" });
-            repoMock.Setup(r => r.ObtenerCarritoActivoAsync(5)).ReturnsAsync(new Carrito { Id = 10, IdUsuario = 5, Activo = true });
-            repoMock.Setup(r => r.ObtenerProductosCarritoAsync(10)).ReturnsAsync(new List<CheckoutCarritoItemDto>
-            {
-                CrearItemCarrito(1, 10, "Item", 100m, 1, 1, Guid.NewGuid(), "Tienda")
-            });
-
-            repoMock.Setup(r => r.ObtenerIdempotenciaAsync(5, key)).ReturnsAsync(new CheckoutIdempotencia
-            {
-                IdUsuario = 5,
-                IdempotencyKey = key,
-                Status = "processing"
-            });
-
-            var resultado = await service.Confirmar(new ConfirmarCheckoutDto { IdempotencyKey = key });
-
-            Assert.Equal("409", resultado.Codigo);
-            Assert.Contains("ya se encuentra en procesamiento", resultado.Mensaje);
-        }
-
-        // ==============================================================
-        // 3. FLUJO EXITOSO DE CONFIRMACIÓN Y DESCUENTO DE STOCK
-        // ==============================================================
-
-        [Fact]
-        public async Task Confirmar_FlujoExitoso_GuardaPedidoYNotificaComercio()
-        {
-            var (service, repoMock, notifMock) = CrearServicio(5);
-            var comercioUuid = Guid.NewGuid();
-
-            repoMock.Setup(r => r.ObtenerUsuarioAsync(5)).ReturnsAsync(new Usuario { Id = 5, Nombre = "Juan Pérez" });
-            repoMock.Setup(r => r.ObtenerCarritoActivoAsync(5)).ReturnsAsync(new Carrito { Id = 10, IdUsuario = 5, Activo = true });
-            repoMock.Setup(r => r.ObtenerProductosCarritoAsync(10)).ReturnsAsync(new List<CheckoutCarritoItemDto>
-            {
-                CrearItemCarrito(101, 55, "Café Americano", 45m, 2, 1, comercioUuid, "Café Central", manejaStock: true, stock: 10)
-            });
-
-            repoMock.Setup(r => r.ObtenerIdempotenciaAsync(5, It.IsAny<string>())).ReturnsAsync((CheckoutIdempotencia?)null);
-            repoMock.Setup(r => r.RegistrarIdempotenciaInicioAsync(It.IsAny<CheckoutIdempotencia>())).Returns(Task.CompletedTask);
-
-            repoMock.Setup(r => r.ObtenerConfiguracionPagoAsync(1)).ReturnsAsync(new ConfiguracionPagoComercio
-            {
-                IdComercio = 1,
-                AceptaEfectivo = true,
-                AceptaTransferencia = false
-            });
-
-            repoMock.Setup(r => r.ObtenerConfiguracionAsync(It.IsAny<string>())).ReturnsAsync((ConfiguracionSistema?)null);
-
-            List<Pedido>? pedidosGuardados = null;
-            List<(long Id, int Cantidad, string Nombre)>? stockActualizado = null;
-
-            repoMock.Setup(r => r.GuardarCheckoutAsync(
-                It.IsAny<List<Pedido>>(),
-                It.IsAny<List<(long, int, string)>>(),
-                It.IsAny<Carrito>(),
-                It.IsAny<CheckoutIdempotencia?>(),
-                It.IsAny<string?>(),
-                It.IsAny<CancellationToken>()
-            ))
-            .Callback<List<Pedido>, List<(long, int, string)>, Carrito, CheckoutIdempotencia?, string?, CancellationToken>(
-                (p, s, c, idemp, json, token) =>
-                {
-                    pedidosGuardados = p;
-                    stockActualizado = s;
-                }
-            )
-            .Returns(Task.CompletedTask);
-
-            var resultado = await service.Confirmar(new ConfirmarCheckoutDto
-            {
-                IdempotencyKey = "key_exitosa_1",
-                Comercios = new List<CheckoutComercioDto>
-                {
-                    new()
-                    {
-                        ComercioUuid = comercioUuid,
-                        MetodoPago = MetodoPagoPedido.Efectivo,
-                        TipoEntrega = TipoEntregaPedido.Recoger
-                    }
-                }
-            });
-
-            Assert.Equal("200", resultado.Codigo);
-            Assert.NotNull(pedidosGuardados);
-            Assert.Single(pedidosGuardados);
-            Assert.Equal(90m, pedidosGuardados[0].Total); // 2 x $45
-            Assert.NotNull(stockActualizado);
-            Assert.Single(stockActualizado);
-            Assert.Equal(55, stockActualizado[0].Id);
-            Assert.Equal(2, stockActualizado[0].Cantidad);
-
-            // Verificar desacoplamiento de notificaciones
-            notifMock.Verify(n => n.NotificarComercioAsync(
-                It.IsAny<Pedido>(),
-                TipoNotificacionPedido.PedidoCreado,
-                It.IsAny<string>(),
-                It.IsAny<string>()
-            ), Times.Once);
-        }
-
-        // ==============================================================
-        // 4. ATOMICIDAD ANTE FALLO DE STOCK CONCURRENTE
-        // ==============================================================
-
-        [Fact]
-        public async Task Confirmar_FalloDeStockEnBaseDeDatos_Retorna400YNoCompletaPedido()
-        {
-            var (service, repoMock, _) = CrearServicio(5);
-            var comercioUuid = Guid.NewGuid();
-
-            repoMock.Setup(r => r.ObtenerUsuarioAsync(5)).ReturnsAsync(new Usuario { Id = 5, Nombre = "Juan Pérez" });
-            repoMock.Setup(r => r.ObtenerCarritoActivoAsync(5)).ReturnsAsync(new Carrito { Id = 10, IdUsuario = 5, Activo = true });
-            repoMock.Setup(r => r.ObtenerProductosCarritoAsync(10)).ReturnsAsync(new List<CheckoutCarritoItemDto>
-            {
-                CrearItemCarrito(102, 70, "Pastel Chocolate", 200m, 5, 1, comercioUuid, "Panadería", manejaStock: true, stock: 10)
-            });
-
-            repoMock.Setup(r => r.ObtenerIdempotenciaAsync(5, It.IsAny<string>())).ReturnsAsync((CheckoutIdempotencia?)null);
-            repoMock.Setup(r => r.RegistrarIdempotenciaInicioAsync(It.IsAny<CheckoutIdempotencia>())).Returns(Task.CompletedTask);
-
-            repoMock.Setup(r => r.ObtenerConfiguracionPagoAsync(1)).ReturnsAsync(new ConfiguracionPagoComercio
-            {
-                IdComercio = 1,
-                AceptaEfectivo = true
-            });
-
-            repoMock.Setup(r => r.ObtenerConfiguracionAsync(It.IsAny<string>())).ReturnsAsync((ConfiguracionSistema?)null);
-
-            // Simular fallo atómico de stock insuficiente en BD
-            repoMock.Setup(r => r.GuardarCheckoutAsync(
-                It.IsAny<List<Pedido>>(),
-                It.IsAny<List<(long, int, string)>>(),
-                It.IsAny<Carrito>(),
-                It.IsAny<CheckoutIdempotencia?>(),
-                It.IsAny<string?>(),
-                It.IsAny<CancellationToken>()
-            ))
-            .ThrowsAsync(new InvalidOperationException("Stock insuficiente para el producto 'Pastel Chocolate'. Por favor actualiza tu carrito."));
-
-            var resultado = await service.Confirmar(new ConfirmarCheckoutDto
-            {
-                IdempotencyKey = "key_stock_fail",
-                Comercios = new List<CheckoutComercioDto>
-                {
-                    new()
-                    {
-                        ComercioUuid = comercioUuid,
-                        MetodoPago = MetodoPagoPedido.Efectivo,
-                        TipoEntrega = TipoEntregaPedido.Recoger
-                    }
-                }
-            });
-
-            Assert.Equal("400", resultado.Codigo);
-            Assert.Contains("Stock insuficiente para el producto 'Pastel Chocolate'", resultado.Mensaje);
-        }
+    [Fact] public async Task Confirmar_CarritoVacio_Retorna400()
+    {
+        var f = new Fixture(); f.Items.Clear();
+        var r = await f.Service.Confirmar(f.Dto);
+        Assert.Equal("400", r.Codigo); Assert.Equal("Tu carrito está vacío.", r.Mensaje); f.SinPersistencia();
+    }
+    [Fact] public async Task Confirmar_FaltaConfigurarComercio_Retorna400SinRegistrarIntento()
+    {
+        var f = new Fixture(); f.Dto.Comercios.Clear();
+        Assert.Equal("400", (await f.Service.Confirmar(f.Dto)).Codigo); f.SinPersistencia();
+    }
+    [Fact] public async Task Confirmar_CompletadaSinCarrito_RecuperaRespuesta()
+    {
+        var f = new Fixture(); f.Cache();
+        f.Repo.Setup(r => r.ObtenerCarritoActivoAsync(5)).ReturnsAsync((Carrito?)null);
+        var r = await f.Service.Confirmar(f.Dto);
+        Assert.Equal("200", r.Codigo); Assert.Equal(90, r.Respuesta!.TotalGeneral);
+        f.Repo.Verify(r => r.ObtenerCarritoActivoAsync(5), Times.Never); f.SinPersistencia();
+    }
+    [Fact] public async Task Confirmar_MismaClaveConPayloadDistinto_Retorna409()
+    {
+        var f = new Fixture(); f.Cache(); f.Dto.Comercios[0].Observaciones = "Cambio";
+        Assert.Equal("409", (await f.Service.Confirmar(f.Dto)).Codigo); f.SinPersistencia();
+    }
+    [Fact] public async Task Confirmar_ProcessingReciente_Retorna409()
+    {
+        var f = new Fixture(); f.Cache("processing");
+        Assert.Equal("409", (await f.Service.Confirmar(f.Dto)).Codigo); f.SinPersistencia();
+    }
+    [Fact] public async Task Confirmar_ProcessingVencido_PermiteRecuperacionTransaccional()
+    {
+        var f = new Fixture(); f.Cache("processing", fecha: DateTime.UtcNow.AddHours(-1));
+        Assert.Equal("200", (await f.Service.Confirmar(f.Dto)).Codigo); Assert.Single(f.Guardados!);
+    }
+    [Fact] public async Task Confirmar_SinConfiguracion_NoBloqueaReintento()
+    {
+        var f = new Fixture(); f.Repo.Setup(r => r.ObtenerConfiguracionPagoAsync(1)).ReturnsAsync((ConfiguracionPagoComercio?)null);
+        Assert.Equal("400", (await f.Service.Confirmar(f.Dto)).Codigo); f.SinPersistencia();
+        f.Repo.Setup(r => r.ObtenerConfiguracionPagoAsync(1)).ReturnsAsync(new ConfiguracionPagoComercio { AceptaEfectivo = true });
+        Assert.Equal("200", (await f.Service.Confirmar(f.Dto)).Codigo);
+    }
+    [Fact] public async Task Confirmar_Exitoso_NotificaUnaVez()
+    {
+        var f = new Fixture(); Assert.Equal("200", (await f.Service.Confirmar(f.Dto)).Codigo);
+        Assert.Single(f.Guardados!); Assert.Equal(90, f.Guardados![0].Total);
+        f.Notificaciones.Verify(n => n.NotificarComercioAsync(It.IsAny<Pedido>(), TipoNotificacionPedido.PedidoCreado,
+            It.IsAny<string>(), It.IsAny<string>()), Times.Once);
+    }
+    [Fact] public async Task Confirmar_CarritoCambio_Retorna400()
+    {
+        var f = new Fixture(); f.Items[0].Cantidad++;
+        Assert.Equal("400", (await f.Service.Confirmar(f.Dto)).Codigo); f.SinPersistencia();
+    }
+    [Fact] public async Task Confirmar_ClaveAusente_Retorna400()
+    {
+        var f = new Fixture(); f.Dto.IdempotencyKey = null;
+        Assert.Equal("400", (await f.Service.Confirmar(f.Dto)).Codigo); f.SinPersistencia();
+    }
+    [Fact] public async Task Confirmar_Cancelacion_NoSeConvierteEn500()
+    {
+        var f = new Fixture(); using var cts = new CancellationTokenSource(); cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => f.Service.Confirmar(f.Dto, cts.Token));
+        f.SinPersistencia();
+    }
+    [Fact] public async Task Confirmar_FalloPersistencia_NoExponeDetallesInternos()
+    {
+        var f = new Fixture();
+        f.Repo.Setup(r => r.GuardarCheckoutAsync(It.IsAny<List<Pedido>>(), It.IsAny<List<(long,int,string)>>(),
+            It.IsAny<Carrito>(), It.IsAny<CheckoutIdempotencia>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Exception("detalle privado de conexión"));
+        var r = await f.Service.Confirmar(f.Dto); Assert.Equal("500", r.Codigo);
+        Assert.DoesNotContain("privado", r.Mensaje);
     }
 }

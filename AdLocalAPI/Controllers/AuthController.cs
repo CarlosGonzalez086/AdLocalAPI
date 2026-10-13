@@ -164,7 +164,7 @@ namespace AdLocalAPI.Controllers
 
             if (!result.Success)
             {
-                return Responder(ApiResponse.NotFound(result.Message));
+                return Responder(ApiResponse.Error(result.Codigo, result.Message));
             }
 
             return Responder(ApiResponse<object>.Success(new

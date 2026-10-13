@@ -24,6 +24,8 @@ namespace AdLocalAPI.DTOs
     }
     public class ComisionMovimientoDto
     {
+        public int TipoOperacion { get; set; }
+        public string? Observaciones { get; set; }
         public Guid Uuid { get; set; }
         public string Comercio { get; set; } = string.Empty;
         public Guid PedidoUuid { get; set; }

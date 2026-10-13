@@ -7,13 +7,15 @@ using static Amazon.S3.Util.S3EventNotification;
 
 namespace AdLocalAPI.Repositories
 {
-    public class CitaRepository : ICitaRepository
+    public partial class CitaRepository : ICitaRepository
     {
         private readonly AppDbContext _context;
+        private readonly TimeProvider _reloj;
 
-        public CitaRepository(AppDbContext context)
+        public CitaRepository(AppDbContext context, TimeProvider? reloj = null)
         {
             _context = context;
+            _reloj = reloj ?? TimeProvider.System;
         }
 
         public async Task<Cita?> ObtenerPorIdAsync(long id)
@@ -106,21 +108,6 @@ namespace AdLocalAPI.Repositories
                 .FirstOrDefaultAsync();
         }
 
-        public async Task<Cita> CrearAsync(Cita cita)
-        {
-            _context.Citas.Add(cita);
-
-            await _context.SaveChangesAsync();
-
-            return cita;
-        }
-
-        public async Task GuardarCambiosAsync(Cita cita)
-        {
-            _context.Citas.Update(cita);
-            await _context.SaveChangesAsync();
-        }
-
         private IQueryable<CitaConsulta> Consulta()
         {
             return
@@ -129,7 +116,7 @@ namespace AdLocalAPI.Repositories
                 join comercio in _context.Comercios.AsNoTracking()
                     on cita.IdComercio equals comercio.Id
 
-                join servicio in _context.ProductosServicios.AsNoTracking()
+                join servicio in _context.ProductosServicios.IgnoreQueryFilters().AsNoTracking()
                     on cita.IdProductoServicio equals servicio.Id
 
                 join usuario in _context.Usuarios.AsNoTracking()
@@ -149,6 +136,11 @@ namespace AdLocalAPI.Repositories
             return new CitaDto
             {
                 Uuid = x.Cita.Uuid,
+                Version = x.Cita.Version,
+                ZonaHoraria = x.Cita.ZonaHoraria,
+                AccionesDisponibles = AdLocalAPI.Helpers.CitaOperacion.Acciones(x.Cita, AdLocalAPI.Helpers.CitaOperacion.Ahora(TimeProvider.System, x.Cita.ZonaHoraria)),
+                PuedeGestionarCliente = (x.Cita.Estado is EstadoCita.Pendiente or EstadoCita.Confirmada) &&
+                    x.Cita.FechaInicio > AdLocalAPI.Helpers.CitaOperacion.Ahora(TimeProvider.System, x.Cita.ZonaHoraria),
 
                 ProductoUuid = x.Servicio.Uuid,
 
