@@ -1,12 +1,17 @@
+using System;
+using System.Collections.Generic;
+using System.Net.Sockets;
+using System.Threading.Tasks;
 using AdLocalAPI.Constants;
 using AdLocalAPI.Interfaces;
+using AdLocalAPI.Interfaces.Services;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using MimeKit;
-
-using AdLocalAPI.Interfaces.Services;
+using SendGrid;
+using SendGrid.Helpers.Mail;
 
 namespace AdLocalAPI.Utils
 {
@@ -37,7 +42,7 @@ namespace AdLocalAPI.Utils
             }
 
             // ==========================================
-            // 1. OBTENER CONFIGURACIÓN DE BASE DE DATOS
+            // 1. OBTENER CONFIGURACIÓN DESDE BASE DE DATOS
             // ==========================================
             var configuraciones = await _repository.ObtenerTodosAsync();
 
@@ -54,14 +59,15 @@ namespace AdLocalAPI.Utils
             }
 
             // ==========================================
-            // 2. LEER CONFIGURACIÓN SMTP (DB con fallback a IConfiguration)
+            // 2. LEER CREDENCIALES (DB con prioridad absoluta, fallback a IConfiguration)
             // ==========================================
-            var host = ObtenerValor(configDict, ConfiguracionKeys.EmailHost, "Email:Host", "SMTP_HOST");
-            var portString = ObtenerValor(configDict, ConfiguracionKeys.EmailPort, "Email:Port", "SMTP_PORT");
-            var user = ObtenerValor(configDict, ConfiguracionKeys.EmailUser, "Email:User", "SMTP_USER");
-            var key = ObtenerValor(configDict, ConfiguracionKeys.EmailKey, "Email:Key", "SMTP_KEY", "Email:Password", "SMTP_PASSWORD");
-            var from = ObtenerValor(configDict, ConfiguracionKeys.EmailFrom, "Email:From", "SMTP_FROM");
-            var fromNombre = ObtenerValor(configDict, ConfiguracionKeys.EmailFromNombre, "Email:FromNombre", "Email:FromName", "SMTP_FROM_NOMBRE");
+            var host = ObtenerValor(configDict, ConfiguracionKeys.EmailHost, "SMTP_HOST", "Email:Host", "Host", "EmailHost");
+            var portString = ObtenerValor(configDict, ConfiguracionKeys.EmailPort, "SMTP_PORT", "Email:Port", "Port", "EmailPort");
+            var user = ObtenerValor(configDict, ConfiguracionKeys.EmailUser, "SMTP_USER", "Email:User", "User", "EmailUser", "Usuario");
+            var key = ObtenerValor(configDict, ConfiguracionKeys.EmailKey, "EMAIL_PASSWORD", "EMAIL_PASS", "SMTP_KEY", "SMTP_PASSWORD", "SMTP_PASS", "Email:Key", "Email:Password", "Password");
+            var from = ObtenerValor(configDict, ConfiguracionKeys.EmailFrom, "SMTP_FROM", "Email:From", "From", "EmailFrom", "FromEmail", "EmailSettingsSendGrid:FromEmail");
+            var fromNombre = ObtenerValor(configDict, ConfiguracionKeys.EmailFromNombre, "SMTP_FROM_NOMBRE", "Email:FromNombre", "Email:FromName", "FromName", "EmailSettingsSendGrid:FromName");
+            var sendGridApiKey = ObtenerValor(configDict, "SENDGRID_API_KEY", "SENDGRID_KEY", "EMAIL_SENDGRID_KEY", "SendGrid:ApiKey", "EmailSettingsSendGrid:ApiKey");
 
             if (string.IsNullOrWhiteSpace(fromNombre))
             {
@@ -80,11 +86,11 @@ namespace AdLocalAPI.Utils
             // ==========================================
             // 3. LIMPIEZA Y NORMALIZACIÓN DE CREDENCIALES
             // ==========================================
-            host = host.Trim();
-            user = user.Trim();
-            from = from.Trim();
+            host = host?.Trim() ?? string.Empty;
+            user = user?.Trim() ?? string.Empty;
+            from = from?.Trim() ?? string.Empty;
 
-            // Si la clave tiene espacios (común al copiar contraseñas de aplicación de Google "xxxx xxxx xxxx xxxx")
+            // Si la clave tiene espacios (contraseñas de aplicación de Google "xxxx xxxx xxxx xxxx")
             if (!string.IsNullOrWhiteSpace(key))
             {
                 key = key.Trim();
@@ -94,148 +100,183 @@ namespace AdLocalAPI.Utils
                 }
             }
 
-            // ==========================================
-            // 4. VALIDACIONES DE CONFIGURACIÓN
-            // ==========================================
-            if (string.IsNullOrWhiteSpace(host))
-            {
-                throw new InvalidOperationException("No se ha configurado el servidor SMTP (EMAIL_HOST) en la base de datos.");
-            }
-
             if (!int.TryParse(portString, out var port) || port <= 0 || port > 65535)
             {
                 port = host.Contains("gmail", StringComparison.OrdinalIgnoreCase) ? 587 : 587;
-                _logger.LogWarning("Puerto SMTP no especificado o inválido '{PortString}'. Usando puerto por defecto: {Port}", portString, port);
-            }
-
-            if (string.IsNullOrWhiteSpace(user))
-            {
-                throw new InvalidOperationException("No se ha configurado el usuario SMTP (EMAIL_USER) en la base de datos.");
-            }
-
-            if (string.IsNullOrWhiteSpace(key))
-            {
-                throw new InvalidOperationException("No se ha configurado la clave SMTP (EMAIL_KEY) en la base de datos.");
-            }
-
-            if (string.IsNullOrWhiteSpace(from))
-            {
-                throw new InvalidOperationException("No se ha configurado el correo remitente (EMAIL_FROM) ni un usuario SMTP válido.");
             }
 
             // ==========================================
-            // 5. CONSTRUCCIÓN DEL MENSAJE (MimeKit)
+            // 4. ENVÍO VÍA SMTP (CON TIMEOUT CONTROLADO Y AUTO-FALLBACK DE PUERTO)
             // ==========================================
-            var mensaje = new MimeMessage();
-            mensaje.From.Add(new MailboxAddress(fromNombre, from));
-            mensaje.To.Add(MailboxAddress.Parse(para.Trim()));
-            mensaje.Subject = asunto ?? "Notificación - AdLocal";
+            Exception? smtpUltimaExcepcion = null;
 
-            var bodyBuilder = new BodyBuilder
+            if (!string.IsNullOrWhiteSpace(host) && !string.IsNullOrWhiteSpace(user) && !string.IsNullOrWhiteSpace(key) && !string.IsNullOrWhiteSpace(from))
             {
-                HtmlBody = htmlContenido
-            };
-            mensaje.Body = bodyBuilder.ToMessageBody();
+                var puertosAIntentar = DeterminarPuertosAIntentar(host, port);
+
+                foreach (var (puertoIntento, opcionesSocket) in puertosAIntentar)
+                {
+                    try
+                    {
+                        _logger.LogInformation("Intentando envío SMTP a {Host}:{Port} ({Options}) para destinatario {Para}...", host, puertoIntento, opcionesSocket, para);
+
+                        using var smtp = new SmtpClient();
+                        smtp.Timeout = 8000; // 8 segundos para evitar bloqueos largos
+                        smtp.ServerCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true;
+
+                        await smtp.ConnectAsync(host, puertoIntento, opcionesSocket);
+                        await smtp.AuthenticateAsync(user, key);
+
+                        var mensaje = new MimeMessage();
+                        mensaje.From.Add(new MailboxAddress(fromNombre, from));
+                        mensaje.To.Add(MailboxAddress.Parse(para.Trim()));
+                        mensaje.Subject = asunto ?? "Notificación - AdLocal";
+
+                        var bodyBuilder = new BodyBuilder { HtmlBody = htmlContenido };
+                        mensaje.Body = bodyBuilder.ToMessageBody();
+
+                        await smtp.SendAsync(mensaje);
+                        await smtp.DisconnectAsync(true);
+
+                        _logger.LogInformation("Correo enviado exitosamente vía SMTP ({Host}:{Port}) a {Para}.", host, puertoIntento, para);
+                        return; // Éxito inmediato
+                    }
+                    catch (Exception ex)
+                    {
+                        smtpUltimaExcepcion = ex;
+                        _logger.LogWarning(ex, "Intento SMTP fallido en {Host}:{Port} ({Message}). Evaluando reintento o fallback...", host, puertoIntento, ex.Message);
+                    }
+                }
+            }
 
             // ==========================================
-            // 6. DETECCIÓN DE MODO SSL / TLS SEGÚN PUERTO
+            // 5. FALLBACK AUTOMÁTICO A SENDGRID HTTP API (PUERTO 443 HTTPS NUNCA SE BLOQUEA)
             // ==========================================
-            SecureSocketOptions socketOptions = port switch
+            var apiKeyParaSendGrid = !string.IsNullOrWhiteSpace(sendGridApiKey)
+                ? sendGridApiKey
+                : (key.StartsWith("SG.", StringComparison.OrdinalIgnoreCase) ? key : string.Empty);
+
+            if (!string.IsNullOrWhiteSpace(apiKeyParaSendGrid))
+            {
+                try
+                {
+                    _logger.LogInformation("Activando envío de correo vía SendGrid HTTP API (HTTPS 443) para {Para}...", para);
+
+                    var remitente = !string.IsNullOrWhiteSpace(from) ? from : "no-reply@adlocal.mx";
+                    var client = new SendGridClient(apiKeyParaSendGrid);
+                    var msg = MailHelper.CreateSingleEmail(
+                        new EmailAddress(remitente, fromNombre),
+                        new EmailAddress(para.Trim()),
+                        asunto ?? "Notificación - AdLocal",
+                        plainTextContent: null,
+                        htmlContent: htmlContenido
+                    );
+
+                    var response = await client.SendEmailAsync(msg);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        _logger.LogInformation("Correo enviado exitosamente a {Para} vía SendGrid HTTP API.", para);
+                        return;
+                    }
+
+                    var responseBody = await response.Body.ReadAsStringAsync();
+                    _logger.LogWarning("SendGrid API respondió con status {StatusCode}: {Body}", response.StatusCode, responseBody);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error al enviar correo vía SendGrid HTTP API a {Para}", para);
+                }
+            }
+
+            // ==========================================
+            // 6. MANEJO FINAL DE ERROR SI NINGÚN MÉTODO FUNCIONÓ
+            // ==========================================
+            if (smtpUltimaExcepcion != null)
+            {
+                throw new InvalidOperationException(
+                    $"No fue posible enviar el correo vía SMTP ({host}:{port}). Detalle: {smtpUltimaExcepcion.Message}",
+                    smtpUltimaExcepcion
+                );
+            }
+
+            throw new InvalidOperationException(
+                "No se han configurado credenciales válidas de correo electrónico (EMAIL_HOST, EMAIL_USER, EMAIL_KEY, EMAIL_FROM) en la base de datos."
+            );
+        }
+
+        private static List<(int Puerto, SecureSocketOptions Opciones)> DeterminarPuertosAIntentar(string host, int puertoConfigurado)
+        {
+            var resultado = new List<(int Puerto, SecureSocketOptions Opciones)>();
+
+            // Puerto principal según lo configurado
+            var opcionPrincipal = puertoConfigurado switch
             {
                 465 => SecureSocketOptions.SslOnConnect,
                 587 => SecureSocketOptions.StartTls,
                 25 => SecureSocketOptions.StartTlsWhenAvailable,
                 _ => SecureSocketOptions.Auto
             };
+            resultado.Add((puertoConfigurado, opcionPrincipal));
 
-            // ==========================================
-            // 7. ENVÍO VÍA MAILKIT
-            // ==========================================
-            using var smtp = new SmtpClient();
-            smtp.Timeout = 15000; // 15 segundos timeout
-
-            // Evitar bloqueos por certificados intermedios
-            smtp.ServerCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true;
-
-            try
+            // Si es 587, agregar 465 con SSL como fallback (común cuando los ISPs bloquean 587)
+            if (puertoConfigurado == 587)
             {
-                _logger.LogInformation("Conectando al servidor SMTP {Host}:{Port} ({Options})...", host, port, socketOptions);
-                await smtp.ConnectAsync(host, port, socketOptions);
+                resultado.Add((465, SecureSocketOptions.SslOnConnect));
+            }
+            // Si es 465, agregar 587 con STARTTLS como fallback
+            else if (puertoConfigurado == 465)
+            {
+                resultado.Add((587, SecureSocketOptions.StartTls));
+            }
 
-                _logger.LogInformation("Autenticando usuario SMTP: {User}...", user);
-                await smtp.AuthenticateAsync(user, key);
+            // Si es SendGrid SMTP, soporta también 2525
+            if (host.Contains("sendgrid", StringComparison.OrdinalIgnoreCase))
+            {
+                resultado.Add((2525, SecureSocketOptions.StartTls));
+            }
 
-                _logger.LogInformation("Enviando correo a {Para} con asunto: {Asunto}...", para, asunto);
-                await smtp.SendAsync(mensaje);
-
-                await smtp.DisconnectAsync(true);
-                _logger.LogInformation("Correo enviado exitosamente a {Para}.", para);
-            }
-            catch (MailKit.Security.AuthenticationException ex)
-            {
-                _logger.LogError(ex, "Error de autenticación SMTP al conectar con {User}@{Host}:{Port}", user, host, port);
-                throw new InvalidOperationException(
-                    $"Error de autenticación SMTP con el usuario '{user}'. Verifica que la clave o 'Contraseña de Aplicación' de Google sea correcta y esté activa. Detalle: {ex.Message}",
-                    ex
-                );
-            }
-            catch (MailKit.Net.Smtp.SmtpCommandException ex)
-            {
-                _logger.LogError(ex, "Error en comando SMTP ({StatusCode}) con {Host}:{Port}", ex.StatusCode, host, port);
-                throw new InvalidOperationException(
-                    $"El servidor SMTP rechazó el comando (Código {ex.StatusCode}): {ex.Message}",
-                    ex
-                );
-            }
-            catch (System.Net.Sockets.SocketException ex)
-            {
-                _logger.LogError(ex, "No se pudo establecer conexión de red con el servidor SMTP {Host}:{Port}", host, port);
-                throw new InvalidOperationException(
-                    $"No se pudo conectar al servidor SMTP '{host}:{port}'. Revisa el nombre del host, el puerto o si las reglas de red/firewall bloquean la conexión saliente. Detalle: {ex.Message}",
-                    ex
-                );
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error al enviar correo a {Para} vía {Host}:{Port}", para, host, port);
-                throw new InvalidOperationException(
-                    $"Ocurrió un error al enviar el correo: {ex.Message}",
-                    ex
-                );
-            }
+            return resultado;
         }
 
         private string ObtenerValor(
             Dictionary<string, string> dict,
             string dbKey,
-            params string[] fallbackConfigKeys)
+            params string[] fallbackKeys)
         {
-            // 1. Intentar desde base de datos con clave directa
+            // 1. Clave exacta en diccionario
             if (dict.TryGetValue(dbKey, out var val) && !string.IsNullOrWhiteSpace(val))
             {
-                return val;
+                return val.Trim();
             }
 
-            // 2. Intentar buscar en el diccionario ignorando prefijos comunes
-            foreach (var key in fallbackConfigKeys)
+            // 2. Probar claves de fallback directamente contra el diccionario
+            foreach (var key in fallbackKeys)
             {
-                var clean = key.Replace("Email:", "").Replace("SMTP_", "");
-                if (dict.TryGetValue(clean, out var altVal) && !string.IsNullOrWhiteSpace(altVal))
+                if (dict.TryGetValue(key, out var altVal) && !string.IsNullOrWhiteSpace(altVal))
                 {
-                    return altVal;
+                    return altVal.Trim();
+                }
+
+                var clean = key.Replace("Email:", "", StringComparison.OrdinalIgnoreCase)
+                               .Replace("SMTP_", "", StringComparison.OrdinalIgnoreCase)
+                               .Replace("EmailSettingsSendGrid:", "", StringComparison.OrdinalIgnoreCase);
+
+                if (dict.TryGetValue(clean, out var cleanVal) && !string.IsNullOrWhiteSpace(cleanVal))
+                {
+                    return cleanVal.Trim();
                 }
             }
 
-            // 3. Fallback a IConfiguration (appsettings.json / variables de entorno)
+            // 3. Fallback a IConfiguration (appsettings.Local.json / variables de entorno)
             if (_config != null)
             {
                 var cfgVal = _config[dbKey];
-                if (!string.IsNullOrWhiteSpace(cfgVal)) return cfgVal;
+                if (!string.IsNullOrWhiteSpace(cfgVal)) return cfgVal.Trim();
 
-                foreach (var k in fallbackConfigKeys)
+                foreach (var k in fallbackKeys)
                 {
                     cfgVal = _config[k];
-                    if (!string.IsNullOrWhiteSpace(cfgVal)) return cfgVal;
+                    if (!string.IsNullOrWhiteSpace(cfgVal)) return cfgVal.Trim();
                 }
             }
 
