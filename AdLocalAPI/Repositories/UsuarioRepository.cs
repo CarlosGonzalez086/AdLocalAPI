@@ -12,15 +12,13 @@ namespace AdLocalAPI.Repositories
     public class UsuarioRepository : IUsuarioRepository
     {
         private readonly AppDbContext _context;
-        private readonly Supabase.Client _supabaseClient;
         private readonly IWebHostEnvironment _env;
         private readonly string _bucketName = "perfil";
         private readonly IAmazonS3 _s3Client;
 
-        public UsuarioRepository(AppDbContext context, Supabase.Client supabaseClient, IWebHostEnvironment env, IAmazonS3 s3Client)
+        public UsuarioRepository(AppDbContext context, IWebHostEnvironment env, IAmazonS3 s3Client)
         {
             _context = context;
-            _supabaseClient = supabaseClient;
             _s3Client = s3Client;
             _env = env;
         }

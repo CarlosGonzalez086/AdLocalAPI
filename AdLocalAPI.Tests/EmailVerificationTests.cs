@@ -63,7 +63,7 @@ namespace AdLocalAPI.Tests
         {
             // Arrange
             using var context = CreateDbContext();
-            var repo = new UsuarioRepository(context, null!, null!, null!);
+            var repo = new UsuarioRepository(context, null!, null!);
             var service = new UsuarioService(repo, null!, null!, null!, null!, null!, null!, null!, null!, null!, null!);
 
             var user = new Usuario
@@ -104,7 +104,7 @@ namespace AdLocalAPI.Tests
         {
             // Arrange
             using var context = CreateDbContext();
-            var repo = new UsuarioRepository(context, null!, null!, null!);
+            var repo = new UsuarioRepository(context, null!, null!);
             var service = new UsuarioService(repo, null!, null!, null!, null!, null!, null!, null!, null!, null!, null!);
 
             var user = new Usuario
@@ -144,7 +144,7 @@ namespace AdLocalAPI.Tests
         {
             // Arrange
             using var context = CreateDbContext();
-            var repo = new UsuarioRepository(context, null!, null!, null!);
+            var repo = new UsuarioRepository(context, null!, null!);
             var service = new UsuarioService(repo, null!, null!, null!, null!, null!, null!, null!, null!, null!, null!);
 
             var user = new Usuario
@@ -185,7 +185,7 @@ namespace AdLocalAPI.Tests
         {
             // Arrange
             using var context = CreateDbContext();
-            var repo = new UsuarioRepository(context, null!, null!, null!);
+            var repo = new UsuarioRepository(context, null!, null!);
             var service = new UsuarioService(repo, null!, null!, null!, null!, null!, null!, null!, null!, null!, null!);
 
             var user = new Usuario
