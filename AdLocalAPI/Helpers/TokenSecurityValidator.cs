@@ -3,6 +3,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using AdLocalAPI.Models;
 using AdLocalAPI.Data;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 
@@ -26,6 +27,19 @@ namespace AdLocalAPI.Helpers
             }
         };
 
+        public const string UserCachePrefix = "user_session_security_";
+        public static readonly TimeSpan CacheDuration = TimeSpan.FromSeconds(60);
+
+        public static string ObtenerClaveCache(long usuarioId) => $"{UserCachePrefix}{usuarioId}";
+
+        public static void InvalidarCacheUsuario(IMemoryCache? cache, long usuarioId)
+        {
+            if (cache != null && usuarioId > 0)
+            {
+                cache.Remove(ObtenerClaveCache(usuarioId));
+            }
+        }
+
         public static async Task ValidarContextoAsync(TokenValidatedContext context)
         {
             var idClaim = context.Principal?.FindFirst("id")?.Value;
@@ -34,11 +48,33 @@ namespace AdLocalAPI.Helpers
                 context.Fail("Identidad de sesión inválida.");
                 return;
             }
-            var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
-            var usuario = await db.Usuarios.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id,
-                context.HttpContext.RequestAborted);
+
+            var cache = context.HttpContext.RequestServices.GetService<IMemoryCache>();
+            var cacheKey = ObtenerClaveCache(id);
+            Usuario? usuario = null;
+
+            if (cache != null && cache.TryGetValue(cacheKey, out Usuario? cachedUser))
+            {
+                usuario = cachedUser;
+            }
+            else
+            {
+                var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+                usuario = await db.Usuarios.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id,
+                    context.HttpContext.RequestAborted);
+
+                if (usuario != null && cache != null)
+                {
+                    cache.Set(cacheKey, usuario, CacheDuration);
+                }
+            }
+
             var (valid, error) = ValidarUsuarioYClaims(usuario, context.Principal);
-            if (!valid) context.Fail(error!);
+            if (!valid)
+            {
+                cache?.Remove(cacheKey);
+                context.Fail(error!);
+            }
         }
 
         /// <summary>

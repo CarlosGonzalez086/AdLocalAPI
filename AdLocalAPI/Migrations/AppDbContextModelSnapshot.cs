@@ -1581,6 +1581,8 @@ namespace AdLocalAPI.Migrations
                     b.HasIndex("Uuid")
                         .IsUnique();
 
+                    b.HasIndex("EstadoPago", "FechaCreacion", "IdComercio");
+
                     b.ToTable("pedidos");
                 });
 

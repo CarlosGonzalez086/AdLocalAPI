@@ -416,5 +416,44 @@ namespace AdLocalAPI.Tests
             var token4 = service.ExtraerRefreshToken(httpContext4.Request, null);
             Assert.Null(token4);
         }
+
+        [Fact]
+        public void EstablecerCookieRefreshToken_SetsHttpOnly_Secure_AndSameSiteStrict()
+        {
+            // Arrange
+            using var context = CreateDbContext();
+            var service = CreateService(context);
+            var httpContext = new DefaultHttpContext();
+
+            // Act
+            service.EstablecerCookieRefreshToken(httpContext.Response, "sample-token-value");
+
+            // Assert
+            var setCookieHeaders = httpContext.Response.Headers["Set-Cookie"].ToString();
+            Assert.Contains("refreshToken=sample-token-value", setCookieHeaders);
+            Assert.Contains("httponly", setCookieHeaders, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("secure", setCookieHeaders, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("samesite=strict", setCookieHeaders, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public void EliminarCookieRefreshToken_SetsExpiredDateAndSameSiteStrict()
+        {
+            // Arrange
+            using var context = CreateDbContext();
+            var service = CreateService(context);
+            var httpContext = new DefaultHttpContext();
+
+            // Act
+            service.EliminarCookieRefreshToken(httpContext.Response);
+
+            // Assert
+            var setCookieHeaders = httpContext.Response.Headers["Set-Cookie"].ToString();
+            Assert.Contains("refreshToken=", setCookieHeaders);
+            Assert.Contains("httponly", setCookieHeaders, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("secure", setCookieHeaders, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("samesite=strict", setCookieHeaders, StringComparison.OrdinalIgnoreCase);
+        }
     }
 }
+

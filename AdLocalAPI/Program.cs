@@ -197,6 +197,7 @@ builder.Services.AddValidatorsFromAssemblyContaining<ProductosServiciosDtoValida
 // SERVICIOS Y REPOSITORIOS
 // ======================================================
 
+builder.Services.AddMemoryCache();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<JwtContext>();
 
@@ -228,9 +229,9 @@ builder.Services.AddScoped<SuscripcionRepository>();
 builder.Services.AddScoped<SuscripcionService>();
 
 builder.Services.AddScoped<StripeService>();
-builder.Services.AddScoped<IGeoLocationService, GeoLocationService>();
-builder.Services.AddScoped<GeoLocationService>();
-builder.Services.AddScoped<HttpClient>();
+builder.Services.AddHttpClient();
+builder.Services.AddHttpClient<IGeoLocationService, GeoLocationService>();
+builder.Services.AddScoped<GeoLocationService>(sp => (GeoLocationService)sp.GetRequiredService<IGeoLocationService>());
 
 builder.Services.AddScoped<IConfiguracionService, ConfiguracionService>();
 builder.Services.AddScoped<IConfiguracionRepository, ConfiguracionRepository>();
@@ -429,15 +430,27 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
 // SWAGGER
 // ======================================================
 
-app.UseSwagger();
-
-app.UseSwaggerUI(options =>
+if (app.Environment.IsDevelopment())
 {
-    options.SwaggerEndpoint("/swagger/v1/swagger.json", "AdLocalAPI V1");
-    options.RoutePrefix = "swagger";
-});
+    app.UseSwagger();
 
-app.MapGet("/", () => Results.Redirect("/swagger/index.html"));
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "AdLocalAPI V1");
+        options.RoutePrefix = "swagger";
+    });
+
+    app.MapGet("/", () => Results.Redirect("/swagger/index.html"));
+}
+else
+{
+    app.MapGet("/", () => Results.Ok(new
+    {
+        mensaje = "AdLocal API Operativa",
+        ambiente = app.Environment.EnvironmentName,
+        fecha = DateTime.UtcNow
+    }));
+}
 
 app.MapGet("/ping", () => Results.Ok(new
 {
