@@ -4,7 +4,6 @@ using AdLocalAPI.Interfaces.ProductosServicios;
 using AdLocalAPI.Models;
 using Amazon.S3;
 using Microsoft.EntityFrameworkCore;
-using Supabase.Interfaces;
 using System.Linq;
 
 namespace AdLocalAPI.Repositories
@@ -12,15 +11,13 @@ namespace AdLocalAPI.Repositories
     public class ProductosServiciosRepository : IProductosServiciosRepository
     {
         private readonly AppDbContext _context;
-        private readonly Supabase.Client _supabaseClient;
         private readonly IWebHostEnvironment _env;
         private readonly string _bucketName = "productosservicios";
         private readonly IAmazonS3 _s3Client;
 
-        public ProductosServiciosRepository(AppDbContext context, Supabase.Client supabaseClient, IWebHostEnvironment env, IAmazonS3 s3Client)
+        public ProductosServiciosRepository(AppDbContext context, IWebHostEnvironment env, IAmazonS3 s3Client)
         {
             _context = context;
-            _supabaseClient = supabaseClient;
             _s3Client = s3Client;
             _env = env;
         }

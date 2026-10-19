@@ -257,7 +257,7 @@ public class CitasPostgresTests : CheckoutPostgresFixture
         Login("Comercio","7"); Assert.Equal(HttpStatusCode.OK,(await client.PutAsJsonAsync("/api/Comercios/1/zona-horaria",zona)).StatusCode);
         await app.StopAsync();
     }
-    private ComercioRepository Comercios(AppDbContext db) => new(db,null!,null!,new Mock<Amazon.S3.IAmazonS3>().Object);
+    private ComercioRepository Comercios(AppDbContext db) => new(db,null!,new Mock<Amazon.S3.IAmazonS3>().Object);
     private async Task<string> Zona(string nueva,string anterior="America/Mexico_City",long actor=7)
     { await using var db=Context(); return await Comercios(db).ActualizarZonaHorariaAsync(1,actor,new(){ZonaHoraria=nueva,ZonaHorariaAnterior=anterior}); }
     [PostgresCheckoutFact] public async Task ZonaPorComercio_ValidaContraSuHoraLocal_NoContraServidor()

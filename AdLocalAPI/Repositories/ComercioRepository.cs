@@ -6,7 +6,6 @@ using Amazon.S3;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
 using Org.BouncyCastle.Crypto.Digests;
-using Supabase.Gotrue;
 using System.Globalization;
 using System.Linq;
 using System.Text;
@@ -20,7 +19,6 @@ namespace AdLocalAPI.Repositories
     public partial class ComercioRepository : IComercioRepository
     {
         private readonly AppDbContext _context;
-        private readonly Supabase.Client _supabaseClient;
         private readonly IWebHostEnvironment _env;
         private readonly string _bucketName = "logocomercio";
         private readonly IAmazonS3 _s3Client;
@@ -47,10 +45,9 @@ namespace AdLocalAPI.Repositories
         private const double PesoDiversidad = 1.0;   
         private const double PesoDistanciaKm = 0.3;
 
-        public ComercioRepository(AppDbContext context, Supabase.Client supabaseClient, IWebHostEnvironment env, IAmazonS3 s3Client)
+        public ComercioRepository(AppDbContext context, IWebHostEnvironment env, IAmazonS3 s3Client)
         {
             _context = context;
-            _supabaseClient = supabaseClient;
             _s3Client = s3Client;
             _env = env;
         }

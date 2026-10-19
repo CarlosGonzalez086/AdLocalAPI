@@ -83,12 +83,6 @@ var jwtAudience = Environment.GetEnvironmentVariable("JWT__Audience")
 //var webhookSecret = ConfiguracionSegura.Requerir(Environment.GetEnvironmentVariable("STRIPE_WEBHOOK_SECRET")
 //    ?? builder.Configuration["Stripe:WebhookSecret"], "STRIPE_WEBHOOK_SECRET / Stripe__WebhookSecret");
 
-//var supabaseUrl = Environment.GetEnvironmentVariable("SUPABASE__URL")
-//    ?? "https://uzgnfwbztoizcctyfdiv.supabase.co";
-
-//var supabaseKey = ConfiguracionSegura.Requerir(Environment.GetEnvironmentVariable("SUPABASE__KEY")
-//    ?? builder.Configuration["Supabase:Key"], "SUPABASE__KEY");
-
 // PostgreSQL / Supabase
 var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION")
     ?? builder.Configuration.GetConnectionString("DefaultConnection");
@@ -324,11 +318,6 @@ builder.Services.AddScoped<IWebhookService, WebhookService>();
 
 
 builder.Services.AddSingleton<AppConfigState>();
-
-
-
-
-//builder.Services.AddSingleton(new Supabase.Client(supabaseUrl, supabaseKey));
 
 // ======================================================
 // CONTROLLERS + SWAGGER
