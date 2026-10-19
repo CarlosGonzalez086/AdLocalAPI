@@ -187,7 +187,7 @@ namespace AdLocalAPI.Services
             {
                 HttpOnly = true,
                 Secure = true,
-                SameSite = SameSiteMode.None,
+                SameSite = SameSiteMode.Strict,
                 Expires = DateTime.UtcNow.AddDays(DiasExpiracion),
                 Path = "/"
             };
@@ -201,7 +201,7 @@ namespace AdLocalAPI.Services
             {
                 HttpOnly = true,
                 Secure = true,
-                SameSite = SameSiteMode.None,
+                SameSite = SameSiteMode.Strict,
                 Path = "/",
                 Expires = DateTime.UtcNow.AddDays(-1)
             };

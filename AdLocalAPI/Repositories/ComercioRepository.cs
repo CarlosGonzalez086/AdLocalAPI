@@ -28,7 +28,10 @@ namespace AdLocalAPI.Repositories
 
         private const int MaxIpVisitHistory = 20;
         private const double RadioCercanosMetros = 5_000;
+        private const double MetrosPorGradoAproximado = 111_320.0;
+        private const double RadioCercanosGrados = RadioCercanosMetros / MetrosPorGradoAproximado;
         private const double RadioSugeridosMetros = 10_000;
+        private const double RadioSugeridosGrados = RadioSugeridosMetros / MetrosPorGradoAproximado;
 
 
         private const long TipoDesayuno = 1;  
@@ -134,7 +137,7 @@ namespace AdLocalAPI.Repositories
             {
                 case "cercanos":
                     comerciosBase = comerciosBase
-                        .Where(c => c.Ubicacion != null && c.Ubicacion.IsWithinDistance(userLocation, RadioCercanosMetros));
+                        .Where(c => c.Ubicacion != null && c.Ubicacion.IsWithinDistance(userLocation, RadioCercanosGrados));
                     break;
 
                 case "sugeridos":
@@ -145,7 +148,7 @@ namespace AdLocalAPI.Repositories
                     }
                     else if (lat != 0 || lng != 0)
                     {
-                        comerciosBase = comerciosBase.Where(c => c.Ubicacion != null && c.Ubicacion.IsWithinDistance(userLocation, RadioSugeridosMetros));
+                        comerciosBase = comerciosBase.Where(c => c.Ubicacion != null && c.Ubicacion.IsWithinDistance(userLocation, RadioSugeridosGrados));
                     }
                     break;
 
@@ -172,11 +175,25 @@ namespace AdLocalAPI.Repositories
                 );
 
             var hace7Dias = ahora.AddDays(-7);
-            var ventasPorComercio = await _context.Pedidos.AsNoTracking()
-                .Where(p => p.EstadoPago == EstadoPagoPedido.Pagado)
-                .GroupBy(p => p.IdComercio)
-                .Select(g => new { ComercioId = g.Key, Ventas = g.Count(), Monto = g.Sum(x => x.Total) })
-                .ToDictionaryAsync(x => x.ComercioId, x => (x.Ventas, x.Monto));
+            Dictionary<long, (int Ventas, decimal Monto)> ventasPorComercio = new();
+
+            // Optimización: Solo consultar ventas si el tipo de ordenamiento lo requiere (destacados o sugeridos)
+            // y restringir el cálculo a los últimos 7 días sobre los comercios candidatos cargados.
+            if (tipo.Equals("destacados", StringComparison.OrdinalIgnoreCase) ||
+                tipo.Equals("sugeridos", StringComparison.OrdinalIgnoreCase))
+            {
+                var comercioIds = comercios.Select(c => c.Id).ToList();
+                if (comercioIds.Count > 0)
+                {
+                    ventasPorComercio = await _context.Pedidos.AsNoTracking()
+                        .Where(p => p.EstadoPago == EstadoPagoPedido.Pagado &&
+                                    p.FechaCreacion >= hace7Dias &&
+                                    comercioIds.Contains(p.IdComercio))
+                        .GroupBy(p => p.IdComercio)
+                        .Select(g => new { ComercioId = g.Key, Ventas = g.Count(), Monto = g.Sum(x => x.Total) })
+                        .ToDictionaryAsync(x => x.ComercioId, x => (x.Ventas, x.Monto));
+                }
+            }
 
             var queryTyped = comercios.Select(c => new
             {

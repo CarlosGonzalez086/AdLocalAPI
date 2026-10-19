@@ -6,16 +6,20 @@ using AdLocalAPI.Data;
 using AdLocalAPI.Models;
 using AdLocalAPI.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
+using AdLocalAPI.Helpers;
 
 namespace AdLocalAPI.Repositories
 {
     public class RefreshTokenRepository : IRefreshTokenRepository
     {
         private readonly AppDbContext _context;
+        private readonly IMemoryCache? _cache;
 
-        public RefreshTokenRepository(AppDbContext context)
+        public RefreshTokenRepository(AppDbContext context, IMemoryCache? cache = null)
         {
             _context = context;
+            _cache = cache;
         }
 
         public async Task<RefreshToken> CrearAsync(RefreshToken token)
@@ -87,6 +91,8 @@ namespace AdLocalAPI.Repositories
             {
                 usuario.TokensRevocadosAntesDe = ahora;
             }
+
+            TokenSecurityValidator.InvalidarCacheUsuario(_cache, usuarioId);
 
             await _context.SaveChangesAsync();
         }

@@ -435,6 +435,8 @@ namespace AdLocalAPI.Data
 
                 entity.HasIndex(x => x.FechaCreacion);
 
+                entity.HasIndex(x => new { x.EstadoPago, x.FechaCreacion, x.IdComercio });
+
                 entity.HasOne<Usuario>()
                     .WithMany()
                     .HasForeignKey(x => x.IdUsuario)
