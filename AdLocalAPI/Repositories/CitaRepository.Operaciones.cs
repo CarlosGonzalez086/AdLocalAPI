@@ -9,6 +9,7 @@ public partial class CitaRepository
 {
     private async Task<(ProductosServicios servicio, string zona)> ServicioAsync(Guid uuid, CancellationToken ct)
     {
+        CitaOperacion.Exigir(uuid != Guid.Empty, "Identificador de servicio no válido.", "400");
         var producto = await _context.ProductosServicios.AsNoTracking().SingleOrDefaultAsync(x => x.Uuid == uuid, ct);
         if (producto == null) throw new CitaOperacionException("404", "Servicio no encontrado.");
         // Shared with opening-hours writes; product edits cannot change duration during this reservation.
@@ -22,6 +23,7 @@ public partial class CitaRepository
     }
     public async Task<List<string>> DisponibilidadAsync(Guid producto, DateOnly fecha, long usuario, Guid? cita, CancellationToken ct = default)
     {
+        CitaOperacion.Exigir(producto != Guid.Empty, "Identificador de servicio no válido.", "400");
         // GET is read-only; the mutation always rechecks this snapshot under the commerce lock.
         var servicio = await _context.ProductosServicios.AsNoTracking().SingleOrDefaultAsync(x => x.Uuid == producto, ct);
         if (servicio == null) throw new CitaOperacionException("404", "Servicio no encontrado.");

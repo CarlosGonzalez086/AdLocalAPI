@@ -332,6 +332,7 @@ namespace AdLocalAPI.Services
             entity.Activo = dto.Activo;
             entity.Visible = dto.Visible;
             entity.CodigoInterno = string.IsNullOrWhiteSpace(dto.CodigoInterno) ? null : dto.CodigoInterno.Trim();
+            if (entity.Uuid == Guid.Empty) entity.Uuid = Guid.NewGuid();
             entity.FechaActualizacion = DateTime.UtcNow;
 
             try { await _repository.UpdateAsync(entity); }

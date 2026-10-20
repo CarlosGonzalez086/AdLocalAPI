@@ -2001,7 +2001,9 @@ namespace AdLocalAPI.Migrations
                         .HasColumnName("tipo");
 
                     b.Property<Guid>("Uuid")
-                        .HasColumnType("uuid");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<uint>("Version")
                         .IsConcurrencyToken()
@@ -2022,6 +2024,9 @@ namespace AdLocalAPI.Migrations
                     b.HasIndex("IdComercio");
 
                     b.HasIndex("IdUsuario");
+
+                    b.HasIndex("Uuid")
+                        .IsUnique();
 
                     b.ToTable("ProductosServicios");
                 });

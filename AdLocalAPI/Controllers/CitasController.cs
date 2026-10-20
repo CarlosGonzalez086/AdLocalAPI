@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using AdLocalAPI.DTOs;
+using AdLocalAPI.Models;
 using AdLocalAPI.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -28,6 +29,10 @@ namespace AdLocalAPI.Controllers
             Guid productoUuid,
             [FromQuery] DateOnly fecha, [FromQuery] Guid? citaUuid = null)
         {
+            if (productoUuid == Guid.Empty)
+            {
+                return Responder(ApiResponse<List<string>>.Error("400", "Identificador de servicio no válido."));
+            }
             var response = await _service.HorariosAsync(productoUuid, fecha, citaUuid);
             return Responder(response);
         }

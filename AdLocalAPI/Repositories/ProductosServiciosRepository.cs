@@ -24,6 +24,10 @@ namespace AdLocalAPI.Repositories
 
         public async Task<ProductosServicios> CreateAsync(ProductosServicios entity)
         {
+            if (entity.Uuid == Guid.Empty)
+            {
+                entity.Uuid = Guid.NewGuid();
+            }
             _context.ProductosServicios.Add(entity);
             await _context.SaveChangesAsync();
             return entity;
@@ -31,18 +35,42 @@ namespace AdLocalAPI.Repositories
 
         public async Task<IEnumerable<ProductosServicios>> GetAllAsync(long idComercio)
         {
-            return await _context.ProductosServicios
-                .Where(x => x.IdComercio == idComercio).ToListAsync();                
+            var list = await _context.ProductosServicios
+                .Where(x => x.IdComercio == idComercio).ToListAsync();
+            bool reparo = false;
+            foreach (var item in list)
+            {
+                if (item.Uuid == Guid.Empty)
+                {
+                    item.Uuid = Guid.NewGuid();
+                    reparo = true;
+                }
+            }
+            if (reparo)
+            {
+                await _context.SaveChangesAsync();
+            }
+            return list;
         }
 
         public async Task<ProductosServicios?> GetByIdAsync(long id, long idComercio, long idUser)
         {
-            return await _context.ProductosServicios
+            var item = await _context.ProductosServicios
                 .FirstOrDefaultAsync(x => x.Id == id && x.IdComercio == idComercio && x.IdUsuario == idUser);
+            if (item != null && item.Uuid == Guid.Empty)
+            {
+                item.Uuid = Guid.NewGuid();
+                await _context.SaveChangesAsync();
+            }
+            return item;
         }
 
         public async Task UpdateAsync(ProductosServicios entity)
         {
+            if (entity.Uuid == Guid.Empty)
+            {
+                entity.Uuid = Guid.NewGuid();
+            }
             _context.ProductosServicios.Update(entity);
             await _context.SaveChangesAsync();
         }
@@ -241,6 +269,7 @@ namespace AdLocalAPI.Repositories
     Guid uuid
 )
         {
+            if (uuid == Guid.Empty) return null;
             return await _context.ProductosServicios
                 .FirstOrDefaultAsync(x =>
                     x.Uuid == uuid &&

@@ -236,6 +236,10 @@ namespace AdLocalAPI.Data
 
             modelBuilder.Entity<ProductosServicios>(entity =>
             {
+                entity.HasIndex(e => e.Uuid).IsUnique();
+                entity.Property(e => e.Uuid)
+                    .HasDefaultValueSql("gen_random_uuid()");
+
                 entity.HasIndex(e => e.IdComercio);
                 entity.HasIndex(e => e.IdUsuario);
                 entity.HasIndex(e => e.Activo);
