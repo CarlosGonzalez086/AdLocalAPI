@@ -22,7 +22,7 @@ namespace AdLocalAPI.Controllers
         // DISPONIBILIDAD
         // ==========================================
 
-        [Authorize(Roles = "Cliente")]
+        [AllowAnonymous]
         [HttpGet("disponibilidad/{productoUuid:guid}")]
         public async Task<IActionResult> Disponibilidad(
             Guid productoUuid,

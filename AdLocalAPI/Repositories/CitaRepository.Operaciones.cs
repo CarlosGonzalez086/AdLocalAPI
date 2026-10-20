@@ -18,7 +18,7 @@ public partial class CitaRepository
             .AsNoTracking().SingleOrDefaultAsync(ct);
         CitaOperacion.Exigir(comercio is { Activo: true, Visible: true } && producto is { Activo: true, Visible: true, Disponible: true,
             Tipo: TipoProductoServicio.Servicio, Modalidad: ModalidadProductoServicio.Reservacion }, "El servicio ya no admite reservas.");
-        return (producto!, comercio!.ZonaHoraria);
+        return (producto!, string.IsNullOrWhiteSpace(comercio!.ZonaHoraria) ? CitaOperacion.ZonaHoraria : comercio!.ZonaHoraria);
     }
     public async Task<List<string>> DisponibilidadAsync(Guid producto, DateOnly fecha, long usuario, Guid? cita, CancellationToken ct = default)
     {
@@ -27,7 +27,7 @@ public partial class CitaRepository
         if (servicio == null) throw new CitaOperacionException("404", "Servicio no encontrado.");
         var comercio = await _context.Comercios.AsNoTracking().SingleOrDefaultAsync(x => x.Id == servicio.IdComercio, ct);
         if (comercio == null) return [];
-        var zona = comercio.ZonaHoraria;
+        var zona = string.IsNullOrWhiteSpace(comercio.ZonaHoraria) ? CitaOperacion.ZonaHoraria : comercio.ZonaHoraria;
         var ahora = CitaOperacion.Ahora(_reloj, zona);
         if (fecha < DateOnly.FromDateTime(ahora) || fecha > DateOnly.FromDateTime(ahora).AddDays(365)) return [];
         if (!servicio.Activo || !servicio.Visible || !servicio.Disponible || servicio.Tipo != TipoProductoServicio.Servicio ||

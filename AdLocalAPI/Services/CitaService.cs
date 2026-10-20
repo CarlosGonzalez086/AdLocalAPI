@@ -14,8 +14,16 @@ public partial class CitaService(ICitaRepository citaRepository, IComercioReposi
     private readonly IComercioRepository _comercioRepository = comercioRepository;
     private readonly JwtContext _jwt = jwt;
     private readonly ILogger<CitaService> _logger = logger;
-    public async Task<ApiResponse<List<string>>> HorariosAsync(Guid productoUuid, DateOnly fecha, Guid? citaUuid = null) =>
-        await EjecutarAsync(() => _citaRepository.DisponibilidadAsync(productoUuid, fecha, _jwt.GetUserId(), citaUuid));
+    public async Task<ApiResponse<List<string>>> HorariosAsync(Guid productoUuid, DateOnly fecha, Guid? citaUuid = null)
+    {
+        long usuarioId = 0;
+        if (citaUuid.HasValue)
+        {
+            try { usuarioId = _jwt.GetUserId(); }
+            catch { return ApiResponse<List<string>>.Error("401", "Inicia sesión para consultar la cita a reprogramar."); }
+        }
+        return await EjecutarAsync(() => _citaRepository.DisponibilidadAsync(productoUuid, fecha, usuarioId, citaUuid));
+    }
     public async Task<ApiResponse<List<CitaDto>>> MisCitasAsync()
     {
         var datos = await _citaRepository.ObtenerPorUsuarioAsync(_jwt.GetUserId());
