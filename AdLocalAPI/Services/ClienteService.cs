@@ -320,7 +320,7 @@ namespace AdLocalAPI.Services
                 audience: jwtAudience,
                 claims: claims,
                 notBefore: DateTime.UtcNow,
-                expires: DateTime.UtcNow.AddMinutes(60),
+                expires: DateTime.UtcNow.AddHours(8),
                 signingCredentials: creds
             );
 
