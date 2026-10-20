@@ -223,8 +223,8 @@ namespace AdLocalAPI.Services
                 return altVal;
             }
 
-            // 2. Probar body proporcionado
-            if (!string.IsNullOrWhiteSpace(bodyToken))
+            // 2. Probar body proporcionado (descartando JWTs que accidentalmente se pasen como token actual)
+            if (!string.IsNullOrWhiteSpace(bodyToken) && !EsJwt(bodyToken))
             {
                 return bodyToken;
             }
@@ -236,6 +236,12 @@ namespace AdLocalAPI.Services
             }
 
             return null;
+        }
+
+        private static bool EsJwt(string token)
+        {
+            return token.StartsWith("eyJ", StringComparison.OrdinalIgnoreCase) ||
+                   (token.Length > 100 && token.Split('.').Length == 3);
         }
 
         private static string GenerarTokenAleatorio()
