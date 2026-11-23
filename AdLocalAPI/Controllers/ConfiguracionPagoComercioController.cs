@@ -8,7 +8,7 @@ namespace AdLocalAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "Comercio,Colaborador")]
+    [Authorize(Roles = "Comercio")]
     public class ConfiguracionPagoComercioController : ApiControllerBase
     {
         private readonly IConfiguracionPagoComercioService _service;
@@ -19,16 +19,16 @@ namespace AdLocalAPI.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Obtener()
+        public async Task<IActionResult> Obtener([FromQuery] long comercioId = 0)
         {
-            var response = await _service.Obtener();
+            var response = await _service.Obtener(comercioId);
             return Responder(response);
         }
 
         [HttpPost]
-        public async Task<IActionResult> Guardar([FromBody] ConfiguracionPagoComercioDto dto)
+        public async Task<IActionResult> Guardar([FromBody] ConfiguracionPagoComercioDto dto, [FromQuery] long comercioId = 0)
         {
-            var response = await _service.Guardar(dto);
+            var response = await _service.Guardar(dto, comercioId);
             return Responder(response);
         }
     }

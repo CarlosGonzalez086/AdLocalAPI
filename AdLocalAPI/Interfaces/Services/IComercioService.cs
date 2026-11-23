@@ -30,7 +30,8 @@ namespace AdLocalAPI.Interfaces.Services
             long idTipoComercio,
             string orden,
             int page,
-            int pageSize
+            int pageSize,
+            string search = ""
         );
 
         Task<ApiResponse<PagedResponse<ComercioPublicDto>>> GetAllComerciosByUserPaged(

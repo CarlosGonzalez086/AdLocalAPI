@@ -18,6 +18,7 @@ namespace AdLocalAPI.Controllers
             _service = service;
         }
 
+        [EnableRateLimiting("auth")]
         [HttpPost("crear")]
         public async Task<IActionResult> CrearUsuario([FromBody] UsuarioRegistroDto dto)
         {

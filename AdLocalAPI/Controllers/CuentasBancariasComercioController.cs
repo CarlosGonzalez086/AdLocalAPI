@@ -9,7 +9,7 @@ namespace AdLocalAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "Comercio,Colaborador")]
+    [Authorize(Roles = "Comercio")]
     public class CuentasBancariasComercioController : ApiControllerBase
     {
         private readonly ICuentaBancariaComercioService _service;
@@ -20,37 +20,37 @@ namespace AdLocalAPI.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> ObtenerTodas()
+        public async Task<IActionResult> ObtenerTodas([FromQuery] long comercioId = 0)
         {
-            var response = await _service.ObtenerTodas();
+            var response = await _service.ObtenerTodas(comercioId);
             return Responder(response);
         }
 
         [HttpPost]
-        public async Task<IActionResult> Crear([FromBody] CuentaBancariaComercioCreateDto dto)
+        public async Task<IActionResult> Crear([FromBody] CuentaBancariaComercioCreateDto dto, [FromQuery] long comercioId = 0)
         {
-            var response = await _service.Crear(dto);
+            var response = await _service.Crear(dto, comercioId);
             return Responder(response);
         }
 
         [HttpPut("{uuid:guid}")]
-        public async Task<IActionResult> Actualizar(Guid uuid, [FromBody] CuentaBancariaComercioUpdateDto dto)
+        public async Task<IActionResult> Actualizar(Guid uuid, [FromBody] CuentaBancariaComercioUpdateDto dto, [FromQuery] long comercioId = 0)
         {
-            var response = await _service.Actualizar(uuid, dto);
+            var response = await _service.Actualizar(uuid, dto, comercioId);
             return Responder(response);
         }
 
         [HttpDelete("{uuid:guid}")]
-        public async Task<IActionResult> Eliminar(Guid uuid)
+        public async Task<IActionResult> Eliminar(Guid uuid, [FromQuery] long comercioId = 0)
         {
-            var response = await _service.Eliminar(uuid);
+            var response = await _service.Eliminar(uuid, comercioId);
             return Responder(response);
         }
 
         [HttpPut("{uuid:guid}/principal")]
-        public async Task<IActionResult> EstablecerPrincipal(Guid uuid)
+        public async Task<IActionResult> EstablecerPrincipal(Guid uuid, [FromQuery] long comercioId = 0)
         {
-            var response = await _service.EstablecerPrincipal(uuid);
+            var response = await _service.EstablecerPrincipal(uuid, comercioId);
             return Responder(response);
         }
     }

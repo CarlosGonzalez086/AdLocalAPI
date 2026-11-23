@@ -1,4 +1,5 @@
 using AdLocalAPI.DTOs;
+using AdLocalAPI.Helpers;
 using AdLocalAPI.Interfaces.Services;
 using AdLocalAPI.Models;
 using AdLocalAPI.Repositories.Interfaces;
@@ -8,16 +9,26 @@ namespace AdLocalAPI.Services
     public class CalificacionComentarioService : ICalificacionComentarioService
     {
         private readonly ICalificacionComentarioRepository _repository;
+        private readonly IComercioRepository _comercioRepository;
+        private readonly JwtContext _jwtContext;
 
-        public CalificacionComentarioService(ICalificacionComentarioRepository repository)
+        public CalificacionComentarioService(
+            ICalificacionComentarioRepository repository,
+            IComercioRepository comercioRepository,
+            JwtContext jwtContext)
         {
             _repository = repository;
+            _comercioRepository = comercioRepository;
+            _jwtContext = jwtContext;
         }
 
         public async Task<ApiResponse<object>> CrearComentario(CalificacionComentarioCreateDto dto)
         {
             try
             {
+                if (!_jwtContext.EstaAutenticado())
+                    return ApiResponse<object>.Unauthorized("Debes iniciar sesión para publicar una calificación.");
+
                 if (dto.Calificacion < 1 || dto.Calificacion > 5)
                     return ApiResponse<object>.Error("400", "La calificación debe estar entre 1 y 5");
 
@@ -30,12 +41,16 @@ namespace AdLocalAPI.Services
                 if (string.IsNullOrWhiteSpace(dto.NombrePersona))
                     return ApiResponse<object>.Error("400", "El nombre de la persona es obligatorio");
 
+                var comercio = await _comercioRepository.GetByIdAsync(dto.IdComercio);
+                if (comercio == null || !comercio.Activo || !comercio.Visible)
+                    return ApiResponse<object>.NotFound("Comercio no encontrado o no disponible.");
+
                 var comentario = new CalificacionComentario
                 {
                     Calificacion = dto.Calificacion,
-                    Comentario = dto.Comentario,
+                    Comentario = dto.Comentario.Trim(),
                     IdComercio = dto.IdComercio,
-                    NombrePersona = dto.NombrePersona,
+                    NombrePersona = dto.NombrePersona.Trim(),
                     FechaCreacion = DateTime.UtcNow
                 };
 

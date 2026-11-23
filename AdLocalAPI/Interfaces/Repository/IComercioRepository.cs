@@ -20,7 +20,7 @@ namespace AdLocalAPI.Repositories.Interfaces
         Task<string> UploadImageAsync(byte[] imageBytes, long userId, string contentType = "image/png");
         Task<bool> DeleteFromS3Async(string storageReference);
         Task<(List<ComercioPublicDto> items, int total)> GetByFiltros(
-            int estadoId, int municipioId, long idTipoComercio, string orden, int page, int pageSize);
+            int estadoId, int municipioId, long idTipoComercio, string orden, int page, int pageSize, string search = "");
 
         Task<ApiResponse<PagedResponse<ComercioPublicDto>>> GetAllComerciosByUserPaged(
             long idUser, int page = 1, int pageSize = 10);

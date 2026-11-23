@@ -7,24 +7,26 @@ namespace AdLocalAPI.Services.Interfaces
     {
         Task<ApiResponse<
             IEnumerable<CuentaBancariaComercioResponseDto>
-        >> ObtenerTodas();
+        >> ObtenerTodas(long comercioId = 0);
 
         Task<ApiResponse<
             CuentaBancariaComercioResponseDto
         >> Crear(
-            CuentaBancariaComercioCreateDto dto
+            CuentaBancariaComercioCreateDto dto,
+            long comercioId = 0
         );
 
         Task<ApiResponse<bool>>
             Actualizar(
                 Guid uuid,
-                CuentaBancariaComercioUpdateDto dto
+                CuentaBancariaComercioUpdateDto dto,
+                long comercioId = 0
             );
 
         Task<ApiResponse<bool>>
-            Eliminar(Guid uuid);
+            Eliminar(Guid uuid, long comercioId = 0);
 
         Task<ApiResponse<bool>>
-            EstablecerPrincipal(Guid uuid);
+            EstablecerPrincipal(Guid uuid, long comercioId = 0);
     }
 }

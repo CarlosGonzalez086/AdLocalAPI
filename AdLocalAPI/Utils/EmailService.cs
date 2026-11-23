@@ -172,7 +172,6 @@ namespace AdLocalAPI.Utils
 
                         using var smtp = new SmtpClient();
                         smtp.Timeout = 8000; // 8 segundos para evitar bloqueos largos de interfaz
-                        smtp.ServerCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true;
 
                         await smtp.ConnectAsync(host, puertoIntento, opcionesSocket);
                         await smtp.AuthenticateAsync(user, key);

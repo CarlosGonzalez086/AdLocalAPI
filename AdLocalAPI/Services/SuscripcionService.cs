@@ -230,13 +230,11 @@ namespace AdLocalAPI.Services
                 await _usuarioRepository.UpdateAsync(usuario);
             }
 
-            string successUrl = _env.IsProduction()
-                ? "https://ad-local-gamma.vercel.app/app/checkout/success"
-                : "http://localhost:5173/app/checkout/success";
+            var frontendBaseUrl = (Environment.GetEnvironmentVariable("FRONTEND_URL")
+                ?? (_env.IsProduction() ? "https://panel.adlocal.store" : "http://localhost:5173")).TrimEnd('/');
 
-            string cancelUrl = _env.IsProduction()
-                ? "https://ad-local-gamma.vercel.app/app/checkout/cancel"
-                : "http://localhost:5173/app/checkout/cancel";
+            string successUrl = $"{frontendBaseUrl}/usuario/app/plan?checkout=success";
+            string cancelUrl = $"{frontendBaseUrl}/usuario/app/plan?checkout=cancel";
 
             var session = await new SessionService().CreateAsync(
                 new SessionCreateOptions

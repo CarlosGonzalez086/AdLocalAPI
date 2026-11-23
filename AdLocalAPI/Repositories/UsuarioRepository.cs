@@ -251,7 +251,7 @@ namespace AdLocalAPI.Repositories
 
         public async Task DeleteAsync(int id)
         {
-            var usuario = await _context.Usuarios.FindAsync(id);
+            var usuario = await _context.Usuarios.FindAsync((long)id);
             if (usuario != null)
             {
                 _context.Usuarios.Remove(usuario);
