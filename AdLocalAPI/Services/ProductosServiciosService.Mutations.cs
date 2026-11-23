@@ -4,30 +4,18 @@ using System.Linq;
 using System.Threading.Tasks;
 using AdLocalAPI.DTOs;
 using AdLocalAPI.Models;
+using AdLocalAPI.Utils;
 
 namespace AdLocalAPI.Services
 {
     public partial class ProductosServiciosService
     {
-        private static readonly Dictionary<string, string> TiposImagenPermitidos = new()
-        {
-            { "image/jpeg", "data:image/jpeg;base64," },
-            { "image/jpg",  "data:image/jpg;base64,"  },
-            { "image/png",  "data:image/png;base64,"  },
-            { "image/webp", "data:image/webp;base64," }
-        };
-
         private bool EsUrl(string value)
         {
             if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
                 return false;
 
             return uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps;
-        }
-
-        private bool EsImagenBase64(string value)
-        {
-            return value.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase);
         }
 
         public async Task<ApiResponse<ProductosServiciosDto>> CreateAsync(ProductosServiciosDto dto)
@@ -121,17 +109,14 @@ namespace AdLocalAPI.Services
 
                 if (!string.IsNullOrWhiteSpace(dto.ImagenBase64))
                 {
-                    string? contentType = TiposImagenPermitidos
-                        .FirstOrDefault(x => dto.ImagenBase64.StartsWith(x.Value))
-                        .Key;
-
-                    if (contentType == null)
+                    if (!MediaBase64Validator.TryDecodeValidatedImage(
+                            dto.ImagenBase64,
+                            out byte[] imageBytes,
+                            out string contentType,
+                            out string validationError))
                     {
-                        return ApiResponse<ProductosServiciosDto>.Error("400", "Formato de imagen no permitido. Usa JPG, PNG o WEBP");
+                        return ApiResponse<ProductosServiciosDto>.Error("400", validationError);
                     }
-
-                    string base64Clean = dto.ImagenBase64.Replace($"data:{contentType};base64,", string.Empty);
-                    byte[] imageBytes = Convert.FromBase64String(base64Clean);
                     logoUrl = await _repository.UploadImageAsync(imageBytes, userId, contentType);
                 }
 
@@ -246,30 +231,19 @@ namespace AdLocalAPI.Services
                 }
             }
 
+            string? previousLogoToDelete = null;
             if (!string.IsNullOrWhiteSpace(dto.ImagenBase64) && !EsUrl(dto.ImagenBase64))
             {
-                if (!EsImagenBase64(dto.ImagenBase64))
+                if (!MediaBase64Validator.TryDecodeValidatedImage(
+                        dto.ImagenBase64,
+                        out byte[] imageBytes,
+                        out string contentType,
+                        out string validationError))
                 {
-                    return ApiResponse<bool>.Error("400", "Formato de imagen inválido");
+                    return ApiResponse<bool>.Error("400", validationError);
                 }
 
-                string? contentType = TiposImagenPermitidos
-                    .FirstOrDefault(x => dto.ImagenBase64.StartsWith(x.Value))
-                    .Key;
-
-                if (contentType == null)
-                {
-                    return ApiResponse<bool>.Error("400", "Formato de imagen no permitido. Usa JPG, PNG o WEBP");
-                }
-
-                string base64Clean = dto.ImagenBase64.Replace($"data:{contentType};base64,", string.Empty);
-                byte[] imageBytes = Convert.FromBase64String(base64Clean);
-
-                if (!string.IsNullOrWhiteSpace(entity.LogoUrl))
-                {
-                    await _repository.DeleteFromS3Async(entity.LogoUrl);
-                }
-
+                previousLogoToDelete = entity.LogoUrl;
                 entity.LogoUrl = await _repository.UploadImageAsync(imageBytes, userId, contentType);
             }
 
@@ -295,6 +269,11 @@ namespace AdLocalAPI.Services
             catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
             { return ApiResponse<bool>.Error("409", "El inventario cambió durante la edición. Actualiza el producto."); }
 
+            if (!string.IsNullOrWhiteSpace(previousLogoToDelete))
+            {
+                await _repository.DeleteFromS3Async(previousLogoToDelete);
+            }
+
             return ApiResponse<bool>.Success(true, "Actualizado correctamente");
         }
 
@@ -311,10 +290,7 @@ namespace AdLocalAPI.Services
             if (entity == null)
                 return ApiResponse<bool>.Error("404", "Producto/Servicio no encontrado");
 
-            if (!string.IsNullOrWhiteSpace(entity.LogoUrl))
-            {
-                await _repository.DeleteFromS3Async(entity.LogoUrl);
-            }
+            var logoAnterior = entity.LogoUrl;
 
             entity.Eliminado = true;
             entity.Activo = false;
@@ -324,6 +300,11 @@ namespace AdLocalAPI.Services
             try { await _repository.UpdateAsync(entity); }
             catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
             { return ApiResponse<bool>.Error("409", "El inventario cambió. Actualiza el producto e intenta nuevamente."); }
+
+            if (!string.IsNullOrWhiteSpace(logoAnterior))
+            {
+                await _repository.DeleteFromS3Async(logoAnterior);
+            }
 
             return ApiResponse<bool>.Success(true, "Eliminado correctamente");
         }

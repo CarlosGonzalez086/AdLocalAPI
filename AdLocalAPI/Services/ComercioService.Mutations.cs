@@ -5,19 +5,12 @@ using System.Threading.Tasks;
 using AdLocalAPI.DTOs;
 using AdLocalAPI.Helpers;
 using AdLocalAPI.Models;
+using AdLocalAPI.Utils;
 
 namespace AdLocalAPI.Services
 {
     public partial class ComercioService
     {
-        private static readonly Dictionary<string, string> TiposImagenPermitidos = new()
-        {
-            { "image/jpeg", "data:image/jpeg;base64," },
-            { "image/jpg",  "data:image/jpg;base64,"  },
-            { "image/png",  "data:image/png;base64,"  },
-            { "image/webp", "data:image/webp;base64," }
-        };
-
         private bool EsUrl(string value)
         {
             if (!Uri.TryCreate(value, UriKind.Absolute, out var uri))
@@ -25,11 +18,6 @@ namespace AdLocalAPI.Services
 
             return uri.Scheme == Uri.UriSchemeHttp
                 || uri.Scheme == Uri.UriSchemeHttps;
-        }
-
-        private bool EsImagenBase64(string value)
-        {
-            return value.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase);
         }
 
         public async Task<ApiResponse<object>> CreateComercio(ComercioCreateDto dto)
@@ -105,22 +93,14 @@ namespace AdLocalAPI.Services
 
                 if (!string.IsNullOrWhiteSpace(dto.LogoBase64))
                 {
-                    string? contentType = TiposImagenPermitidos
-                        .FirstOrDefault(x => dto.LogoBase64.StartsWith(x.Value))
-                        .Key;
-
-                    if (contentType == null)
+                    if (!MediaBase64Validator.TryDecodeValidatedImage(
+                            dto.LogoBase64,
+                            out byte[] imageBytes,
+                            out string contentType,
+                            out string validationError))
                     {
-                        return ApiResponse<object>.Error(
-                            "400",
-                            "Formato de imagen no permitido. Usa JPG, PNG o WEBP"
-                        );
+                        return ApiResponse<object>.Error("400", validationError);
                     }
-
-                    string base64Clean = dto.LogoBase64
-                        .Replace($"data:{contentType};base64,", string.Empty);
-
-                    byte[] imageBytes = Convert.FromBase64String(base64Clean);
 
                     logoUrl = await _repository.UploadImageAsync(
                         imageBytes,
@@ -166,29 +146,24 @@ namespace AdLocalAPI.Services
 
                 if (dto.Imagenes?.Count > 0)
                 {
-                    foreach (var item in dto.Imagenes)
+                    int maxFotos = _jwtContext.GetMaxFotos();
+                    var imagenesPermitidas = maxFotos > 0 ? dto.Imagenes.Take(maxFotos) : dto.Imagenes;
+                    foreach (var item in imagenesPermitidas)
                     {
+                        if (!MediaBase64Validator.TryDecodeValidatedImage(
+                                item,
+                                out byte[] imageBytes,
+                                out string contentType,
+                                out _))
+                            continue;
+
                         try
                         {
-                            string? contentType = TiposImagenPermitidos
-                                .FirstOrDefault(x => item.StartsWith(x.Value))
-                                .Key;
-
-                            if (contentType == null)
-                                continue;
-
-                            string base64Clean = item
-                                .Replace($"data:{contentType};base64,", string.Empty);
-
-                            byte[] imageBytes = Convert.FromBase64String(base64Clean);
-
                             var imagenUrl = await _comercioImagenRepositorio
                                 .UploadImageAsync(imageBytes, (int)idUser, contentType);
 
-                            if (string.IsNullOrEmpty(imagenUrl))
-                                continue;
-
-                            await _comercioImagenRepositorio.Crear(creado.Id, imagenUrl);
+                            if (!string.IsNullOrEmpty(imagenUrl))
+                                await _comercioImagenRepositorio.Crear(creado.Id, imagenUrl);
                         }
                         catch
                         {
@@ -307,43 +282,24 @@ namespace AdLocalAPI.Services
                 comercio.ColorPrimario = dto.ColorPrimario;
                 comercio.ColorSecundario = dto.ColorSecundario;
                 comercio.Email = dto.Email;
-                comercio.Activo = dto.Activo;
+                if (!_jwtContext.EsColaborador())
+                    comercio.Activo = dto.Activo;
                 comercio.TipoComercioId = dto.TipoComercioId;
 
+                string? previousLogoToDelete = null;
                 if (!string.IsNullOrWhiteSpace(dto.LogoBase64) &&
                     !EsUrl(dto.LogoBase64))
                 {
-                    if (!EsImagenBase64(dto.LogoBase64))
+                    if (!MediaBase64Validator.TryDecodeValidatedImage(
+                            dto.LogoBase64,
+                            out byte[] imageBytes,
+                            out string contentType,
+                            out string validationError))
                     {
-                        return ApiResponse<object>.Error(
-                            "400",
-                            "Formato de imagen inválido"
-                        );
+                        return ApiResponse<object>.Error("400", validationError);
                     }
 
-                    string? contentType = TiposImagenPermitidos
-                        .FirstOrDefault(x => dto.LogoBase64.StartsWith(x.Value))
-                        .Key;
-
-                    if (contentType == null)
-                    {
-                        return ApiResponse<object>.Error(
-                            "400",
-                            "Formato de imagen no permitido. Usa JPG, PNG o WEBP"
-                        );
-                    }
-
-                    string base64Clean = dto.LogoBase64.Replace(
-                        $"data:{contentType};base64,", string.Empty
-                    );
-
-                    byte[] imageBytes = Convert.FromBase64String(base64Clean);
-
-                    if (!string.IsNullOrWhiteSpace(comercio.LogoUrl))
-                    {
-                        await _repository.DeleteFromS3Async(comercio.LogoUrl);
-                    }
-
+                    previousLogoToDelete = comercio.LogoUrl;
                     comercio.LogoUrl = await _repository.UploadImageAsync(
                         imageBytes,
                         (int)userId,
@@ -372,6 +328,11 @@ namespace AdLocalAPI.Services
                 }
 
                 await _repository.UpdateAsync(comercio);
+
+                if (!string.IsNullOrWhiteSpace(previousLogoToDelete))
+                {
+                    await _repository.DeleteFromS3Async(previousLogoToDelete);
+                }
 
                 if (dto.Horarios.Count > 0)
                 {
@@ -405,20 +366,15 @@ namespace AdLocalAPI.Services
                             if (string.IsNullOrWhiteSpace(item))
                                 continue;
 
-                            if (EsImagenBase64(item))  
+                            if (MediaBase64Validator.TryDecodeValidatedImage(
+                                    item,
+                                    out byte[] imageBytes,
+                                    out string contentType,
+                                    out _))
                             {
-                                string? contentType = TiposImagenPermitidos
-                                    .FirstOrDefault(x => item.StartsWith(x.Value))
-                                    .Key;
-                                if (contentType == null)
-                                    continue;
-
-                                string base64Clean = item.Replace($"data:{contentType};base64,", string.Empty);
-                                byte[] imageBytes = Convert.FromBase64String(base64Clean);
-
                                 var storageKey = await _comercioImagenRepositorio.UploadImageAsync(
                                     imageBytes,
-                                    (long)comercio.Id,  
+                                    (long)comercio.Id,
                                     contentType
                                 );
 

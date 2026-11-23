@@ -130,7 +130,8 @@ public partial class CitaRepository
                 if (estado == EstadoCita.Completada)
                     CitaOperacion.Exigir(ahora >= cita.FechaFin, "Todavía no termina el horario reservado.");
                 cita.Estado = estado!.Value;
-                if (comercio.HasValue) cita.NombreAtiende = atiende?.Trim();
+                if (comercio.HasValue && !string.IsNullOrWhiteSpace(atiende))
+                    cita.NombreAtiende = atiende.Trim();
             }
             cita.Version++; cita.FechaActualizacion = _reloj.GetUtcNow().UtcDateTime;
             Historial(cita, actor, inicio.HasValue ? "Reprogramacion" : "Estado", anterior, fechaAnterior, motivo);

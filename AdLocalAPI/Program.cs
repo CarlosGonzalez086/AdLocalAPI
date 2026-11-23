@@ -77,12 +77,12 @@ var jwtAudience = Environment.GetEnvironmentVariable("JWT__Audience")
     ?? builder.Configuration["Jwt:Audience"]
     ?? "AdLocal";
 
-//var webhookSecret = Environment.GetEnvironmentVariable("STRIPE_WEBHOOK_SECRET")
-//    ?? builder.Configuration["Stripe:WebhookSecret"];
-//if (builder.Environment.IsProduction())
-//{
-//    webhookSecret = ConfiguracionSegura.Requerir(webhookSecret, "STRIPE_WEBHOOK_SECRET / Stripe__WebhookSecret");
-//}
+var webhookSecret = Environment.GetEnvironmentVariable("STRIPE_WEBHOOK_SECRET")
+    ?? builder.Configuration["Stripe:WebhookSecret"];
+if (builder.Environment.IsProduction())
+{
+    webhookSecret = ConfiguracionSegura.Requerir(webhookSecret, "STRIPE_WEBHOOK_SECRET / Stripe__WebhookSecret");
+}
 
 // PostgreSQL / Supabase
 var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION")
@@ -98,10 +98,10 @@ if (string.IsNullOrWhiteSpace(connectionString))
 builder.Configuration["Jwt:Key"] = jwtKey;
 builder.Configuration["Jwt:Issuer"] = jwtIssuer;
 builder.Configuration["Jwt:Audience"] = jwtAudience;
-//if (!string.IsNullOrWhiteSpace(webhookSecret))
-//{
-//    builder.Configuration["Stripe:WebhookSecret"] = webhookSecret;
-//}
+if (!string.IsNullOrWhiteSpace(webhookSecret))
+{
+    builder.Configuration["Stripe:WebhookSecret"] = webhookSecret;
+}
 
 Stripe.StripeConfiguration.ApiKey =
    builder.Configuration["Stripe:SecretKey"];
@@ -421,7 +421,7 @@ var forwardedHeadersOptions = new ForwardedHeadersOptions
     ForwardedHeaders =
         ForwardedHeaders.XForwardedFor |
         ForwardedHeaders.XForwardedProto,
-    ForwardLimit = 2
+    ForwardLimit = 1
 };
 forwardedHeadersOptions.KnownNetworks.Clear();
 forwardedHeadersOptions.KnownProxies.Clear();

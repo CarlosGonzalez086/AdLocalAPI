@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using AdLocalAPI.DTOs;
 using AdLocalAPI.Helpers;
 using AdLocalAPI.Interfaces.Services;
@@ -10,6 +11,7 @@ namespace AdLocalAPI.Services
 {
     public class BeneficiosServices : IBeneficiosService
     {
+        private static readonly ConcurrentDictionary<long, SemaphoreSlim> UserLocks = new();
         private readonly JwtContext _jwt;
         private readonly IUsuarioRepository _usuarioRepository;
         private readonly ISuscripcionRepository _suscripcionRepository;
@@ -32,6 +34,20 @@ namespace AdLocalAPI.Services
         public async Task<ApiResponse<object>> ReclamarBeneficio()
         {
             long idUser = _jwt.GetUserId();
+            var userLock = UserLocks.GetOrAdd(idUser, _ => new SemaphoreSlim(1, 1));
+            await userLock.WaitAsync();
+            try
+            {
+                return await ReclamarBeneficioInternoAsync(idUser);
+            }
+            finally
+            {
+                userLock.Release();
+            }
+        }
+
+        private async Task<ApiResponse<object>> ReclamarBeneficioInternoAsync(long idUser)
+        {
 
             var usuario = await _usuarioRepository.GetByIdAsync(idUser);
             if (usuario == null)
