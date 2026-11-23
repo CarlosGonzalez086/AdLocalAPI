@@ -241,15 +241,7 @@ namespace AdLocalAPI.Services
 
             if (sub == null)
             {
-                var existSub = await _suscripcionRepo.GetActivaByUsuarioAsync(user.Id);
-                if (existSub != null)
-                {
-                    existSub.Status = "canceled";
-                    existSub.IsActive = false;
-                    existSub.CanceledAt = DateTime.UtcNow;
-                    existSub.UpdatedAt = DateTime.UtcNow;
-                    await _suscripcionRepo.ActualizarAsync(existSub);
-                }
+                await DesactivarSuscripcionesPreviasAsync(user.Id);
 
                 var plan = await _planRepo.GetByStripePriceIdAsync(priceId);
                 if (plan == null)
@@ -276,6 +268,11 @@ namespace AdLocalAPI.Services
                 return;
             }
 
+            if (!sub.IsActive || sub.Status != "active")
+            {
+                await DesactivarSuscripcionesPreviasAsync(user.Id, sub.Id);
+            }
+
             sub.CurrentPeriodStart = periodStart;
             sub.CurrentPeriodEnd = periodEnd;
             sub.Status = "active";
@@ -284,6 +281,22 @@ namespace AdLocalAPI.Services
             sub.UpdatedAt = DateTime.UtcNow;
 
             await _suscripcionRepo.ActualizarAsync(sub);
+        }
+
+        private async Task DesactivarSuscripcionesPreviasAsync(long usuarioId, int? suscripcionExcluidaId = null)
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                var existSub = await _suscripcionRepo.GetActivaByUsuarioAsync(usuarioId);
+                if (existSub == null || (suscripcionExcluidaId.HasValue && existSub.Id == suscripcionExcluidaId.Value))
+                    break;
+
+                existSub.Status = "canceled";
+                existSub.IsActive = false;
+                existSub.CanceledAt = DateTime.UtcNow;
+                existSub.UpdatedAt = DateTime.UtcNow;
+                await _suscripcionRepo.ActualizarAsync(existSub);
+            }
         }
 
         // =================================================

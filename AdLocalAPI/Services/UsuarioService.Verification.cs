@@ -43,8 +43,8 @@ namespace AdLocalAPI.Services
                 );
             }
 
-            // Validar expiración del código (24 horas)
-            if (usuario.CodigoExpiracion.HasValue && DateTime.UtcNow > usuario.CodigoExpiracion.Value)
+            // Validar expiración obligatoria del código
+            if (!usuario.CodigoExpiracion.HasValue || DateTime.UtcNow > usuario.CodigoExpiracion.Value)
             {
                 usuario.Codigo = null;
                 usuario.CodigoExpiracion = null;

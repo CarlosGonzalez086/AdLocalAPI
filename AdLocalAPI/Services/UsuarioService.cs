@@ -396,45 +396,18 @@ namespace AdLocalAPI.Services
             if (usuario == null)
                 return ApiResponse<string>.Error("404", "Usuario no encontrado");
 
-            if (string.IsNullOrEmpty(dto.Base64))
-                return ApiResponse<string>.Error("400", "No se recibió la imagen");
-
-            var tiposPermitidos = new List<string> { "image/jpeg", "image/jpg", "image/png", "image/webp" };
-
-            string base64Data = dto.Base64;
-            string? tipoImagen = null;
-
-            if (base64Data.StartsWith("data:"))
+            if (!MediaBase64Validator.TryDecodeValidatedImage(
+                    dto?.Base64,
+                    out byte[] imageBytes,
+                    out string contentType,
+                    out string validationError))
             {
-                var parts = base64Data.Split(',');
-                if (parts.Length != 2)
-                    return ApiResponse<string>.Error("400", "Formato de imagen inválido");
-
-                tipoImagen = parts[0].Replace("data:", "").Replace(";base64", "");
-                base64Data = parts[1];
+                return ApiResponse<string>.Error("400", validationError);
             }
-
-            if (tipoImagen != null && !tiposPermitidos.Contains(tipoImagen.ToLower()))
-                return ApiResponse<string>.Error("400", "Tipo de imagen no permitido. Solo JPEG, JPG, PNG o WEBP");
 
             try
             {
-                byte[] imageBytes = Convert.FromBase64String(base64Data);
-
-                if (!string.IsNullOrWhiteSpace(usuario.FotoUrl))
-                {
-                    bool deleted = await _repository.DeleteFromS3Async(usuario.FotoUrl);
-
-                    if (!deleted)
-                    {
-                        return ApiResponse<string>.Error(
-                            "500",
-                            "No fue posible eliminar la imagen anterior"
-                        );
-                    }
-                }
-
-                string contentType = tipoImagen ?? "image/png";
+                string previousPhotoUrl = usuario.FotoUrl ?? string.Empty;
 
                 string newUrl = await _repository.UploadImageAsync(
                     imageBytes,
@@ -444,6 +417,18 @@ namespace AdLocalAPI.Services
 
                 await _repository.UpdateUserPhotoUrlAsync(id, newUrl);
 
+                if (!string.IsNullOrWhiteSpace(previousPhotoUrl))
+                {
+                    try
+                    {
+                        await _repository.DeleteFromS3Async(previousPhotoUrl);
+                    }
+                    catch (Exception exDel)
+                    {
+                        _logger.LogWarning(exDel, "No fue posible limpiar la foto anterior de S3 para usuario {UserId}", id);
+                    }
+                }
+
                 return ApiResponse<string>.Success(
                     newUrl,
                     "La imagen se actualizó correctamente"
@@ -451,7 +436,8 @@ namespace AdLocalAPI.Services
             }
             catch (Exception ex)
             {
-                return ApiResponse<string>.Error("500", ex.Message);
+                _logger.LogError(ex, "Error al subir foto de perfil para usuario {UserId}", id);
+                return ApiResponse<string>.Error("500", "Ocurrió un error al actualizar la imagen.");
             }
         }
     }

@@ -9,6 +9,8 @@ namespace AdLocalAPI.DTOs
     {
         public string PasswordNueva { get; set; } = string.Empty;
         public string Codigo { get; set; } = string.Empty;
+        public string? Token { get; set; }
+        public string? Email { get; set; }
     }
     public class EmailDto
     {

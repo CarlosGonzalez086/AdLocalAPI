@@ -416,12 +416,16 @@ builder.Services.AddCors(options =>
 
 
 var app = builder.Build();
-app.UseForwardedHeaders(new ForwardedHeadersOptions
+var forwardedHeadersOptions = new ForwardedHeadersOptions
 {
     ForwardedHeaders =
         ForwardedHeaders.XForwardedFor |
-        ForwardedHeaders.XForwardedProto
-});
+        ForwardedHeaders.XForwardedProto,
+    ForwardLimit = 2
+};
+forwardedHeadersOptions.KnownNetworks.Clear();
+forwardedHeadersOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedHeadersOptions);
 
 // ======================================================
 // SWAGGER

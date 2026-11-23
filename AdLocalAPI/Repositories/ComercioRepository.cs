@@ -120,7 +120,7 @@ namespace AdLocalAPI.Repositories
 
 
             IQueryable<Comercio> comerciosBase = _context.Comercios
-                .Where(c => c.Activo && c.Ubicacion != null)
+                .Where(c => c.Activo && c.Visible && c.Ubicacion != null)
                 .Include(c => c.Estado)
                 .Include(c => c.Municipio);
 
@@ -160,6 +160,7 @@ namespace AdLocalAPI.Repositories
             var suscripcionesVigentes = await _context.Suscripcions
                 .Where(s => s.IsActive &&
                             !s.IsDeleted &&
+                            (s.CurrentPeriodEnd == null || s.CurrentPeriodEnd > ahora || s.Plan.Tipo == "FREE") &&
                             usuarioIds.Contains(s.UsuarioId))
                 .Include(s => s.Plan)
                 .ToListAsync();

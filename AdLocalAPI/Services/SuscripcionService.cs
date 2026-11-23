@@ -134,9 +134,16 @@ namespace AdLocalAPI.Services
             if (plan == null || !plan.Activo)
                 return ApiResponse<string>.Error("404", "Plan no encontrado");
 
+            if (string.IsNullOrWhiteSpace(plan.StripePriceId))
+                return ApiResponse<string>.Error("400", "El plan seleccionado no tiene configuración de pago en Stripe.");
+
             var usuario = await _usuarioRepository.GetByIdAsync(_jwt.GetUserId());
             if (usuario == null)
                 return ApiResponse<string>.Error("404", "Usuario no encontrado");
+
+            var suscripcionActual = await _suscripcionRepository.GetActivaByUsuarioAsync(usuario.Id);
+            if (suscripcionActual != null && !string.IsNullOrWhiteSpace(suscripcionActual.StripeSubscriptionId))
+                return ApiResponse<string>.Error("409", "Ya cuentas con una suscripción de pago activa.");
 
             // 1️ Crear customer si no existe
             if (string.IsNullOrEmpty(usuario.StripeCustomerId))
@@ -214,9 +221,16 @@ namespace AdLocalAPI.Services
             if (plan == null || !plan.Activo)
                 return ApiResponse<string>.Error("404", "Plan no encontrado");
 
+            if (string.IsNullOrWhiteSpace(plan.StripePriceId))
+                return ApiResponse<string>.Error("400", "El plan seleccionado no tiene configuración de pago en Stripe.");
+
             var usuario = await _usuarioRepository.GetByIdAsync(_jwt.GetUserId());
             if (usuario == null)
                 return ApiResponse<string>.Error("404", "Usuario no encontrado");
+
+            var suscripcionActual = await _suscripcionRepository.GetActivaByUsuarioAsync(usuario.Id);
+            if (suscripcionActual != null && !string.IsNullOrWhiteSpace(suscripcionActual.StripeSubscriptionId))
+                return ApiResponse<string>.Error("409", "Ya cuentas con una suscripción de pago activa.");
 
             if (string.IsNullOrEmpty(usuario.StripeCustomerId))
             {
@@ -275,6 +289,9 @@ namespace AdLocalAPI.Services
 
             if (suscripcion == null)
                 return ApiResponse<string>.Error("404", "No hay suscripción activa");
+
+            if (string.IsNullOrWhiteSpace(suscripcion.StripeSubscriptionId))
+                return ApiResponse<string>.Error("400", "El plan actual no requiere cancelación en Stripe.");
 
             await new SubscriptionService().UpdateAsync(
                 suscripcion.StripeSubscriptionId,
