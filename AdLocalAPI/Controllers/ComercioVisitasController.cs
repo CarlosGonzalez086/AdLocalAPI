@@ -2,6 +2,7 @@ using System.Threading.Tasks;
 using AdLocalAPI.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace AdLocalAPI.Controllers
 {
@@ -17,6 +18,7 @@ namespace AdLocalAPI.Controllers
         }
 
         [HttpPost("{comercioId}")]
+        [EnableRateLimiting("auth")]
         public async Task<IActionResult> Registrar(long comercioId)
         {
             var ip = HttpContext.Connection.RemoteIpAddress?.ToString();

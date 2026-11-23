@@ -104,7 +104,8 @@ namespace AdLocalAPI.Services
             }
             catch (Exception ex)
             {
-                return ApiResponse<object>.Error("500", ex.Message);
+                _logger.LogError(ex, "Error en ForgetPassword");
+                return ApiResponse<object>.Error("500", "No fue posible procesar la solicitud de recuperación.");
             }
         }
 
@@ -115,14 +116,22 @@ namespace AdLocalAPI.Services
                 return ApiResponse<object>.Error("400", "El código o token de recuperación es requerido.");
             }
 
-            var usuario = await _repository.GetByCodeAsync(dto.Codigo.Trim());
-            if (usuario == null)
+            if (string.IsNullOrWhiteSpace(dto.Token) && string.IsNullOrWhiteSpace(dto.Email))
+            {
+                return ApiResponse<object>.Error("400", "El token o correo electrónico de recuperación es requerido.");
+            }
+
+            Usuario? usuario = !string.IsNullOrWhiteSpace(dto.Token)
+                ? await _repository.GetByTokenAsync(dto.Token.Trim())
+                : await _repository.GetByCorreoAsync(dto.Email!.Trim().ToLowerInvariant());
+
+            if (usuario == null || string.IsNullOrWhiteSpace(usuario.Codigo))
             {
                 return ApiResponse<object>.Error("400", "El código no es válido o ha expirado.");
             }
 
-            // Validar expiración de 15 minutos
-            if (usuario.CodigoExpiracion.HasValue && DateTime.UtcNow > usuario.CodigoExpiracion.Value)
+            // Validar expiración obligatoria (rechaza también CodigoExpiracion == null)
+            if (!usuario.CodigoExpiracion.HasValue || DateTime.UtcNow > usuario.CodigoExpiracion.Value)
             {
                 usuario.Token = null;
                 usuario.Codigo = null;
@@ -133,7 +142,7 @@ namespace AdLocalAPI.Services
                 return ApiResponse<object>.Error("400", "El código ha expirado. Solicita uno nuevo.");
             }
 
-            // Validar límite de intentos
+            // Validar límite de intentos antes de comparar
             if (usuario.IntentosCodigo >= 5)
             {
                 usuario.Token = null;
@@ -143,6 +152,24 @@ namespace AdLocalAPI.Services
                 await _repository.UpdateAsync(usuario);
 
                 return ApiResponse<object>.Error("400", "Ha superado el número máximo de intentos permitidos (5). Por seguridad, el código ha sido invalidado. Solicite uno nuevo.");
+            }
+
+            if (!string.Equals(usuario.Codigo.Trim(), dto.Codigo.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                usuario.IntentosCodigo++;
+                if (usuario.IntentosCodigo >= 5)
+                {
+                    usuario.Token = null;
+                    usuario.Codigo = null;
+                    usuario.CodigoExpiracion = null;
+                    usuario.IntentosCodigo = 0;
+                    await _repository.UpdateAsync(usuario);
+
+                    return ApiResponse<object>.Error("400", "Ha superado el número máximo de intentos permitidos (5). Por seguridad, el código ha sido invalidado. Solicite uno nuevo.");
+                }
+
+                await _repository.UpdateAsync(usuario);
+                return ApiResponse<object>.Error("400", $"El código no es válido. Intentos restantes: {5 - usuario.IntentosCodigo}.");
             }
 
             if (string.IsNullOrWhiteSpace(dto.PasswordNueva) || dto.PasswordNueva.Length < 8)
@@ -206,8 +233,8 @@ namespace AdLocalAPI.Services
                 );
             }
 
-            // Validar expiración de 15 minutos en el enlace
-            if (usuario.CodigoExpiracion.HasValue && DateTime.UtcNow > usuario.CodigoExpiracion.Value)
+            // Validar expiración obligatoria en el enlace
+            if (!usuario.CodigoExpiracion.HasValue || DateTime.UtcNow > usuario.CodigoExpiracion.Value)
             {
                 usuario.Token = null;
                 usuario.Codigo = null;

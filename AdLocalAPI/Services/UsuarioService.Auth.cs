@@ -50,6 +50,9 @@ namespace AdLocalAPI.Services
                 }
             }
 
+            if (string.IsNullOrWhiteSpace(usuario.PasswordHash))
+                return ApiResponse<object>.Error("401", "Debes activar tu cuenta creando una contraseña desde tu enlace de invitación.");
+
             bool valid = BCrypt.Net.BCrypt.Verify(password, usuario.PasswordHash);
 
             if (!valid)

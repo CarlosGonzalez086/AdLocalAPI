@@ -7,7 +7,7 @@ namespace AdLocalAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
+    [Authorize(Roles = "Comercio")]
     public class BeneficiosController : ApiControllerBase
     {
         private readonly IBeneficiosService _service;

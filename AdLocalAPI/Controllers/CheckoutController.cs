@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 using AdLocalAPI.Controllers;
 
-[Authorize]
+[Authorize(Roles = "Comercio")]
 [ApiController]
 [Route("api/checkout")]
 public class CheckoutController : ApiControllerBase

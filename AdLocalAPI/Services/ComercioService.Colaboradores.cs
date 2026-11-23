@@ -45,15 +45,18 @@ namespace AdLocalAPI.Services
 
                 string codigo = ServicesGenerals.GenerarCodigoAlfanumerico(6);
                 string token = Guid.NewGuid().ToString();
+                var emailNormalizado = dto.Correo.Trim().ToLowerInvariant();
                 var userColaborador = new Usuario
                 {
-                    Nombre = dto.Nombre,
-                    Email = dto.Correo,
+                    Nombre = dto.Nombre.Trim(),
+                    Email = emailNormalizado,
                     ComercioId = dto.IdComercio,
                     Activo = true,
                     FechaCreacion = DateTime.UtcNow,
                     Codigo = codigo,
                     Token = token,
+                    CodigoExpiracion = DateTime.UtcNow.AddHours(48),
+                    IntentosCodigo = 0,
                     Rol = "Colaborador",
                     PasswordHash = "",
                 };
