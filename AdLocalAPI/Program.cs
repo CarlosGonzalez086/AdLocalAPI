@@ -97,7 +97,7 @@ if (string.IsNullOrWhiteSpace(connectionString))
 // Emisión y validación deben emplear exactamente la misma configuración efectiva.
 builder.Configuration["Jwt:Key"] = jwtKey;
 builder.Configuration["Jwt:Issuer"] = jwtIssuer;
-builder.Configuration["Jwt:Audience"] = jwtAudience;
+//builder.Configuration["Jwt:Audience"] = jwtAudience;
 //if (!string.IsNullOrWhiteSpace(webhookSecret))
 //{
 //    builder.Configuration["Stripe:WebhookSecret"] = webhookSecret;
@@ -421,7 +421,7 @@ var forwardedHeadersOptions = new ForwardedHeadersOptions
     ForwardedHeaders =
         ForwardedHeaders.XForwardedFor |
         ForwardedHeaders.XForwardedProto,
-    ForwardLimit = 2
+    ForwardLimit = 1
 };
 forwardedHeadersOptions.KnownNetworks.Clear();
 forwardedHeadersOptions.KnownProxies.Clear();

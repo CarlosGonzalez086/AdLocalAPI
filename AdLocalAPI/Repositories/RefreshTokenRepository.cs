@@ -32,6 +32,7 @@ namespace AdLocalAPI.Repositories
         public async Task<RefreshToken?> ObtenerPorHashConUsuarioAsync(string tokenHash)
         {
             return await _context.RefreshTokens
+                .AsTracking()
                 .Include(r => r.Usuario)
                 .FirstOrDefaultAsync(r => r.TokenHash == tokenHash);
         }
@@ -92,9 +93,9 @@ namespace AdLocalAPI.Repositories
                 usuario.TokensRevocadosAntesDe = ahora;
             }
 
-            TokenSecurityValidator.InvalidarCacheUsuario(_cache, usuarioId);
-
             await _context.SaveChangesAsync();
+
+            TokenSecurityValidator.InvalidarCacheUsuario(_cache, usuarioId);
         }
     }
 }

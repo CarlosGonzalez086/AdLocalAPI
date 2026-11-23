@@ -5,6 +5,7 @@ using AdLocalAPI.Controllers;
 using AdLocalAPI.Data;
 using AdLocalAPI.DTOs;
 using AdLocalAPI.Helpers;
+using AdLocalAPI.Middlewares;
 using AdLocalAPI.Interfaces;
 using AdLocalAPI.Interfaces.Repository;
 using AdLocalAPI.Interfaces.Services;
@@ -19,7 +20,9 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
@@ -312,5 +315,68 @@ public class P2ClosureSecurityAndBillingTests
 
         var res = await service.CancelarPlan();
         Assert.Equal("400", res.Codigo);
+    }
+
+    [Fact]
+    public async Task GlobalExceptionMiddleware_SanitizaErrorInterno500EnProduccion()
+    {
+        var prodEnv = new Mock<IWebHostEnvironment>();
+        prodEnv.SetupGet(e => e.EnvironmentName).Returns(Environments.Production);
+
+        var middleware = new GlobalExceptionMiddleware(
+            _ => throw new Exception("DetalleSQLPrivado_TablaX"),
+            NullLogger<GlobalExceptionMiddleware>.Instance,
+            prodEnv.Object);
+
+        var ctx = new DefaultHttpContext();
+        ctx.Response.Body = new MemoryStream();
+        await middleware.InvokeAsync(ctx);
+
+        ctx.Response.Body.Position = 0;
+        var body = await new StreamReader(ctx.Response.Body).ReadToEndAsync();
+        Assert.Equal(500, ctx.Response.StatusCode);
+        Assert.DoesNotContain("DetalleSQLPrivado_TablaX", body);
+    }
+
+    [Fact]
+    public async Task RefreshTokenRepository_ObtenerPorHashConUsuario_HabilitaTrackingParaRotacion()
+    {
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        await using var db = new AppDbContext(options);
+
+        var user = new Usuario { Id = 88, Nombre = "User", Email = "u88@adlocal.store", PasswordHash = "h", Rol = "Cliente" };
+        db.Usuarios.Add(user);
+        db.RefreshTokens.Add(new RefreshToken
+        {
+            Id = 1,
+            UsuarioId = 88,
+            TokenHash = "hash-88",
+            ExpiresAt = DateTime.UtcNow.AddDays(10)
+        });
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+
+        var repo = new RefreshTokenRepository(db, new MemoryCache(new MemoryCacheOptions()));
+        var loaded = await repo.ObtenerPorHashConUsuarioAsync("hash-88");
+
+        Assert.NotNull(loaded);
+        Assert.NotEmpty(db.ChangeTracker.Entries<RefreshToken>());
+    }
+
+    [Fact]
+    public void ProgramCs_ExigeWebhookSecretEnProduccionYForwardLimitUno()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "AdLocalAPI", "Program.cs")))
+        {
+            dir = dir.Parent;
+        }
+
+        Assert.NotNull(dir);
+        var program = File.ReadAllText(Path.Combine(dir!.FullName, "AdLocalAPI", "Program.cs"));
+        Assert.DoesNotContain("//if (builder.Environment.IsProduction())", program);
+        Assert.Contains("ForwardLimit = 1", program);
     }
 }
