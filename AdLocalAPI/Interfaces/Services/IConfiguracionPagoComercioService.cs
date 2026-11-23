@@ -6,11 +6,12 @@ namespace AdLocalAPI.Services.Interfaces
     public interface IConfiguracionPagoComercioService
     {
         Task<ApiResponse<ConfiguracionPagoComercioResponseDto?>>
-            Obtener();
+            Obtener(long comercioId = 0);
 
         Task<ApiResponse<ConfiguracionPagoComercioResponseDto>>
             Guardar(
-                ConfiguracionPagoComercioDto dto
+                ConfiguracionPagoComercioDto dto,
+                long comercioId = 0
             );
     }
 }

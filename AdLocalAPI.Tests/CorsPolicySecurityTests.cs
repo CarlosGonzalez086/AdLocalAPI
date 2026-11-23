@@ -39,10 +39,23 @@ namespace AdLocalAPI.Tests
         [InlineData("https://adlocal-preview-branch.vercel.app")]
         [InlineData("https://staging-panel.vercel.app")]
         [InlineData("https://adlocal-worker.workers.dev")]
-        public void IsOriginAllowed_PreviewDeployments_Allowed(string origin)
+        [InlineData("http://adlocal.store")]
+        [InlineData("http://panel.adlocal.store")]
+        public void IsOriginAllowed_WildcardHostingAndInsecureProduction_Rejected(string origin)
         {
             var isAllowed = CorsSecurityPolicy.IsOriginAllowed(origin, _explicitOrigins);
-            Assert.True(isAllowed);
+            Assert.False(isAllowed);
+        }
+
+        [Fact]
+        public void IsOriginAllowed_ExplicitConfiguredOrigin_Allowed()
+        {
+            var originsWithPreview = new[]
+            {
+                "https://adlocal.store",
+                "https://ad-local-gamma.vercel.app"
+            };
+            Assert.True(CorsSecurityPolicy.IsOriginAllowed("https://ad-local-gamma.vercel.app", originsWithPreview));
         }
 
         [Theory]

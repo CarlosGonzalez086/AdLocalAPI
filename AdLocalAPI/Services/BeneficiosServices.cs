@@ -37,6 +37,12 @@ namespace AdLocalAPI.Services
             if (usuario == null)
                 return ApiResponse<object>.Error("404", "Usuario no encontrado");
 
+            if (usuario.RedeemRewards)
+                return ApiResponse<object>.Error(
+                    "400",
+                    "El beneficio por referidos ya fue reclamado anteriormente"
+                );
+
             if (string.IsNullOrWhiteSpace(usuario.CodigoReferido))
                 return ApiResponse<object>.Error(
                     "400",
@@ -49,7 +55,7 @@ namespace AdLocalAPI.Services
             if (totalUsos < 10)
                 return ApiResponse<object>.Error(
                     "400",
-                    $"Beneficio no disponible. Referidos actuales: {totalUsos} / 15"
+                    $"Beneficio no disponible. Referidos actuales: {totalUsos} / 10"
                 );
 
             var subscription = await _suscripcionRepository
@@ -57,11 +63,30 @@ namespace AdLocalAPI.Services
 
             if (subscription == null || subscription.Plan.Tipo == "FREE")
             {
+                if (string.IsNullOrWhiteSpace(usuario.StripeCustomerId))
+                {
+                    return ApiResponse<object>.Error(
+                        "400",
+                        "Debes completar tu perfil de facturación en Stripe antes de activar el beneficio"
+                    );
+                }
+
                 await CrearPlanBasicoGratis(usuario);
+
+                usuario.RedeemRewards = true;
+                await _usuarioRepository.UpdateAsync(usuario);
 
                 return ApiResponse<object>.Success(
                     null,
                     "Beneficio aplicado correctamente. Se activó el plan básico gratuito"
+                );
+            }
+
+            if (string.IsNullOrWhiteSpace(subscription.StripeSubscriptionId) || !subscription.CurrentPeriodEnd.HasValue)
+            {
+                return ApiResponse<object>.Error(
+                    "400",
+                    "La suscripción activa no es elegible para extensión automática"
                 );
             }
 

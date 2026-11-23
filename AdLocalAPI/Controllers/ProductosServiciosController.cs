@@ -10,6 +10,7 @@ namespace AdLocalAPI.Controllers
 
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Roles = "Comercio,Colaborador")]
     public class ProductosServiciosController : ApiControllerBase
     {
         private readonly IProductosServiciosService _service;

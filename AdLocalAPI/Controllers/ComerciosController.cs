@@ -22,7 +22,7 @@ namespace AdLocalAPI.Controllers
         public async Task<IActionResult> ZonaHoraria(long id, [FromBody] ComercioZonaHorariaDto dto, CancellationToken ct = default) =>
             Responder(await _service.ActualizarZonaHorariaAsync(id, dto, ct));
 
-        [Authorize]
+        [Authorize(Roles = "Comercio")]
         [HttpPost]
         public async Task<IActionResult> Crear([FromBody] ComercioCreateDto dto)
         {
@@ -30,7 +30,7 @@ namespace AdLocalAPI.Controllers
             return Responder(response);
         }
 
-        [Authorize]
+        [Authorize(Roles = "Comercio,Colaborador")]
         [HttpPut]
         public async Task<IActionResult> Actualizar([FromBody] ComercioUpdateDto dto)
         {
@@ -38,7 +38,7 @@ namespace AdLocalAPI.Controllers
             return Responder(response);
         }
 
-        [Authorize]
+        [Authorize(Roles = "Comercio")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> Eliminar(long id)
         {
@@ -53,7 +53,7 @@ namespace AdLocalAPI.Controllers
             return Responder(response);
         }
 
-        [Authorize]
+        [Authorize(Roles = "Comercio,Colaborador")]
         [HttpGet("mine")]
         public async Task<IActionResult> GetMine()
         {
@@ -61,7 +61,7 @@ namespace AdLocalAPI.Controllers
             return Responder(response);
         }
 
-        [Authorize]
+        [Authorize(Roles = "Comercio,Colaborador")]
         [HttpGet("getTotalComerciosByIdUsuario")]
         public async Task<IActionResult> GeTotalComerciosByIdUsuario()
         {
@@ -104,7 +104,8 @@ namespace AdLocalAPI.Controllers
             [FromQuery] long idTipoComercio = 0,
             [FromQuery] string orden = "alfabetico",
             [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 8)
+            [FromQuery] int pageSize = 8,
+            [FromQuery] string search = "")
         {
             var response = await _service.GetByFiltros(
                 estadoId,
@@ -112,13 +113,14 @@ namespace AdLocalAPI.Controllers
                 idTipoComercio,
                 orden,
                 page,
-                pageSize
+                pageSize,
+                search
             );
 
             return Responder(response);
         }
 
-        [Authorize]
+        [Authorize(Roles = "Comercio")]
         [HttpGet("getAllComerciosByUser")]
         public async Task<IActionResult> GetAllComerciosByUser(
             int page = 1,

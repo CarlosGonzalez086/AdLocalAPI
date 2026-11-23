@@ -1,7 +1,9 @@
 using System.Threading.Tasks;
 using AdLocalAPI.DTOs;
 using AdLocalAPI.Interfaces.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace AdLocalAPI.Controllers
 {
@@ -16,6 +18,8 @@ namespace AdLocalAPI.Controllers
             _service = service;
         }
 
+        [Authorize]
+        [EnableRateLimiting("auth")]
         [HttpPost]
         public async Task<IActionResult> Crear([FromBody] CalificacionComentarioCreateDto dto)
         {

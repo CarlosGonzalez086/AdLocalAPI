@@ -24,7 +24,7 @@ namespace AdLocalAPI.Controllers
             return Responder(response);
         }
 
-        [Authorize]
+        [Authorize(Roles = "Comercio,Colaborador,Admin")]
         [HttpGet("{comercioId}/stats")]
         public async Task<IActionResult> GetStats(long comercioId)
         {

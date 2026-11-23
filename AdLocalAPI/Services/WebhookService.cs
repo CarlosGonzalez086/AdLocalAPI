@@ -71,6 +71,14 @@ namespace AdLocalAPI.Services
                 return ApiResponse<object>.Success(new { status = "already_processed" }, "Evento ya procesado previamente.");
             }
 
+            if (eventoExistente != null &&
+                eventoExistente.Status == "processing" &&
+                eventoExistente.ReceivedAt > DateTime.UtcNow.AddMinutes(-5))
+            {
+                _logger.LogWarning("Evento Stripe {EventId} [{EventType}] ya está en procesamiento concurrente.", stripeEvent.Id, stripeEvent.Type);
+                return ApiResponse<object>.Error("409", "Evento Stripe en procesamiento concurrente.");
+            }
+
             if (eventoExistente == null)
             {
                 eventoExistente = new StripeWebhookEvent
@@ -81,6 +89,30 @@ namespace AdLocalAPI.Services
                     ReceivedAt = DateTime.UtcNow
                 };
                 await _webhookEventRepo.CrearAsync(eventoExistente);
+            }
+            else
+            {
+                eventoExistente.Status = "processing";
+                eventoExistente.ReceivedAt = DateTime.UtcNow;
+                await _webhookEventRepo.ActualizarAsync(eventoExistente);
+            }
+
+            // Prefetch de Stripe fuera de la transacción de PostgreSQL para no mantener bloqueos durante I/O remoto.
+            Subscription? prefetchedStripeSub = null;
+            if (stripeEvent.Type == "invoice.payment_succeeded")
+            {
+                var invoice = (Invoice)stripeEvent.Data.Object;
+                var subId = ExtraerSubscriptionId(invoice);
+                if (!string.IsNullOrEmpty(subId))
+                {
+                    var subService = new SubscriptionService();
+                    prefetchedStripeSub = await subService.GetAsync(
+                        subId,
+                        new SubscriptionGetOptions
+                        {
+                            Expand = new List<string> { "items.data.price" }
+                        });
+                }
             }
 
             // 2. Procesamiento transaccional
@@ -94,7 +126,7 @@ namespace AdLocalAPI.Services
                         break;
 
                     case "invoice.payment_succeeded":
-                        await OnInvoicePaymentSucceeded((Invoice)stripeEvent.Data.Object);
+                        await OnInvoicePaymentSucceeded((Invoice)stripeEvent.Data.Object, prefetchedStripeSub);
                         break;
 
                     case "invoice.payment_failed":
@@ -181,7 +213,7 @@ namespace AdLocalAPI.Services
         // =================================================
         // 2️ Pago exitoso: AQUÍ nacen las fechas
         // =================================================
-        private async Task OnInvoicePaymentSucceeded(Invoice invoice)
+        private async Task OnInvoicePaymentSucceeded(Invoice invoice, Subscription? stripeSub)
         {
             if (invoice?.Lines?.Data == null || !invoice.Lines.Data.Any())
                 return;
@@ -197,14 +229,6 @@ namespace AdLocalAPI.Services
                 _logger.LogWarning("No se encontró usuario para Stripe Customer {CustomerId}", invoice.CustomerId);
                 return;
             }
-
-            var subService = new SubscriptionService();
-            var stripeSub = await subService.GetAsync(
-                subscriptionId,
-                new SubscriptionGetOptions
-                {
-                    Expand = new List<string> { "items.data.price" }
-                });
 
             if (stripeSub?.Items?.Data == null || !stripeSub.Items.Data.Any())
                 return;
@@ -346,6 +370,10 @@ namespace AdLocalAPI.Services
                 if (planFree == null || user == null)
                     return;
 
+                var activaExistente = await _suscripcionRepo.GetActivaByUsuarioAsync(user.Id);
+                if (activaExistente != null && activaExistente.Plan?.Tipo == "FREE")
+                    return;
+
                 await _suscripcionRepo.CrearAsync(new Suscripcion
                 {
                     UsuarioId = user.Id,
@@ -374,21 +402,25 @@ namespace AdLocalAPI.Services
 
             if (planFree != null)
             {
-                await _suscripcionRepo.CrearAsync(new Suscripcion
+                var activaRestante = await _suscripcionRepo.GetActivaByUsuarioAsync(sub.UsuarioId);
+                if (activaRestante == null || activaRestante.Plan?.Tipo != "FREE")
                 {
-                    UsuarioId = sub.UsuarioId,
-                    PlanId = planFree.Id,
-                    CurrentPeriodStart = DateTime.UtcNow,
-                    CurrentPeriodEnd = DateTime.MaxValue,
-                    Status = "active",
-                    IsActive = true,
-                    AutoRenew = false,
-                    CreatedAt = DateTime.UtcNow,
-                    StripeCustomerId = string.Empty,
-                    StripeSubscriptionId = string.Empty,
-                    StripePriceId = string.Empty,
-                    StripeCheckoutSessionId = string.Empty,
-                });
+                    await _suscripcionRepo.CrearAsync(new Suscripcion
+                    {
+                        UsuarioId = sub.UsuarioId,
+                        PlanId = planFree.Id,
+                        CurrentPeriodStart = DateTime.UtcNow,
+                        CurrentPeriodEnd = DateTime.MaxValue,
+                        Status = "active",
+                        IsActive = true,
+                        AutoRenew = false,
+                        CreatedAt = DateTime.UtcNow,
+                        StripeCustomerId = string.Empty,
+                        StripeSubscriptionId = string.Empty,
+                        StripePriceId = string.Empty,
+                        StripeCheckoutSessionId = string.Empty,
+                    });
+                }
             }
 
             _logger.LogInformation("Suscripción {SubId} cancelada y plan FREE asignado", stripeSub.Id);

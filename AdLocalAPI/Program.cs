@@ -55,9 +55,6 @@ ConfiguracionSegura.CargarLocal(
 // Las variables de entorno tienen la última prioridad en la API.
 builder.Configuration.AddEnvironmentVariables();
 
-//Singlenton variable
-builder.Services.AddSingleton<StripeSettings>();
-
 // ======================================================
 // VARIABLES DE ENTORNO (Docker / Producción / Local)
 // ======================================================
@@ -80,8 +77,12 @@ var jwtAudience = Environment.GetEnvironmentVariable("JWT__Audience")
     ?? builder.Configuration["Jwt:Audience"]
     ?? "AdLocal";
 
-//var webhookSecret = ConfiguracionSegura.Requerir(Environment.GetEnvironmentVariable("STRIPE_WEBHOOK_SECRET")
-//    ?? builder.Configuration["Stripe:WebhookSecret"], "STRIPE_WEBHOOK_SECRET / Stripe__WebhookSecret");
+var webhookSecret = Environment.GetEnvironmentVariable("STRIPE_WEBHOOK_SECRET")
+    ?? builder.Configuration["Stripe:WebhookSecret"];
+if (builder.Environment.IsProduction())
+{
+    webhookSecret = ConfiguracionSegura.Requerir(webhookSecret, "STRIPE_WEBHOOK_SECRET / Stripe__WebhookSecret");
+}
 
 // PostgreSQL / Supabase
 var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION")
@@ -97,7 +98,10 @@ if (string.IsNullOrWhiteSpace(connectionString))
 builder.Configuration["Jwt:Key"] = jwtKey;
 builder.Configuration["Jwt:Issuer"] = jwtIssuer;
 builder.Configuration["Jwt:Audience"] = jwtAudience;
-//builder.Configuration["Stripe:WebhookSecret"] = webhookSecret;
+if (!string.IsNullOrWhiteSpace(webhookSecret))
+{
+    builder.Configuration["Stripe:WebhookSecret"] = webhookSecret;
+}
 
 Stripe.StripeConfiguration.ApiKey =
    builder.Configuration["Stripe:SecretKey"];
@@ -130,12 +134,19 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    options.AddFixedWindowLimiter("auth", opt =>
+    options.AddPolicy("auth", httpContext =>
     {
-        opt.PermitLimit = 10;
-        opt.Window = TimeSpan.FromMinutes(1);
-        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
-        opt.QueueLimit = 2;
+        var ip = httpContext.Connection.RemoteIpAddress?.ToString();
+        var partitionKey = !string.IsNullOrWhiteSpace(ip) ? ip : "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey,
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 2
+            });
     });
 });
 
@@ -245,9 +256,6 @@ builder.Services.AddScoped<ICalificacionComentarioRepository, CalificacionComent
 builder.Services.AddScoped<CalificacionComentarioRepository>();
 builder.Services.AddScoped<ICalificacionComentarioService, CalificacionComentarioService>();
 builder.Services.AddScoped<CalificacionComentarioService>();
-
-builder.Services.AddSingleton<StripeConfigProvider>();
-builder.Services.AddSingleton<ClavesConfigProvider>();
 
 
 builder.Services.AddScoped<IEmailService, EmailService>();

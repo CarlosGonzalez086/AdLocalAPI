@@ -6,6 +6,7 @@ using AdLocalAPI.Helpers;
 using AdLocalAPI.Interfaces.ProductosServicios;
 using AdLocalAPI.Models;
 using AdLocalAPI.Repositories;
+using AdLocalAPI.Repositories.Interfaces;
 using FluentValidation;
 
 namespace AdLocalAPI.Services
@@ -13,6 +14,7 @@ namespace AdLocalAPI.Services
     public partial class ProductosServiciosService : IProductosServiciosService
     {
         private readonly IProductosServiciosRepository _repository;
+        private readonly IComercioRepository _comercioRepository;
         private readonly JwtContext _jwtContext;
         private readonly SuscripcionRepository _suscripcionRepository;
         private readonly UsuarioRepository _usuarioRepository;
@@ -20,20 +22,90 @@ namespace AdLocalAPI.Services
 
         public ProductosServiciosService(
             IProductosServiciosRepository repository,
+            IComercioRepository comercioRepository,
             JwtContext jwtContext,
             SuscripcionRepository suscripcionRepository,
             UsuarioRepository usuarioRepository,
             IValidator<ProductosServiciosDto> validator)
         {
             _repository = repository;
+            _comercioRepository = comercioRepository;
             _jwtContext = jwtContext;
             _validator = validator;
             _suscripcionRepository = suscripcionRepository;
             _usuarioRepository = usuarioRepository;
         }
 
+        private async Task<(bool Ok, long UserId, long ComercioId, string Codigo, string Mensaje)> ResolverComercioAutorizadoAsync(
+            long comercioSolicitadoId,
+            bool requierePlanColaborador)
+        {
+            if (!_jwtContext.EstaAutenticado())
+            {
+                return (false, 0, 0, "401", "Usuario no autenticado.");
+            }
+
+            var rol = _jwtContext.GetUserRole();
+            long idComercio = comercioSolicitadoId == 0 ? _jwtContext.GetComercioId() : comercioSolicitadoId;
+
+            if (idComercio <= 0)
+            {
+                return (false, 0, 0, "900", "Debes registrar un comercio o negocio antes de realizar esta acción.");
+            }
+
+            var comercio = await _comercioRepository.GetByIdAsync(idComercio);
+            if (comercio == null)
+            {
+                return (false, 0, 0, "404", "Comercio no encontrado.");
+            }
+
+            if (rol == "Colaborador")
+            {
+                if (idComercio != _jwtContext.GetComercioId())
+                {
+                    return (false, 0, 0, "403", "No tienes permiso para acceder a otro comercio.");
+                }
+
+                var usuario = await _usuarioRepository.GetByIdComercioAsync(idComercio);
+                if (usuario == null)
+                {
+                    return (false, 0, 0, "404", "No se encontró el comercio asociado al colaborador.");
+                }
+
+                if (requierePlanColaborador)
+                {
+                    var planActivo = await _suscripcionRepository.GetActivaByUsuarioAsync(usuario.Id);
+                    if (planActivo?.Plan == null || planActivo.Plan.Tipo == "BASIC" || planActivo.Plan.Tipo == "FREE")
+                    {
+                        return (false, 0, 0, "400", "El dueño del negocio necesita actualizar su suscripción para que puedas usar las funciones de colaborador.");
+                    }
+                }
+
+                return (true, usuario.Id, idComercio, "200", string.Empty);
+            }
+
+            if (rol == "Comercio")
+            {
+                long callerId = _jwtContext.GetUserId();
+                if (comercio.IdUsuario != callerId)
+                {
+                    return (false, 0, 0, "403", "No tienes permiso para acceder o modificar productos de este comercio.");
+                }
+
+                return (true, callerId, idComercio, "200", string.Empty);
+            }
+
+            return (false, 0, 0, "403", "No tienes permiso para gestionar productos o servicios.");
+        }
+
         public async Task<ApiResponse<IEnumerable<ProductosServiciosDto>>> GetAllAsync(long idComercio)
         {
+            var auth = await ResolverComercioAutorizadoAsync(idComercio, requierePlanColaborador: false);
+            if (!auth.Ok)
+            {
+                return ApiResponse<IEnumerable<ProductosServiciosDto>>.Error(auth.Codigo, auth.Mensaje);
+            }
+
             if (!_jwtContext.PermiteCatalogo())
             {
                 return ApiResponse<IEnumerable<ProductosServiciosDto>>
@@ -43,7 +115,7 @@ namespace AdLocalAPI.Services
                     );
             }
 
-            var list = await _repository.GetAllAsync(idComercio);
+            var list = await _repository.GetAllAsync(auth.ComercioId);
             int maxProductos = _jwtContext.GetMaxProductos();
 
             var query = list.Where(x => x.Activo && !x.Eliminado);
@@ -87,31 +159,13 @@ namespace AdLocalAPI.Services
 
         public async Task<ApiResponse<ProductosServiciosDto>> GetByIdAsync(long id)
         {
-            long userId = 0;
-            if (_jwtContext.GetUserRole() == "Colaborador")
+            var auth = await ResolverComercioAutorizadoAsync(0, requierePlanColaborador: true);
+            if (!auth.Ok)
             {
-                var usuario = await _usuarioRepository.GetByIdComercioAsync(_jwtContext.GetComercioId());
-                if (usuario == null)
-                {
-                    return ApiResponse<ProductosServiciosDto>.Error("404", "No se encontró el comercio asociado al colaborador.");
-                }
-                userId = usuario.Id;
-                var planActivo = await _suscripcionRepository.GetActivaByUsuarioAsync(userId);
-                if (planActivo?.Plan == null || planActivo.Plan.Tipo == "BASIC" || planActivo.Plan.Tipo == "FREE")
-                {
-                    return ApiResponse<ProductosServiciosDto>.Error(
-                       "400",
-                       "El dueño del negocio necesita actualizar su suscripción para que puedas usar las funciones de colaborador."
-                    );
-                }
-            }
-            else
-            {
-                userId = _jwtContext.GetUserId();
+                return ApiResponse<ProductosServiciosDto>.Error(auth.Codigo, auth.Mensaje);
             }
 
-            long idComercio = _jwtContext.GetComercioId();
-            var entity = await _repository.GetByIdAsync(id, idComercio, userId);
+            var entity = await _repository.GetByIdAsync(id, auth.ComercioId, auth.UserId);
 
             if (entity == null)
                 return ApiResponse<ProductosServiciosDto>.Error("404", "Producto/Servicio no encontrado");
@@ -133,24 +187,14 @@ namespace AdLocalAPI.Services
         public async Task<ApiResponse<PagedResponse<ProductosServiciosDto>>> GetAllPagedAsync(
             int page = 1, int pageSize = 10, string orderBy = "recent", string search = "", long idComercio = 0)
         {
-            long userId = 0;
-            if (_jwtContext.GetUserRole() == "Colaborador")
+            var auth = await ResolverComercioAutorizadoAsync(idComercio, requierePlanColaborador: false);
+            if (!auth.Ok)
             {
-                var usuario = await _usuarioRepository.GetByIdComercioAsync(_jwtContext.GetComercioId());
-                if (usuario == null)
-                {
-                    return ApiResponse<PagedResponse<ProductosServiciosDto>>.NotFound("No se encontró el comercio asociado al colaborador.");
-                }
-                userId = usuario.Id;
-            }
-            else
-            {
-                userId = _jwtContext.GetUserId();
+                return ApiResponse<PagedResponse<ProductosServiciosDto>>.Error(auth.Codigo, auth.Mensaje);
             }
 
             int maxProductos = _jwtContext.GetMaxProductos();
-            idComercio = idComercio == 0 ? _jwtContext.GetComercioId() : idComercio;
-            return await _repository.GetAllPagedAsync(userId, idComercio, page, pageSize, orderBy, search, maxProductos);
+            return await _repository.GetAllPagedAsync(auth.UserId, auth.ComercioId, page, pageSize, orderBy, search, maxProductos);
         }
     }
 }

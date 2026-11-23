@@ -24,6 +24,7 @@ namespace AdLocalAPI.Controllers
             return Responder(response);
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpGet("contar")]
         public async Task<IActionResult> ContarPorCodigo([FromQuery] string codigo)
         {
@@ -31,6 +32,7 @@ namespace AdLocalAPI.Controllers
             return Responder(response);
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpGet("total")]
         public async Task<IActionResult> TotalUsos()
         {

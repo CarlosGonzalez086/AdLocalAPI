@@ -36,6 +36,16 @@ namespace AdLocalAPI.Services
         {
             try
             {
+                if (!_jwtContext.EstaAutenticado())
+                {
+                    return ApiResponse<object>.Error("401", "No autenticado.");
+                }
+
+                if (!_jwtContext.EsComercio())
+                {
+                    return ApiResponse<object>.Error("403", "Solo las cuentas de tipo Comercio pueden registrar un negocio.");
+                }
+
                 long idUser = _jwtContext.GetUserId();
                 string planTipo = _jwtContext.GetPlanTipo();
                 if (planTipo != "PRO" && planTipo != "BUSINESS")
@@ -55,7 +65,7 @@ namespace AdLocalAPI.Services
                 {
                     int maxNegocios = _jwtContext.GetMaxNegocios();
                     List<Comercio> totalNegocios = await _repository.GetAllComerciosByIdUsuario(idUser);
-                    if (maxNegocios == totalNegocios.Count)
+                    if (maxNegocios <= totalNegocios.Count)
                     {
                         return ApiResponse<object>.Error(
                             "409",
@@ -250,7 +260,16 @@ namespace AdLocalAPI.Services
                 long userId = 0;
                 if (_jwtContext.GetUserRole() == "Colaborador")
                 {
-                    var usuario = await _usuarioRepository.GetByIdComercioAsync(_jwtContext.GetComercioId());                    
+                    var comercioAsignadoId = _jwtContext.GetComercioId();
+                    if (comercio.Id != comercioAsignadoId)
+                    {
+                        return ApiResponse<object>.Error(
+                            "403",
+                            "No tienes permiso para modificar este comercio"
+                        );
+                    }
+
+                    var usuario = await _usuarioRepository.GetByIdComercioAsync(comercioAsignadoId);                    
                     if (usuario == null)
                     {
                         return ApiResponse<object>.Error(
@@ -434,62 +453,6 @@ namespace AdLocalAPI.Services
                 return ApiResponse<object>.Error(
                     "500",
                     "Ocurrió un error al actualizar el comercio"
-                );
-            }
-        }
-
-        public async Task<ApiResponse<object>> DeleteComercio(long id)
-        {
-            try
-            {
-                var comercio = await _repository.GetByIdAsync(id);
-
-                if (comercio == null)
-                    return ApiResponse<object>.Error(
-                        "404",
-                        "Comercio no encontrado"
-                    );
-
-                long userId = _jwtContext.GetUserId();
-                if (comercio.IdUsuario != userId)
-                {
-                    return ApiResponse<object>.Error(
-                        "403",
-                        "No tienes permiso para eliminar este comercio"
-                    );
-                }
-
-                if (!string.IsNullOrWhiteSpace(comercio.LogoUrl))
-                {
-                    await _repository.DeleteFromS3Async(comercio.LogoUrl);
-                }
-                var listaImagenes = await _comercioImagenRepositorio.ObtenerPorComercio(comercio.Id);
-                if (listaImagenes.Count > 0)
-                {
-                    foreach (var img in listaImagenes)
-                    {
-                        await _comercioImagenRepositorio
-                            .Eliminar(comercio.Id, img.FotoUrl);
-                    }
-                }
-                bool siTiene = await _horarioComercioRepository.ComercioTieneHorariosAsync(comercio.Id);
-                if (siTiene)
-                {
-                    await _horarioComercioRepository.EliminarHorariosPorComercioAsync(comercio.Id);
-                }
-
-                await _repository.DeleteAsync(id);
-
-                return ApiResponse<object>.Success(
-                    null,
-                    "El comercio se eliminó correctamente"
-                );
-            }
-            catch
-            {
-                return ApiResponse<object>.Error(
-                    "500",
-                    "Ocurrió un error al eliminar el comercio"
                 );
             }
         }

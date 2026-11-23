@@ -370,3 +370,5 @@ secrets-migration.private.json
 !.env.example
 
 .checkout-postgres/
+.idea/
+.checkout-test-tmp/

@@ -158,10 +158,11 @@ namespace AdLocalAPI.Services
                 var listaProductos = await _productosServiciosRepository.GetAllAsync(id);
                 int MaxProductos = plan?.MaxProductos ?? 10;
                 List<ProductosServicios> productos = new List<ProductosServicios>();
-                if (plan?.PermiteCatalogo == true) 
+                if (plan?.PermiteCatalogo == true)
                 {
-                    listaProductos = listaProductos.Take(MaxProductos);
-                    listaProductos = listaProductos.Where(c => c.Activo);
+                    listaProductos = listaProductos
+                        .Where(c => c.Activo)
+                        .Take(MaxProductos);
 
                     if (listaProductos.Count() > 0)
                     {
@@ -377,7 +378,8 @@ namespace AdLocalAPI.Services
             long idTipoComercio,
             string orden,
             int page,
-            int pageSize
+            int pageSize,
+            string search = ""
         )
         {
             try
@@ -388,7 +390,8 @@ namespace AdLocalAPI.Services
                     idTipoComercio,
                     orden,
                     page,
-                    pageSize
+                    pageSize,
+                    search
                 );
 
                 return ApiResponse<object>.Success(

@@ -32,33 +32,15 @@ namespace AdLocalAPI.Services
 
         public async Task<ApiResponse<ProductosServiciosDto>> CreateAsync(ProductosServiciosDto dto)
         {
-            long userId = 0;
-
-            if (_jwtContext.GetUserRole() == "Colaborador")
+            var auth = await ResolverComercioAutorizadoAsync(dto.IdComercio, requierePlanColaborador: true);
+            if (!auth.Ok)
             {
-                var usuario = await _usuarioRepository.GetByIdComercioAsync(_jwtContext.GetComercioId());
-                if (usuario == null)
-                {
-                    return ApiResponse<ProductosServiciosDto>.Error("404", "No se encontró el comercio asociado al colaborador.");
-                }
-                userId = usuario.Id;
-
-                var planActivo = await _suscripcionRepository.GetActivaByUsuarioAsync(userId);
-                if (planActivo?.Plan == null || planActivo.Plan.Tipo == "BASIC" || planActivo.Plan.Tipo == "FREE")
-                {
-                    return ApiResponse<ProductosServiciosDto>.Error(
-                        "400",
-                        "El dueño del negocio necesita actualizar su suscripción para que puedas usar las funciones de colaborador."
-                    );
-                }
-            }
-            else
-            {
-                userId = _jwtContext.GetUserId();
+                return ApiResponse<ProductosServiciosDto>.Error(auth.Codigo, auth.Mensaje);
             }
 
+            long userId = auth.UserId;
+            long idComercio = auth.ComercioId;
             int maxProductos = _jwtContext.GetMaxProductos();
-            long idComercio = dto.IdComercio == 0 ? _jwtContext.GetComercioId() : dto.IdComercio;
 
             var validationResult = await _validator.ValidateAsync(dto);
             if (!validationResult.IsValid)
@@ -68,14 +50,6 @@ namespace AdLocalAPI.Services
 
             try
             {
-                if (idComercio == 0)
-                {
-                    return ApiResponse<ProductosServiciosDto>.Error(
-                        "900",
-                        "Debes registrar un comercio o negocio antes de agregar un producto o servicio."
-                    );
-                }
-
                 var list = await _repository.GetAllAsync(idComercio);
                 if (list.Count() >= maxProductos)
                 {
@@ -200,32 +174,14 @@ namespace AdLocalAPI.Services
 
         public async Task<ApiResponse<bool>> UpdateAsync(long id, ProductosServiciosDto dto)
         {
-            long userId = 0;
-
-            if (_jwtContext.GetUserRole() == "Colaborador")
+            var auth = await ResolverComercioAutorizadoAsync(dto.IdComercio, requierePlanColaborador: true);
+            if (!auth.Ok)
             {
-                var usuario = await _usuarioRepository.GetByIdComercioAsync(_jwtContext.GetComercioId());
-                if (usuario == null)
-                {
-                    return ApiResponse<bool>.Error("404", "No se encontró el comercio asociado al colaborador.");
-                }
-                userId = usuario.Id;
-
-                var planActivo = await _suscripcionRepository.GetActivaByUsuarioAsync(userId);
-                if (planActivo?.Plan == null || planActivo.Plan.Tipo == "BASIC" || planActivo.Plan.Tipo == "FREE")
-                {
-                    return ApiResponse<bool>.Error(
-                        "400",
-                        "El dueño del negocio necesita actualizar su suscripción para que puedas usar las funciones de colaborador."
-                    );
-                }
-            }
-            else
-            {
-                userId = _jwtContext.GetUserId();
+                return ApiResponse<bool>.Error(auth.Codigo, auth.Mensaje);
             }
 
-            long idComercio = dto.IdComercio == 0 ? _jwtContext.GetComercioId() : dto.IdComercio;
+            long userId = auth.UserId;
+            long idComercio = auth.ComercioId;
             var entity = await _repository.GetByIdAsync(id, idComercio, userId);
 
             if (entity == null)
@@ -344,31 +300,13 @@ namespace AdLocalAPI.Services
 
         public async Task<ApiResponse<bool>> DeleteAsync(long id, long idComercio)
         {
-            long userId = 0;
-            if (_jwtContext.GetUserRole() == "Colaborador")
+            var auth = await ResolverComercioAutorizadoAsync(idComercio, requierePlanColaborador: true);
+            if (!auth.Ok)
             {
-                var usuario = await _usuarioRepository.GetByIdComercioAsync(_jwtContext.GetComercioId());
-                if (usuario == null)
-                {
-                    return ApiResponse<bool>.Error("404", "No se encontró el comercio asociado al colaborador.");
-                }
-                userId = usuario.Id;
-                var planActivo = await _suscripcionRepository.GetActivaByUsuarioAsync(userId);
-                if (planActivo?.Plan == null || planActivo.Plan.Tipo == "BASIC" || planActivo.Plan.Tipo == "FREE")
-                {
-                    return ApiResponse<bool>.Error(
-                       "400",
-                       "El dueño del negocio necesita actualizar su suscripción para que puedas usar las funciones de colaborador."
-                   );
-                }
-            }
-            else
-            {
-                userId = _jwtContext.GetUserId();
+                return ApiResponse<bool>.Error(auth.Codigo, auth.Mensaje);
             }
 
-            idComercio = idComercio == 0 ? _jwtContext.GetComercioId() : idComercio;
-            var entity = await _repository.GetByIdAsync(id, idComercio, userId);
+            var entity = await _repository.GetByIdAsync(id, auth.ComercioId, auth.UserId);
 
             if (entity == null)
                 return ApiResponse<bool>.Error("404", "Producto/Servicio no encontrado");
@@ -392,31 +330,13 @@ namespace AdLocalAPI.Services
 
         public async Task<ApiResponse<bool>> DesactivarAsync(long id, long idComercio)
         {
-            long userId = 0;
-            if (_jwtContext.GetUserRole() == "Colaborador")
+            var auth = await ResolverComercioAutorizadoAsync(idComercio, requierePlanColaborador: true);
+            if (!auth.Ok)
             {
-                var usuario = await _usuarioRepository.GetByIdComercioAsync(_jwtContext.GetComercioId());
-                if (usuario == null)
-                {
-                    return ApiResponse<bool>.Error("404", "No se encontró el comercio asociado al colaborador.");
-                }
-                userId = usuario.Id;
-                var planActivo = await _suscripcionRepository.GetActivaByUsuarioAsync(userId);
-                if (planActivo?.Plan == null || planActivo.Plan.Tipo == "BASIC" || planActivo.Plan.Tipo == "FREE")
-                {
-                    return ApiResponse<bool>.Error(
-                       "400",
-                       "El dueño del negocio necesita actualizar su suscripción para que puedas usar las funciones de colaborador."
-                   );
-                }
-            }
-            else
-            {
-                userId = _jwtContext.GetUserId();
+                return ApiResponse<bool>.Error(auth.Codigo, auth.Mensaje);
             }
 
-            idComercio = idComercio == 0 ? _jwtContext.GetComercioId() : idComercio;
-            var entity = await _repository.GetByIdAsync(id, idComercio, userId);
+            var entity = await _repository.GetByIdAsync(id, auth.ComercioId, auth.UserId);
 
             if (entity == null)
                 return ApiResponse<bool>.Error("404", "Producto/Servicio no encontrado");

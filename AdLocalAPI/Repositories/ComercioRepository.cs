@@ -539,7 +539,8 @@ namespace AdLocalAPI.Repositories
             long idTipoComercio,
             string orden,
             int page,
-            int pageSize
+            int pageSize,
+            string search = ""
         )
         {
             var hoy = DateTime.UtcNow.Date;
@@ -548,35 +549,66 @@ namespace AdLocalAPI.Repositories
             if (pageSize < 1) pageSize = 8;
             if (pageSize > 50) pageSize = 50;
 
-            var suscripciones = await _context.Suscripcions
-                .Where(s =>
-                    s.IsActive &&
-                    !s.IsDeleted &&
-                    s.CurrentPeriodEnd > hoy &&
-                    (s.Plan.Tipo == "FREE" || s.Plan.Tipo == "BASIC" ||
-                     s.Plan.Tipo == "PRO" || s.Plan.Tipo == "BUSINESS")
-                )
-                .Select(s => new
-                {
-                    s.UsuarioId,
-                    s.CurrentPeriodEnd,
-                    s.Plan.BadgeTexto,
-                    s.Plan.Tipo
-                })
+            IQueryable<Comercio> comerciosQuery = _context.Comercios
+                .AsNoTracking()
+                .Where(c => c.Activo && c.Visible);
+
+            if (estadoId != 0)
+                comerciosQuery = comerciosQuery.Where(c => c.EstadoId == estadoId);
+
+            if (municipioId != 0)
+                comerciosQuery = comerciosQuery.Where(c => c.MunicipioId == municipioId);
+
+            if (idTipoComercio != 0)
+                comerciosQuery = comerciosQuery.Where(c => c.TipoComercioId == idTipoComercio);
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim().ToLowerInvariant();
+                comerciosQuery = comerciosQuery.Where(c =>
+                    c.Nombre.ToLower().Contains(term) ||
+                    (c.Descripcion != null && c.Descripcion.ToLower().Contains(term)) ||
+                    (c.Direccion != null && c.Direccion.ToLower().Contains(term)) ||
+                    (c.Municipio != null && c.Municipio.MunicipioNombre.ToLower().Contains(term)) ||
+                    (c.Estado != null && c.Estado.EstadoNombre.ToLower().Contains(term))
+                );
+            }
+
+            var comercios = await comerciosQuery
+                .Include(c => c.Estado)
+                .Include(c => c.Municipio)
+                .Include(c => c.CalificacionesComentarios)
                 .ToListAsync();
+
+            var usuarioIds = comercios.Select(c => c.IdUsuario).Distinct().ToList();
+
+            var suscripciones = usuarioIds.Count == 0
+                ? new List<(long UsuarioId, DateTime? CurrentPeriodEnd, string? BadgeTexto, string Tipo)>()
+                : (await _context.Suscripcions
+                    .AsNoTracking()
+                    .Where(s =>
+                        usuarioIds.Contains(s.UsuarioId) &&
+                        s.IsActive &&
+                        !s.IsDeleted &&
+                        s.CurrentPeriodEnd > hoy &&
+                        (s.Plan.Tipo == "FREE" || s.Plan.Tipo == "BASIC" ||
+                         s.Plan.Tipo == "PRO" || s.Plan.Tipo == "BUSINESS")
+                    )
+                    .Select(s => new
+                    {
+                        s.UsuarioId,
+                        s.CurrentPeriodEnd,
+                        s.Plan.BadgeTexto,
+                        s.Plan.Tipo
+                    })
+                    .ToListAsync())
+                    .Select(s => (s.UsuarioId, s.CurrentPeriodEnd, s.BadgeTexto, Tipo: s.Tipo ?? "FREE"))
+                    .ToList();
 
             var suscripcionesVigentes = suscripciones
                 .GroupBy(s => s.UsuarioId)
                 .Select(g => g.OrderByDescending(x => x.CurrentPeriodEnd).First())
                 .ToList();
-
-            IQueryable<Comercio> comerciosQuery = _context.Comercios
-                .Where(c => c.Activo)
-                .Include(c => c.Estado)
-                .Include(c => c.Municipio)
-                .Include(c => c.CalificacionesComentarios);
-
-            var comercios = await comerciosQuery.ToListAsync();
 
             var query =
                 from c in comercios
@@ -589,14 +621,6 @@ namespace AdLocalAPI.Repositories
                     Suscripcion = suscripcion
                 };
 
-            if (estadoId != 0)
-                query = query.Where(x => x.Comercio.EstadoId == estadoId);
-
-            if (municipioId != 0)
-                query = query.Where(x => x.Comercio.MunicipioId == municipioId);
-            if (idTipoComercio != 0)
-                query = query.Where(x => x.Comercio.TipoComercioId == idTipoComercio);
-
             var lista = query
                 .Select(x => new ComercioPublicDto
                 {
@@ -607,15 +631,15 @@ namespace AdLocalAPI.Repositories
                     Telefono = x.Comercio.Telefono,
                     Email = x.Comercio.Email,
                     LogoUrl = x.Comercio.LogoUrl,
-                    Lat = x.Comercio.Ubicacion!.Y,
-                    Lng = x.Comercio.Ubicacion!.X,
+                    Lat = x.Comercio.Ubicacion != null ? x.Comercio.Ubicacion.Y : 0,
+                    Lng = x.Comercio.Ubicacion != null ? x.Comercio.Ubicacion.X : 0,
                     ColorPrimario = x.Comercio.ColorPrimario,
                     ColorSecundario = x.Comercio.ColorSecundario,
-                    Badge = x.Suscripcion?.BadgeTexto ?? "",
-                    PlanTipo = x.Suscripcion?.Tipo,
-                    SuscripcionVigente = x.Suscripcion != null,
-                    EstadoNombre = x.Comercio.Estado.EstadoNombre ?? "",
-                    MunicipioNombre = x.Comercio.Municipio.MunicipioNombre ?? "",
+                    Badge = x.Suscripcion.BadgeTexto ?? "",
+                    PlanTipo = x.Suscripcion.Tipo,
+                    SuscripcionVigente = x.Suscripcion.UsuarioId != 0,
+                    EstadoNombre = x.Comercio.Estado?.EstadoNombre ?? "",
+                    MunicipioNombre = x.Comercio.Municipio?.MunicipioNombre ?? "",
                     PromedioCalificacion = x.Comercio.CalificacionesComentarios.Any()
                         ? x.Comercio.CalificacionesComentarios.Average(cc => cc.Calificacion)
                         : 0,

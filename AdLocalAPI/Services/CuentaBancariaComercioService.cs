@@ -9,27 +9,52 @@ namespace AdLocalAPI.Services
     public class CuentaBancariaComercioService : ICuentaBancariaComercioService
     {
         private readonly ICuentaBancariaComercioRepository _repository;
+        private readonly IComercioRepository _comercioRepository;
         private readonly JwtContext _jwtContext;
 
         public CuentaBancariaComercioService(
             ICuentaBancariaComercioRepository repository,
+            IComercioRepository comercioRepository,
             JwtContext jwtContext)
         {
             _repository = repository;
+            _comercioRepository = comercioRepository;
             _jwtContext = jwtContext;
         }
 
-        public async Task<ApiResponse<IEnumerable<CuentaBancariaComercioResponseDto>>> ObtenerTodas()
+        private async Task<(bool Ok, long IdComercio, string Codigo, string Mensaje)> ResolverComercioPropioAsync(long comercioIdSolicitado)
+        {
+            if (!_jwtContext.EstaAutenticado())
+                return (false, 0, "401", "Usuario no autenticado.");
+
+            if (!_jwtContext.EsComercio())
+                return (false, 0, "403", "Solo las cuentas de comercio pueden administrar cuentas bancarias.");
+
+            var idComercio = comercioIdSolicitado > 0 ? comercioIdSolicitado : _jwtContext.GetComercioId();
+            if (idComercio <= 0)
+                return (false, 0, "400", "No se encontró un comercio asociado.");
+
+            var comercio = await _comercioRepository.GetByIdAsync(idComercio);
+            if (comercio == null)
+                return (false, 0, "404", "Comercio no encontrado.");
+
+            if (comercio.IdUsuario != _jwtContext.GetUserId())
+                return (false, 0, "403", "No tienes permiso para gestionar cuentas de este comercio.");
+
+            return (true, idComercio, "200", string.Empty);
+        }
+
+        public async Task<ApiResponse<IEnumerable<CuentaBancariaComercioResponseDto>>> ObtenerTodas(long comercioId = 0)
         {
             try
             {
-                var idComercio = _jwtContext.GetComercioId();
-                if (idComercio <= 0)
+                var auth = await ResolverComercioPropioAsync(comercioId);
+                if (!auth.Ok)
                 {
-                    return ApiResponse<IEnumerable<CuentaBancariaComercioResponseDto>>.Error("400", "No se encontró un comercio asociado.");
+                    return ApiResponse<IEnumerable<CuentaBancariaComercioResponseDto>>.Error(auth.Codigo, auth.Mensaje);
                 }
 
-                var cuentas = await _repository.ObtenerTodasAsync(idComercio);
+                var cuentas = await _repository.ObtenerTodasAsync(auth.IdComercio);
                 var result = cuentas.Select(Mapear);
 
                 return ApiResponse<IEnumerable<CuentaBancariaComercioResponseDto>>.Success(result, "Cuentas obtenidas correctamente.");
@@ -40,15 +65,17 @@ namespace AdLocalAPI.Services
             }
         }
 
-        public async Task<ApiResponse<CuentaBancariaComercioResponseDto>> Crear(CuentaBancariaComercioCreateDto dto)
+        public async Task<ApiResponse<CuentaBancariaComercioResponseDto>> Crear(CuentaBancariaComercioCreateDto dto, long comercioId = 0)
         {
             try
             {
-                var idComercio = _jwtContext.GetComercioId();
-                if (idComercio <= 0)
+                var auth = await ResolverComercioPropioAsync(comercioId);
+                if (!auth.Ok)
                 {
-                    return ApiResponse<CuentaBancariaComercioResponseDto>.Error("400", "No se encontró un comercio asociado.");
+                    return ApiResponse<CuentaBancariaComercioResponseDto>.Error(auth.Codigo, auth.Mensaje);
                 }
+
+                var idComercio = auth.IdComercio;
 
                 var validacion = ValidarCuenta(dto.Banco, dto.Beneficiario, dto.NumeroCuenta, dto.Clabe, dto.NumeroTarjeta);
                 if (validacion != null)
@@ -88,11 +115,17 @@ namespace AdLocalAPI.Services
             }
         }
 
-        public async Task<ApiResponse<bool>> Actualizar(Guid uuid, CuentaBancariaComercioUpdateDto dto)
+        public async Task<ApiResponse<bool>> Actualizar(Guid uuid, CuentaBancariaComercioUpdateDto dto, long comercioId = 0)
         {
             try
             {
-                var idComercio = _jwtContext.GetComercioId();
+                var auth = await ResolverComercioPropioAsync(comercioId);
+                if (!auth.Ok)
+                {
+                    return ApiResponse<bool>.Error(auth.Codigo, auth.Mensaje);
+                }
+
+                var idComercio = auth.IdComercio;
                 if (uuid == Guid.Empty)
                 {
                     return ApiResponse<bool>.Error("400", "La cuenta es requerida.");
@@ -134,11 +167,17 @@ namespace AdLocalAPI.Services
             }
         }
 
-        public async Task<ApiResponse<bool>> Eliminar(Guid uuid)
+        public async Task<ApiResponse<bool>> Eliminar(Guid uuid, long comercioId = 0)
         {
             try
             {
-                var idComercio = _jwtContext.GetComercioId();
+                var auth = await ResolverComercioPropioAsync(comercioId);
+                if (!auth.Ok)
+                {
+                    return ApiResponse<bool>.Error(auth.Codigo, auth.Mensaje);
+                }
+
+                var idComercio = auth.IdComercio;
                 var cuenta = await _repository.ObtenerPorUuidAsync(idComercio, uuid);
                 if (cuenta == null)
                 {
@@ -171,11 +210,17 @@ namespace AdLocalAPI.Services
             }
         }
 
-        public async Task<ApiResponse<bool>> EstablecerPrincipal(Guid uuid)
+        public async Task<ApiResponse<bool>> EstablecerPrincipal(Guid uuid, long comercioId = 0)
         {
             try
             {
-                var idComercio = _jwtContext.GetComercioId();
+                var auth = await ResolverComercioPropioAsync(comercioId);
+                if (!auth.Ok)
+                {
+                    return ApiResponse<bool>.Error(auth.Codigo, auth.Mensaje);
+                }
+
+                var idComercio = auth.IdComercio;
                 var cuenta = await _repository.ObtenerPorUuidAsync(idComercio, uuid);
                 if (cuenta == null)
                 {

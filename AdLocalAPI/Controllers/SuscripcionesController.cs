@@ -32,6 +32,7 @@ namespace AdLocalAPI.Controllers
         return Responder(response);
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<IActionResult> GetAll(
         [FromQuery] int page = 1,
@@ -41,6 +42,7 @@ namespace AdLocalAPI.Controllers
         return Responder(response);
     }
 
+    [Authorize(Roles = "Admin")]
     [HttpGet("suscripciones-stats")]
     public async Task<IActionResult> SuscripcionesStats()
     {

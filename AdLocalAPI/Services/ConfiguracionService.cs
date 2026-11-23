@@ -19,6 +19,37 @@ namespace AdLocalAPI.Services
             _repository = repository;
             _emailService = emailService;
         }
+        private const string PrefijoMascaraSecreto = "••••";
+
+        private static readonly HashSet<string> ClavesSecretas = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ConfiguracionKeys.StripeSecretKey,
+            ConfiguracionKeys.EmailKey,
+            ConfiguracionKeys.Ip2LocationKey
+        };
+
+        private static string EnmascararSecreto(string? valor)
+        {
+            if (string.IsNullOrWhiteSpace(valor))
+                return string.Empty;
+
+            var limpio = valor.Trim();
+            return limpio.Length > 4
+                ? $"{PrefijoMascaraSecreto}{limpio[^4..]}"
+                : PrefijoMascaraSecreto;
+        }
+
+        private static ConfiguracionSistema SanitizarParaCliente(ConfiguracionSistema item) =>
+            new()
+            {
+                Id = item.Id,
+                Key = item.Key,
+                Descripcion = item.Descripcion,
+                Tipo = item.Tipo,
+                Val = ClavesSecretas.Contains(item.Key) ? EnmascararSecreto(item.Val) : item.Val,
+                Actualizado = item.Actualizado
+            };
+
         public async Task<ApiResponse<ConfiguracionSistema>> CrearOActualizarAsync(ConfiguracionSistemaDto dto)
         {
             if (!ConfiguracionSistemaDictionary.Data.ContainsKey(dto.Key))
@@ -31,6 +62,17 @@ namespace AdLocalAPI.Services
 
             var meta = ConfiguracionSistemaDictionary.Data[dto.Key];
             var existente = await _repository.ObtenerPorKeyAsync(dto.Key);
+
+            // Si es una clave secreta y llega vacía o con la máscara sin editar, conservar el secreto actual.
+            if (ClavesSecretas.Contains(dto.Key) &&
+                existente != null &&
+                (string.IsNullOrWhiteSpace(dto.Val) || dto.Val.StartsWith(PrefijoMascaraSecreto, StringComparison.Ordinal)))
+            {
+                return ApiResponse<ConfiguracionSistema>.Success(
+                    SanitizarParaCliente(existente),
+                    "Configuración guardada correctamente"
+                );
+            }
 
             ConfiguracionSistema resultado;
 
@@ -53,14 +95,15 @@ namespace AdLocalAPI.Services
             }
 
             return ApiResponse<ConfiguracionSistema>.Success(
-                resultado,
+                SanitizarParaCliente(resultado),
                 "Configuración guardada correctamente"
             );
         }
         public async Task<ApiResponse<List<ConfiguracionSistema>>> ObtenerTodosAsync()
         {
             var lista = await _repository.ObtenerTodosAsync();
-            return ApiResponse<List<ConfiguracionSistema>>.Success(lista);
+            var sanitizada = lista.Select(SanitizarParaCliente).ToList();
+            return ApiResponse<List<ConfiguracionSistema>>.Success(sanitizada);
         }
         public async Task<ApiResponse<List<ConfiguracionSistema>>> RegistrarStripeAsync(StripeConfiguracionDto dto)
         {
