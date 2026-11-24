@@ -379,4 +379,82 @@ public class P2ClosureSecurityAndBillingTests
         Assert.DoesNotContain("//if (builder.Environment.IsProduction())", program);
         Assert.Contains("ForwardLimit = 1", program);
     }
+
+    [Fact]
+    public void StripeYFacturacionControllers_RestringenRolComercio()
+    {
+        var stripeAttr = typeof(StripeController).GetCustomAttribute<AuthorizeAttribute>();
+        Assert.NotNull(stripeAttr);
+        Assert.Equal("Comercio", stripeAttr!.Roles);
+
+        var tarjetasAttr = typeof(TarjetasController).GetCustomAttribute<AuthorizeAttribute>();
+        Assert.NotNull(tarjetasAttr);
+        Assert.Equal("Comercio", tarjetasAttr!.Roles);
+
+        var miSusc = typeof(SuscripcionesController).GetMethod(nameof(SuscripcionesController.MiSuscripcion))!
+            .GetCustomAttribute<AuthorizeAttribute>();
+        Assert.NotNull(miSusc);
+        Assert.Equal("Comercio", miSusc!.Roles);
+
+        var reconciliar = typeof(SuscripcionesController).GetMethod(nameof(SuscripcionesController.ReconciliarMiSuscripcion))!
+            .GetCustomAttribute<AuthorizeAttribute>();
+        Assert.NotNull(reconciliar);
+        Assert.Equal("Comercio", reconciliar!.Roles);
+    }
+
+    [Fact]
+    public async Task UsuarioService_ActualizarUsuario_RechazaCorreoDuplicadoYReseteaVerificacion()
+    {
+        var dbOptions = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        using var db = new AppDbContext(dbOptions);
+        var userRepo = new Mock<IUsuarioRepository>();
+        var actual = new Usuario
+        {
+            Id = 55,
+            Nombre = "Ana",
+            Email = "ana@adlocal.store",
+            EmailVerificado = true,
+            Rol = "Cliente",
+            Activo = true
+        };
+        userRepo.Setup(r => r.GetByIdAsync(55)).ReturnsAsync(actual);
+        userRepo.Setup(r => r.ExistePorCorreoAsync("admin@adlocal.store")).ReturnsAsync(true);
+        userRepo.Setup(r => r.ExistePorCorreoAsync("ana.nueva@adlocal.store")).ReturnsAsync(false);
+
+        var rfService = new RefreshTokenService(
+            new RefreshTokenRepository(db, new MemoryCache(new MemoryCacheOptions())),
+            NullLogger<RefreshTokenService>.Instance);
+
+        var accessor = new HttpContextAccessor
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("id", "55"), new Claim("rol", "Cliente")], "Test"))
+            }
+        };
+
+        var service = new UsuarioService(
+            userRepo.Object,
+            new ConfigurationBuilder().Build(),
+            new JwtContext(accessor),
+            Mock.Of<IComercioRepository>(),
+            Mock.Of<IEmailService>(),
+            Mock.Of<IWebHostEnvironment>(),
+            Mock.Of<ISuscripcionRepository>(),
+            Mock.Of<IPlanRepository>(),
+            Mock.Of<IUsoCodigoReferidoRepository>(),
+            rfService,
+            accessor);
+
+        var dup = await service.ActualizarUsuario(new UsuarioUpdateDto { Nombre = "Ana", Email = "admin@adlocal.store" });
+        Assert.Equal("409", dup.Codigo);
+        Assert.True(actual.EmailVerificado);
+
+        var ok = await service.ActualizarUsuario(new UsuarioUpdateDto { Nombre = "Ana Nueva", Email = "ANA.NUEVA@adlocal.store" });
+        Assert.Equal("200", ok.Codigo);
+        Assert.Equal("ana.nueva@adlocal.store", actual.Email);
+        Assert.False(actual.EmailVerificado);
+    }
 }

@@ -25,6 +25,7 @@ namespace AdLocalAPI.Controllers
         _jwtContext = jwtContext;
     }
 
+    [Authorize(Roles = "Comercio")]
     [HttpGet("mi-suscripcion")]
     public async Task<IActionResult> MiSuscripcion()
     {
@@ -50,6 +51,7 @@ namespace AdLocalAPI.Controllers
         return Responder(response);
     }
 
+    [Authorize(Roles = "Comercio")]
     [HttpPost("reconciliar")]
     public async Task<IActionResult> ReconciliarMiSuscripcion()
     {

@@ -277,10 +277,39 @@ namespace AdLocalAPI.Services
             if (usuario == null)
                 return ApiResponse<object>.Error("404", "Usuario no encontrado");
 
-            bool emailCambiado = !string.IsNullOrWhiteSpace(dto.Email) && !dto.Email.Trim().Equals(usuario.Email, StringComparison.OrdinalIgnoreCase);
+            if (string.IsNullOrWhiteSpace(dto.Nombre))
+                return ApiResponse<object>.Error("400", "El nombre es obligatorio");
 
-            usuario.Nombre = dto.Nombre;
-            usuario.Email = dto.Email;
+            var emailNormalizado = (dto.Email ?? string.Empty).Trim().ToLowerInvariant();
+            if (string.IsNullOrWhiteSpace(emailNormalizado))
+                return ApiResponse<object>.Error("400", "El correo electrónico es obligatorio");
+
+            bool emailValido;
+            try
+            {
+                var parsed = new System.Net.Mail.MailAddress(emailNormalizado);
+                emailValido = parsed.Address.Equals(emailNormalizado, StringComparison.OrdinalIgnoreCase) &&
+                              emailNormalizado.Contains('.');
+            }
+            catch
+            {
+                emailValido = false;
+            }
+
+            if (!emailValido)
+                return ApiResponse<object>.Error("400", "El correo electrónico no tiene un formato válido");
+
+            bool emailCambiado = !emailNormalizado.Equals(usuario.Email, StringComparison.OrdinalIgnoreCase);
+
+            if (emailCambiado && await _repository.ExistePorCorreoAsync(emailNormalizado))
+                return ApiResponse<object>.Error("409", "El correo electrónico ya está registrado.");
+
+            usuario.Nombre = dto.Nombre.Trim();
+            usuario.Email = emailNormalizado;
+            if (emailCambiado)
+            {
+                usuario.EmailVerificado = false;
+            }
 
             await _repository.UpdateAsync(usuario);
 

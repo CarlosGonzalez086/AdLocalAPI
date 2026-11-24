@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AdLocalAPI.Controllers
 {
-    [Authorize]
+    [Authorize(Roles = "Comercio")]
     [ApiController]
     [Route("api/[controller]")]
     public class TarjetasController : ApiControllerBase

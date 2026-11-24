@@ -159,16 +159,18 @@ namespace AdLocalAPI.Services
 
         public async Task<ApiResponse<ProductosServiciosDto>> GetByIdAsync(long id)
         {
-            var auth = await ResolverComercioAutorizadoAsync(0, requierePlanColaborador: true);
+            var entity = await _repository.ObtenerPorIdAsync(id);
+            if (entity == null)
+                return ApiResponse<ProductosServiciosDto>.Error("404", "Producto/Servicio no encontrado");
+
+            var auth = await ResolverComercioAutorizadoAsync(entity.IdComercio, requierePlanColaborador: false);
             if (!auth.Ok)
             {
                 return ApiResponse<ProductosServiciosDto>.Error(auth.Codigo, auth.Mensaje);
             }
 
-            var entity = await _repository.GetByIdAsync(id, auth.ComercioId, auth.UserId);
-
-            if (entity == null)
-                return ApiResponse<ProductosServiciosDto>.Error("404", "Producto/Servicio no encontrado");
+            if (entity.IdUsuario != auth.UserId)
+                return ApiResponse<ProductosServiciosDto>.Error("403", "No tienes permiso para consultar este producto/servicio");
 
             var dto = new ProductosServiciosDto
             {

@@ -241,14 +241,14 @@ namespace AdLocalAPI.Services
 
             if (sub == null)
             {
-                await DesactivarSuscripcionesPreviasAsync(user.Id);
-
                 var plan = await _planRepo.GetByStripePriceIdAsync(priceId);
                 if (plan == null)
                 {
                     _logger.LogWarning("No se encontró plan para PriceId {PriceId}", priceId);
                     return;
                 }
+
+                await DesactivarSuscripcionesPreviasAsync(user.Id);
 
                 await _suscripcionRepo.CrearAsync(new Suscripcion
                 {
@@ -384,7 +384,7 @@ namespace AdLocalAPI.Services
                     return;
 
                 var activaExistente = await _suscripcionRepo.GetActivaByUsuarioAsync(user.Id);
-                if (activaExistente != null && activaExistente.Plan?.Tipo == "FREE")
+                if (activaExistente != null)
                     return;
 
                 await _suscripcionRepo.CrearAsync(new Suscripcion
@@ -416,7 +416,7 @@ namespace AdLocalAPI.Services
             if (planFree != null)
             {
                 var activaRestante = await _suscripcionRepo.GetActivaByUsuarioAsync(sub.UsuarioId);
-                if (activaRestante == null || activaRestante.Plan?.Tipo != "FREE")
+                if (activaRestante == null)
                 {
                     await _suscripcionRepo.CrearAsync(new Suscripcion
                     {

@@ -146,8 +146,8 @@ namespace AdLocalAPI.Services
 
                 if (dto.Imagenes?.Count > 0)
                 {
-                    int maxFotos = _jwtContext.GetMaxFotos();
-                    var imagenesPermitidas = maxFotos > 0 ? dto.Imagenes.Take(maxFotos) : dto.Imagenes;
+                    int maxFotos = await ResolverMaxFotosAsync(idUser);
+                    var imagenesPermitidas = maxFotos > 0 ? dto.Imagenes.Take(maxFotos) : Enumerable.Empty<string>();
                     foreach (var item in imagenesPermitidas)
                     {
                         if (!MediaBase64Validator.TryDecodeValidatedImage(
@@ -194,10 +194,26 @@ namespace AdLocalAPI.Services
             }
         }
 
+        private async Task<int> ResolverMaxFotosAsync(long userId)
+        {
+            var suscripcionActiva = await _suscripcionRepository.GetActivaByUsuarioAsync(userId);
+            if (suscripcionActiva?.Plan != null)
+            {
+                return Math.Max(0, suscripcionActiva.Plan.MaxFotos);
+            }
+
+            return Math.Max(0, _jwtContext.GetMaxFotos());
+        }
+
         public async Task<ApiResponse<object>> UpdateComercio(ComercioUpdateDto dto)
         {
             try
             {
+                if (!_jwtContext.EstaAutenticado())
+                {
+                    return ApiResponse<object>.Error("401", "No autenticado.");
+                }
+
                 long idComercio = dto.Id == 0 ? _jwtContext.GetComercioId() : dto.Id;
                 var comercio = await _repository.GetByIdAsync(idComercio);
 
@@ -349,23 +365,22 @@ namespace AdLocalAPI.Services
 
                 if (dto.Imagenes?.Count > 0)
                 {
+                    int maxFotos = await ResolverMaxFotosAsync(userId);
                     var imagenesActuales = await _comercioImagenRepositorio.ObtenerPorComercio(comercio.Id);
-                    var urlsRecibidas = dto.Imagenes.Where(x => !string.IsNullOrWhiteSpace(x) && EsUrl(x)).ToList();
-                    foreach (var img in imagenesActuales)
-                    {
-                        if (!urlsRecibidas.Contains(img.FotoUrl))
-                        {
-                            await _comercioImagenRepositorio.Eliminar(comercio.Id, img.FotoUrl);
-                        }
-                    }
+                    var urlsPermitidas = dto.Imagenes
+                        .Where(x => !string.IsNullOrWhiteSpace(x) && EsUrl(x))
+                        .Take(maxFotos)
+                        .ToList();
 
-                    foreach (var item in dto.Imagenes)
+                    var cupoNuevas = Math.Max(0, maxFotos - urlsPermitidas.Count);
+                    var nuevasImagenes = dto.Imagenes
+                        .Where(x => !string.IsNullOrWhiteSpace(x) && !EsUrl(x))
+                        .Take(cupoNuevas);
+
+                    foreach (var item in nuevasImagenes)
                     {
                         try
                         {
-                            if (string.IsNullOrWhiteSpace(item))
-                                continue;
-
                             if (MediaBase64Validator.TryDecodeValidatedImage(
                                     item,
                                     out byte[] imageBytes,
@@ -387,6 +402,14 @@ namespace AdLocalAPI.Services
                         catch (Exception)
                         {
                             continue;
+                        }
+                    }
+
+                    foreach (var img in imagenesActuales)
+                    {
+                        if (!urlsPermitidas.Contains(img.FotoUrl))
+                        {
+                            await _comercioImagenRepositorio.Eliminar(comercio.Id, img.FotoUrl);
                         }
                     }
                 }

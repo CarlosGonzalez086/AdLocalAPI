@@ -8,7 +8,7 @@ namespace AdLocalAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
+    [Authorize(Roles = "Comercio")]
     public class StripeController : ApiControllerBase
     {
         private readonly IStripeService _stripe;
